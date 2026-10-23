@@ -1608,7 +1608,7 @@ body:not(.is-phone) .goguryeo-right-toggle {
    Obsidian's own [+] [N tabs] [Done] row ---- */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar {
     z-index: calc(var(--layer-modal) + 1);
-    margin-bottom: calc(var(--navbar-bottom-offset) + 56px);
+    margin-bottom: calc(var(--navbar-bottom-offset) + var(--navbar-height) + 12px);
 }
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action {
@@ -1635,6 +1635,91 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switc
     content: "Search files";
     font-size: var(--font-ui-small);
     color: var(--text-muted);
+}
+
+/* The overview itself: tab cards on the darker canvas, the current one
+   ringed in the accent, and a round glass × at each card's top-left */
+body.is-phone {
+    --tab-switcher-background: var(--g-split-canvas);
+    --tab-switcher-menubar-background: transparent;
+    --tab-switcher-preview-radius: 20px;
+    --tab-switcher-preview-shadow-active: 0 0 0 2px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7),
+        0 0 0 6px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+}
+
+/* Room at the bottom so the search pill and the buttons never cover a card */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-scroll {
+    padding-bottom: calc(var(--navbar-bottom-offset) + var(--navbar-height) * 2 + 36px);
+}
+
+body.is-phone .mobile-tab .close-button {
+    inset-inline-end: auto;
+    inset-inline-start: var(--size-4-2);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-color: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+/* A soft frosted band behind the search pill and the buttons */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher::before {
+    content: "";
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--navbar-bottom-offset) + var(--navbar-height) * 2 + 60px);
+    background-color: color-mix(in srgb, var(--g-split-canvas) 55%, transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    -webkit-mask-image: linear-gradient(to top, #000 70%, transparent);
+    mask-image: linear-gradient(to top, #000 70%, transparent);
+    pointer-events: none;
+}
+
+/* ( + )   ( 2 tabs ⌄ )   ( Done ) — the same height as the main bar */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menubar {
+    z-index: 2;
+    padding: 0 var(--g-phone-side) calc(var(--navbar-bottom-offset) - 2px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
+        .mobile-tab-switcher-menu-spacer:first-child .clickable-icon,
+        .mobile-tab-switcher-menu-button,
+        .mobile-tab-switcher-menu-spacer:last-child .clickable-icon
+    ) {
+    height: var(--navbar-height);
+    box-sizing: border-box;
+    border-radius: 999px;
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-phone-glass-shadow);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menu-spacer:first-child .clickable-icon {
+    width: var(--navbar-height);
+    padding: 0;
+    justify-content: center;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menu-button {
+    padding: 0 18px;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menu-spacer:last-child .clickable-icon {
+    padding: 0 22px;
+    font-weight: var(--font-semibold);
+    color: var(--text-on-accent);
+    background-color: var(--interactive-accent);
+    background-image: none;
 }
 
 
