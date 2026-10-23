@@ -864,6 +864,113 @@ body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscr
     margin-top: var(--g-row2-top);
 }
 
+/* Split screen (2+ panes; the companion plugin sets body.goguryeo-split):
+     [◧] [‹ ›]      ( path of the current pane )      [actions] [+] [⌄] [◨]
+     ╭─ ( tabs ) ─────╮  ╭─ ( tabs ) ─────╮
+     │  pane          │  │  pane          │
+   One shared toolbar across the note area — the current pane's own note
+   header — and each pane a card with its tab row; the current pane gets
+   an accent edge. */
+.theme-dark {
+    --g-split-canvas: #131315;
+    --g-pane-border: rgba(255, 255, 255, 0.16);
+}
+
+.theme-light {
+    --g-split-canvas: #ebebef;
+    --g-pane-border: rgba(0, 0, 0, 0.14);
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-split-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px);
+    --g-split-inset: 0px;
+    --g-split-rt: 0px;
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards):has(.mod-root .sidebar-toggle-button.mod-right) {
+    --g-split-rt: calc(var(--g-row-btn) + 6px);
+}
+
+body.goguryeo-split.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscreen):has(.mod-root .goguryeo-last-pane.mod-top-right-space) {
+    --g-split-inset: calc(var(--frame-right-space) + 18px - var(--g-gap));
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root {
+    padding-inline: 5px;
+    background-color: var(--g-split-canvas);
+}
+
+/* Panes as cards; their tab row sits inside, at the top */
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    --g-row2-top: 6px;
+    --g-bar-offset: calc(var(--g-row2-top) + var(--g-row2-h) + 8px);
+    width: auto;
+    height: auto;
+    margin: var(--g-split-top) 5px var(--g-gap);
+    border: 1.5px solid var(--g-pane-border);
+    border-radius: 16px;
+    background-color: var(--background-primary);
+    box-shadow: var(--g-panel-shadow);
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane {
+    border-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.62);
+    box-shadow: 0 0 0 4px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.12), var(--g-panel-shadow);
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    left: 6px;
+    right: 6px;
+}
+
+/* The shared toolbar: only the current pane's note header shows, pinned
+   across the note area. Obsidian walls each pane in (contain: strict
+   !important); keep size containment but drop layout/paint containment so
+   the header can sit outside its pane. */
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf {
+    contain: size style !important;
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-current-pane) .workspace-leaf-content > .view-header {
+    display: none;
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane .workspace-leaf-content > .view-header {
+    position: fixed;
+    top: var(--g-row1-top);
+    left: calc(var(--g-root-left) + var(--g-gap) + var(--g-row-btn) + 6px);
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt) + (var(--g-row-btn) + 6px) * 2);
+}
+
+/* Its buttons: ◧ at the far left; ⌄, + and ◨ at the far right (only the
+   top-right pane's own + and ⌄ show) */
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    position: fixed;
+    top: var(--g-row1-top);
+    left: auto;
+    right: auto;
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-left {
+    left: calc(var(--g-root-left) + var(--g-gap));
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-right {
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset));
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-tab-list {
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt));
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt) + var(--g-row-btn) + 6px);
+}
+
+body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-last-pane) > .workspace-tab-header-container > :is(.workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    display: none;
+}
+
 body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
     height: 100%;
     padding-top: var(--g-bar-offset);
@@ -1043,7 +1150,7 @@ body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-head
 
 .is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-left-space > .workspace-tab-header-container {
     padding: 3px;
-    margin-inline-start: var(--frame-left-space);
+    margin-inline-start: calc(8px + var(--frame-left-space));
 }
 
 .is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-right-space > .workspace-tab-header-container::after {

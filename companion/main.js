@@ -22,6 +22,9 @@ const OPEN_CLASS = "goguryeo-touch-active";
 const THUMB_CLASS = "goguryeo-glass-thumbs";
 const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
+const SPLIT_CLASS = "goguryeo-split";
+const CURRENT_PANE_CLASS = "goguryeo-current-pane";
+const LAST_PANE_CLASS = "goguryeo-last-pane";
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 
 module.exports = class GoguryeoCompanion extends Plugin {
@@ -130,6 +133,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.registerEvent(this.app.workspace.on(name, () => this.scheduleThumbs()));
         }
         this.registerDomEvent(window, "resize", () => this.scheduleThumbs());
+        if (this.app.workspace.rootSplit) this.resizeObserver.observe(this.app.workspace.rootSplit.containerEl);
         this.scheduleThumbs();
     }
 
@@ -144,6 +148,53 @@ module.exports = class GoguryeoCompanion extends Plugin {
     removeThumbs() {
         document.body.removeClass(THUMB_CLASS);
         document.querySelectorAll(".goguryeo-tab-thumb").forEach((el) => el.remove());
+        this.clearSplit();
+    }
+
+    // ---- Split screen: one shared toolbar over all panes ----
+
+    // With 2+ panes the theme shows only the current pane's note header, as
+    // a toolbar across the whole note area. It needs to know that the screen
+    // is split, where the note area is, which pane is current (the one whose
+    // path shows, even while a sidebar has focus) and which pane is the
+    // top-right one (it holds + and the tab list).
+    updateSplit() {
+        const { rootSplit } = this.app.workspace;
+        // Count panes from Obsidian's layout, not the page: a split animation
+        // briefly leaves an extra copy of a pane in the page
+        const panes = [];
+        const collect = (node) => node?.children?.forEach((child) => {
+            if (child.type === "tabs") panes.push(child.containerEl);
+            else if (child.type === "split") collect(child);
+        });
+        collect(rootSplit);
+        if (!Platform.isDesktopApp || panes.length < 2) {
+            this.clearSplit();
+            return;
+        }
+        const body = document.body;
+        const r = rootSplit.containerEl.getBoundingClientRect();
+        body.addClass(SPLIT_CLASS);
+        body.style.setProperty("--g-root-left", `${r.left}px`);
+        body.style.setProperty("--g-root-right", `${window.innerWidth - r.right}px`);
+
+        const currentEl = this.app.workspace.getMostRecentLeaf(rootSplit)?.parent?.containerEl;
+        const topPanes = panes.filter((el) => el.hasClass("mod-top"));
+        const lastTop = topPanes[topPanes.length - 1];
+        for (const el of panes) {
+            el.toggleClass(CURRENT_PANE_CLASS, el === currentEl);
+            el.toggleClass(LAST_PANE_CLASS, el === lastTop);
+        }
+    }
+
+    clearSplit() {
+        const body = document.body;
+        body.removeClass(SPLIT_CLASS);
+        body.style.removeProperty("--g-root-left");
+        body.style.removeProperty("--g-root-right");
+        document.querySelectorAll(`.${CURRENT_PANE_CLASS}, .${LAST_PANE_CLASS}`).forEach((el) => {
+            el.removeClass(CURRENT_PANE_CLASS, LAST_PANE_CLASS);
+        });
     }
 
     updateThumbs() {
@@ -152,6 +203,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return;
         }
         document.body.addClass(THUMB_CLASS);
+        this.updateSplit();
         for (const bar of document.querySelectorAll(".workspace-tab-header-container")) {
             const strip = bar.querySelector(":scope > .workspace-tab-header-container-inner");
             if (!strip) continue;
