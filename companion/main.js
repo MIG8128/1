@@ -313,7 +313,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
                     subtree: true,
                     childList: true,
                     attributes: true,
-                    attributeFilter: ["class"],
+                    // style: a new tab grows in from an inline width, then
+                    // drops it and snaps to its real size
+                    attributeFilter: ["class", "style"],
                 });
                 this.resizeObserver.observe(strip);
                 this.registerDomEvent(strip, "scroll", () => this.scheduleThumbs(), { passive: true });
