@@ -18,11 +18,15 @@ const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease
 
 module.exports = class GoguryeoCompanion extends Plugin {
     onload() {
-        // Obsidian decides where the sidebar buttons live (inside the ribbon or
-        // in a tab bar) only on its own layout passes, which can run before the
-        // theme's CSS is in place. Redo it once the layout and the CSS are ready,
-        // so the left sidebar button never gets stuck in the hidden ribbon.
-        this.app.workspace.onLayoutReady(() => this.refreshFrame());
+        // Obsidian puts the left sidebar button inside the ribbon whenever the
+        // ribbon "is shown" (has an offsetParent). The theme's floating ribbon
+        // still has one, because Obsidian gives <body> `contain: strict`, so
+        // report it as hidden while it floats; Obsidian then moves the button
+        // to a tab bar. Re-place the buttons once ready and on every CSS change.
+        this.app.workspace.onLayoutReady(() => {
+            this.patchRibbonIsShown();
+            this.refreshFrame();
+        });
         this.registerEvent(this.app.workspace.on("css-change", () => this.refreshFrame()));
 
         if (!Platform.isDesktopApp) return;
@@ -40,6 +44,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
         document.body.removeClass(OPEN_CLASS);
         const ribbon = this.getRibbon();
         if (ribbon) this.clearInline(ribbon);
+    }
+
+    patchRibbonIsShown() {
+        const ribbon = this.app.workspace.leftRibbon?.containerEl;
+        if (!ribbon) return;
+        ribbon.isShown = function () {
+            return getComputedStyle(this).position !== "fixed" && HTMLElement.prototype.isShown.call(this);
+        };
+        this.register(() => {
+            delete ribbon.isShown;
+            this.refreshFrame();
+        });
     }
 
     refreshFrame() {
