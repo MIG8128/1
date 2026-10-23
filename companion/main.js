@@ -1,4 +1,6 @@
-/* Goguryeo Companion — gestures a CSS theme cannot do on its own.
+/* Goguryeo Companion — things a CSS theme cannot do on its own.
+
+   All platforms: keeps the sidebar buttons out of the hidden ribbon.
 
    Desktop touchscreens: swipe right from near the left edge to pull out the
    ribbon the Goguryeo theme hides. The ribbon follows the finger; let go past
@@ -16,6 +18,13 @@ const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease
 
 module.exports = class GoguryeoCompanion extends Plugin {
     onload() {
+        // Obsidian decides where the sidebar buttons live (inside the ribbon or
+        // in a tab bar) only on its own layout passes, which can run before the
+        // theme's CSS is in place. Redo it once the layout and the CSS are ready,
+        // so the left sidebar button never gets stuck in the hidden ribbon.
+        this.app.workspace.onLayoutReady(() => this.refreshFrame());
+        this.registerEvent(this.app.workspace.on("css-change", () => this.refreshFrame()));
+
         if (!Platform.isDesktopApp) return;
 
         this.swipe = null;
@@ -31,6 +40,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         document.body.removeClass(OPEN_CLASS);
         const ribbon = this.getRibbon();
         if (ribbon) this.clearInline(ribbon);
+    }
+
+    refreshFrame() {
+        window.requestAnimationFrame(() => this.app.workspace.updateFrameless?.());
     }
 
     // The ribbon, but only while the theme is auto-hiding it (it floats then)

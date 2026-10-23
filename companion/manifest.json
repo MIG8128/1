@@ -3,7 +3,7 @@
   "name": "Goguryeo Companion",
   "version": "0.1.0",
   "minAppVersion": "1.9.0",
-  "description": "Touch gestures for the Goguryeo theme: swipe from the left edge to pull out the hidden ribbon.",
+  "description": "Helpers for the Goguryeo theme: keeps the sidebar buttons out of the hidden ribbon, and swipe from the left edge to pull the ribbon out.",
   "author": "MIG&Claude (opus5.5)",
   "authorUrl": "",
   "isDesktopOnly": false
