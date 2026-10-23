@@ -725,19 +725,75 @@ body {
     }
 }
 
-/* Sidebar tab pill */
-.mod-sidedock .workspace-tab-header-container-inner {
-    flex: 0 1 auto;
-    gap: 2px;
-    margin: 6px auto;
+/* Sidebar tab pill: the whole tab bar row becomes one rounded pill that hugs
+   its buttons — the tabs and, in the left sidebar, the collapse button. */
+.mod-sidedock .workspace-tabs > .workspace-tab-header-container {
+    align-self: center;
+    width: fit-content;
+    max-width: calc(100% - 16px);
+    height: auto;
+    margin: 6px 0;
     padding: 3px;
+    gap: 2px;
+    border-bottom: none;
     border-radius: 10px;
     background: var(--glass-track);
     box-shadow: var(--glass-track-shadow);
 }
 
-.mod-sidedock .workspace-tab-header-spacer {
-    flex-grow: 0;
+/* Obsidian reserves room for the window buttons (Windows: right, macOS: left)
+   as padding; keep that room outside the pill, along with its no-drag strip */
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-right-space > .workspace-tab-header-container {
+    padding: 3px;
+    margin-inline-end: var(--frame-right-space);
+}
+
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-left-space > .workspace-tab-header-container {
+    padding: 3px;
+    margin-inline-start: var(--frame-left-space);
+}
+
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-right-space > .workspace-tab-header-container::after {
+    right: calc(var(--frame-right-space) * -1);
+}
+
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-left-space > .workspace-tab-header-container::before {
+    left: calc(var(--frame-left-space) * -1);
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header-container-inner {
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header-spacer {
+    display: none;
+}
+
+/* Left sidebar collapse button as the first "tab", with a hairline after it */
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button {
+    order: -1;
+    height: auto;
+    padding: 0;
+    align-items: center;
+    gap: 2px;
+}
+
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button .clickable-icon {
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 7px;
+}
+
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button::after {
+    content: "";
+    width: 1px;
+    height: 14px;
+    margin-inline-start: 2px;
+    background-color: var(--background-modifier-border);
 }
 
 .mod-sidedock .workspace-tab-header-container .workspace-tab-header {
