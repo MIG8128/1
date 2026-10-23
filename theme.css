@@ -658,8 +658,10 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs .workspac
     overflow: hidden;
 }
 
-/* Sidebar cards (glass) */
+/* Sidebar cards (glass). Obsidian sizes them width: 100%, which with the
+   margins would push them 8px past their column; let them stretch instead. */
 body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs {
+    width: auto;
     margin: var(--g-gap) 0 var(--g-gap) var(--g-gap);
     border-radius: var(--g-radius-panel);
     border: 1px solid var(--glass-border);
@@ -679,6 +681,36 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-right-split .workspace-tabs {
    becomes clear so the glass shows through. */
 body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs > * {
     --background-secondary: transparent;
+}
+
+/* Vault name + help/settings under the left sidebar: its own small glass card */
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-sidedock-vault-profile {
+    width: auto;
+    margin: 0 0 var(--g-gap) var(--g-gap);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--g-radius-card);
+    background-color: var(--glass-sidebar);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Status bar: a floating glass chip in the bottom-right corner; the right
+   sidebar card ends above it instead of running underneath */
+body:not(.is-mobile):not(.goguryeo-no-cards) {
+    --status-bar-radius: 10px;
+    --status-bar-border-width: 1px;
+    --g-status-bar-height: 28px;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .status-bar {
+    bottom: var(--g-gap);
+    right: var(--g-gap);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+    padding-bottom: calc(var(--g-status-bar-height) + var(--g-gap));
 }
 
 /* Lighter, hairline dividers between stacked panes */
