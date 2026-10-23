@@ -751,10 +751,18 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inn
     text-align: center;
 }
 
+/* Obsidian pins the close button to the tab's right edge; cancel that, or
+   with left set too it stretches over the whole tab and every click closes */
 body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-close-button {
     position: absolute;
     top: 50%;
     left: 6px;
+    right: auto;
+    inset-inline-end: auto;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    justify-content: center;
     transform: translateY(-50%);
 }
 
