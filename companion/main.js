@@ -20,7 +20,8 @@ const OPEN_AT = 50; // px the finger must travel to keep the ribbon open
 const LOCK_AT = 10; // px of movement before deciding swipe vs. scroll
 const OPEN_CLASS = "goguryeo-touch-active";
 const THUMB_CLASS = "goguryeo-glass-thumbs";
-const SLIDE_MS = 460; // how long the theme's tab slide takes (plus a little)
+const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
+const SWELL_MS = 320; // how long the glass stays swollen while it travels
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 
 module.exports = class GoguryeoCompanion extends Plugin {
@@ -207,7 +208,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             thumb.gSlideUntil = Date.now() + SLIDE_MS;
             thumb.addClass("is-moving");
             window.clearTimeout(thumb.gSwell);
-            thumb.gSwell = window.setTimeout(() => thumb.removeClass("is-moving"), 220);
+            thumb.gSwell = window.setTimeout(() => thumb.removeClass("is-moving"), SWELL_MS);
         } else if (fresh || (moved && !sliding)) {
             thumb.addClass("is-placing");
         }
