@@ -264,13 +264,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
             else if (child.type === "split") collect(child);
         });
         collect(rootSplit);
-        if (!Platform.isDesktopApp || panes.length < 2) {
+        if (!(Platform.isDesktopApp || Platform.isTablet) || panes.length < 2) {
             this.clearSplit();
             return;
         }
         const body = document.body;
         const r = rootSplit.containerEl.getBoundingClientRect();
         body.addClass(SPLIT_CLASS);
+        // iPad pads the note area's top for the status bar; start below it
+        const padTop = parseFloat(getComputedStyle(rootSplit.containerEl).paddingTop) || 0;
+        body.style.setProperty("--g-root-top", `${r.top + padTop}px`);
         body.style.setProperty("--g-root-left", `${r.left}px`);
         body.style.setProperty("--g-root-right", `${window.innerWidth - r.right}px`);
 
@@ -286,6 +289,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     clearSplit() {
         const body = document.body;
         body.removeClass(SPLIT_CLASS);
+        body.style.removeProperty("--g-root-top");
         body.style.removeProperty("--g-root-left");
         body.style.removeProperty("--g-root-right");
         document.querySelectorAll(`.${CURRENT_PANE_CLASS}, .${LAST_PANE_CLASS}`).forEach((el) => {

@@ -595,7 +595,7 @@ button.mod-cta {
       float above it as glass panels.
    ------------------------------------------------------------------------- */
 
-body:not(.is-mobile) .app-container {
+body:is(:not(.is-mobile), .is-tablet) .app-container {
     background-color: var(--background-primary);
 }
 
@@ -603,7 +603,7 @@ body.is-translucent:not(.is-fullscreen) .app-container {
     background: transparent;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
     --titlebar-background: transparent;
     --titlebar-background-focused: transparent;
     --tab-container-background: transparent;
@@ -616,7 +616,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) {
     --divider-color: transparent;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) :is(.horizontal-main-container, .workspace, .workspace-split.mod-root, .workspace-split.mod-sidedock) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.horizontal-main-container, .workspace, .workspace-split.mod-root, .workspace-split.mod-sidedock) {
     background-color: transparent;
 }
 
@@ -651,7 +651,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs > * {
    Row 1 is the note's own header. The sidebar buttons, + and ⌄ live in the
    tab bar (row 2) and are lifted up into row 1. Notes scroll under both
    rows; other views (Homepage, plugins…) start below them. */
-body:not(.is-mobile):not(.goguryeo-no-cards) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
     --g-row-h: 36px;
     --g-row-btn: 40px;
     --g-row1-top: 8px;
@@ -662,7 +662,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) {
 
 /* Room each row keeps free at its ends: the lifted buttons, and on Windows
    the window buttons (— ▢ ✕) when this pane reaches the top-right corner */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     --g-row-inset: 0px;
     --g-row-lt: 0px;
     --g-row-rt: 0px;
@@ -670,11 +670,11 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     --g-row-right: calc(var(--g-row-inset) + var(--g-row-rt) + (var(--g-row-btn) + 6px) * 2);
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs:has(> .workspace-tab-header-container > .sidebar-toggle-button.mod-left) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:has(> .workspace-tab-header-container > .sidebar-toggle-button.mod-left) {
     --g-row-lt: calc(var(--g-row-btn) + 6px);
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs:has(> .workspace-tab-header-container > .sidebar-toggle-button.mod-right) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:has(> .workspace-tab-header-container > .sidebar-toggle-button.mod-right) {
     --g-row-rt: calc(var(--g-row-btn) + 6px);
 }
 
@@ -684,7 +684,7 @@ body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscr
 
 /* A soft frosted band behind both rows, fading out at its bottom edge. It
    lives in each pane (the pane is its own layer), under row 1. */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
     content: "";
     position: absolute;
     z-index: 1;
@@ -701,7 +701,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::
 }
 
 /* Row 2: the tab bar, full width */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
     position: absolute;
     z-index: 3;
     top: var(--g-row2-top);
@@ -716,7 +716,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .worksp
     --tab-max-width: none;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-container-inner {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-container-inner {
     flex: 1 1 auto;
     min-width: 0;
     gap: 3px;
@@ -724,27 +724,27 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-con
     padding: 0;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-spacer {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-spacer {
     display: none;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container .workspace-tab-header {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container .workspace-tab-header {
     padding: 0;
 }
 
 /* Each tab: title centered, × on the left (only on the active or hovered
    tab), pin/link icons on the right */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner {
     position: relative;
     justify-content: center;
     padding: 0 28px;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner::after {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner::after {
     display: none;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-title {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-title {
     flex: 0 1 auto;
     width: auto;
     min-width: 0;
@@ -753,7 +753,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inn
 
 /* Obsidian pins the close button to the tab's right edge; cancel that, or
    with left set too it stretches over the whole tab and every click closes */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-close-button {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-close-button {
     position: absolute;
     top: 50%;
     left: 6px;
@@ -766,19 +766,19 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inn
     transform: translateY(-50%);
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-status-container {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-status-container {
     position: absolute;
     top: 50%;
     right: 6px;
     transform: translateY(-50%);
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header:not(.is-active):not(:hover) .workspace-tab-header-inner-close-button {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header:not(.is-active):not(:hover) .workspace-tab-header-inner-close-button {
     opacity: 0;
 }
 
 /* Buttons that live in the tab bar but show in row 1 */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
     position: absolute;
     top: calc(var(--g-row1-top) - var(--g-row2-top));
     width: var(--g-row-btn);
@@ -790,25 +790,25 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-con
     justify-content: center;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-left {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-left {
     left: 0;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-right {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-right {
     right: var(--g-row-inset);
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-tab-list {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-tab-list {
     right: calc(var(--g-row-inset) + var(--g-row-rt));
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
     right: calc(var(--g-row-inset) + var(--g-row-rt) + var(--g-row-btn) + 6px);
 }
 
 /* Row 1: the note header — ‹ › on the left, the path centered like
    Safari's address bar, the note's actions on the right */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header {
     position: absolute;
     z-index: 2;
     top: var(--g-row1-top);
@@ -822,27 +822,27 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content >
     box-shadow: none;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .view-header-title-container {
-    flex: 0 1 460px;
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container {
+    flex: 0 1 600px;
     height: var(--g-row-h);
     margin-inline: auto;
     padding: 0 16px;
     justify-content: center;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .view-header-title-container::before,
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .view-header-title-container::after {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container::before,
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container::after {
     display: none;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-actions) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-actions) {
     height: var(--g-row-h);
     padding: 0 2px;
 }
 
 /* The glass on every row-1 piece */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-header-title-container, .view-actions),
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-header-title-container, .view-actions),
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
     border-radius: 12px;
     background-color: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
@@ -881,13 +881,13 @@ body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscr
     --g-pane-border: rgba(0, 0, 0, 0.14);
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
     --g-split-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px);
     --g-split-inset: 0px;
     --g-split-rt: 0px;
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards):has(.mod-root .sidebar-toggle-button.mod-right) {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards):has(.mod-root .sidebar-toggle-button.mod-right) {
     --g-split-rt: calc(var(--g-row-btn) + 6px);
 }
 
@@ -895,13 +895,13 @@ body.goguryeo-split.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):
     --g-split-inset: calc(var(--frame-right-space) + 18px - var(--g-gap));
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-split.mod-root {
     padding-inline: 5px;
     background-color: var(--g-split-canvas);
 }
 
 /* Panes as cards; their tab row sits inside, at the top */
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     --g-row2-top: 6px;
     --g-bar-offset: calc(var(--g-row2-top) + var(--g-row2-h) + 8px);
     width: auto;
@@ -913,12 +913,12 @@ body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace
     box-shadow: var(--g-panel-shadow);
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane {
     border-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.62);
     box-shadow: 0 0 0 4px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.12), var(--g-panel-shadow);
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
     left: 6px;
     right: 6px;
 }
@@ -927,62 +927,62 @@ body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace
    across the note area. Obsidian walls each pane in (contain: strict
    !important); keep size containment but drop layout/paint containment so
    the header can sit outside its pane. */
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf {
     contain: size style !important;
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-current-pane) .workspace-leaf-content > .view-header {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-current-pane) .workspace-leaf-content > .view-header {
     display: none;
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane .workspace-leaf-content > .view-header {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane .workspace-leaf-content > .view-header {
     position: fixed;
-    top: var(--g-row1-top);
+    top: calc(var(--g-root-top, 0px) + var(--g-row1-top));
     left: calc(var(--g-root-left) + var(--g-gap) + var(--g-row-btn) + 6px);
     right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt) + (var(--g-row-btn) + 6px) * 2);
 }
 
 /* Its buttons: ◧ at the far left; ⌄, + and ◨ at the far right (only the
    top-right pane's own + and ⌄ show) */
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
     position: fixed;
-    top: var(--g-row1-top);
+    top: calc(var(--g-root-top, 0px) + var(--g-row1-top));
     left: auto;
     right: auto;
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-left {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-left {
     left: calc(var(--g-root-left) + var(--g-gap));
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-right {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-right {
     right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset));
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-tab-list {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-tab-list {
     right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt));
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
     right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt) + var(--g-row-btn) + 6px);
 }
 
-body.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-last-pane) > .workspace-tab-header-container > :is(.workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-last-pane) > .workspace-tab-header-container > :is(.workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
     display: none;
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
     height: 100%;
     padding-top: var(--g-bar-offset);
 }
 
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] > .view-content {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] > .view-content {
     padding-top: 0;
     --file-margins: calc(var(--g-bar-offset) + var(--size-4-8)) var(--size-4-8) var(--size-4-8);
 }
 
 /* Fade the note out in the thin gap above the bar so nothing peeks there */
-body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] :is(.cm-scroller, .markdown-preview-view) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] :is(.cm-scroller, .markdown-preview-view) {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
     mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
 }
@@ -1793,6 +1793,27 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-
     background-image: none;
 }
 
+
+
+/* -------------------------------------------------------------------------
+   11. iPad — the desktop layout (path row on top, tabs below, split screen
+       as cards; section 6) with bigger, rounder controls for fingers. The
+       sidebars stay Obsidian's glass drawers.
+   ------------------------------------------------------------------------- */
+
+body.is-tablet:not(.goguryeo-no-cards) {
+    --g-row-h: 42px;
+    --g-row-btn: 42px;
+    --g-row2-h: 38px;
+}
+
+body.is-tablet:not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-header-title-container, .view-actions),
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list),
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner,
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb {
+    border-radius: 999px;
+}
 
 
 /* -------------------------------------------------------------------------
