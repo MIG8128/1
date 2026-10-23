@@ -720,9 +720,10 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-leaf-resize-handle:hover
 
 /* -------------------------------------------------------------------------
    7. Tabs
-      Sidebars: icons inside one bordered pill (like the Border theme),
-      active tab = raised glass button.
-      Editor tabs: soft pills, active tab = raised glass.
+      Sidebars: icons inside one bordered pill (like the Border theme).
+      Editor tabs: centered in one pill in the main tab bar.
+      Active tab = raised glass; with the companion plugin, that glass slides
+      to the newly picked tab with a liquid swell.
    ------------------------------------------------------------------------- */
 
 body {
@@ -754,6 +755,83 @@ body {
     .workspace-tab-header-container .workspace-tab-header:not(.is-active):hover .workspace-tab-header-inner {
         background-color: var(--background-modifier-hover);
     }
+}
+
+/* Sliding glass thumb (drawn by the companion plugin under the active tab) */
+body.goguryeo-glass-thumbs .workspace-tab-header-container .workspace-tab-header.is-active .workspace-tab-header-inner {
+    background: transparent;
+    box-shadow: none;
+}
+
+body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-header-container-inner {
+    position: relative;
+    z-index: 1;
+}
+
+.goguryeo-tab-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: var(--g-thumb-w);
+    height: var(--g-thumb-h);
+    border-radius: 8px;
+    background: var(--glass-thumb);
+    box-shadow: var(--glass-thumb-shadow);
+    transform: translate(var(--g-thumb-x), var(--g-thumb-y)) scale(var(--g-thumb-sx, 1), var(--g-thumb-sy, 1));
+    pointer-events: none;
+    transition: transform 440ms cubic-bezier(0.34, 1.45, 0.5, 1), width 440ms cubic-bezier(0.34, 1.45, 0.5, 1),
+        background 220ms ease, box-shadow 220ms ease;
+}
+
+.mod-sidedock .goguryeo-tab-thumb {
+    border-radius: 7px;
+}
+
+.goguryeo-tab-thumb.is-placing {
+    transition: none;
+}
+
+/* While it travels, the glass swells into a clearer lens, then settles */
+.goguryeo-tab-thumb.is-moving {
+    --g-thumb-sx: 1.08;
+    --g-thumb-sy: 1.22;
+    background: var(--glass-thumb-hover);
+    box-shadow: var(--glass-thumb-shadow), 0 0 0 1px var(--glass-border), 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .goguryeo-tab-thumb {
+        transition: none;
+    }
+}
+
+/* Main tab bar: the tabs sit centered in one pill, like the sidebars, with
+   the sidebar buttons at either end */
+body:not(.is-mobile) .mod-root .workspace-tab-header-container .workspace-tab-header-container-inner {
+    flex: 0 1 auto;
+    gap: 2px;
+    margin: 4px 0 4px auto;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--glass-track);
+    box-shadow: var(--glass-track-shadow);
+}
+
+body:not(.is-mobile) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
+    margin-inline-end: auto;
+}
+
+body:not(.is-mobile) .mod-root .workspace-tab-header-container > .workspace-tab-header-spacer {
+    display: none;
+}
+
+body:not(.is-mobile) .mod-root .workspace-tab-header-container .workspace-tab-header {
+    padding: 0;
+}
+
+body:not(.is-mobile) .mod-root .workspace-tab-header-inner::after {
+    display: none;
 }
 
 /* Sidebar tab pill: the whole tab bar row becomes one rounded pill that hugs
@@ -804,27 +882,44 @@ body {
     display: none;
 }
 
-/* Left sidebar collapse button as the first "tab", with a hairline after it */
-.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button {
-    order: -1;
+/* Sidebar collapse buttons as "tabs" in the pill: first in the left sidebar,
+   last in the right one (the companion plugin moves the right one in),
+   each with a hairline between it and the tabs */
+.mod-sidedock .workspace-tab-header-container > .sidebar-toggle-button {
     height: auto;
     padding: 0;
     align-items: center;
     gap: 2px;
 }
 
-.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button .clickable-icon {
+.mod-sidedock .workspace-tab-header-container > .sidebar-toggle-button .clickable-icon {
     height: 26px;
     padding: 0 9px;
     border-radius: 7px;
 }
 
-.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button::after {
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button {
+    order: -1;
+}
+
+.mod-right-split .workspace-tab-header-container > .sidebar-toggle-button {
+    order: 99;
+}
+
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button::after,
+.mod-right-split .workspace-tab-header-container > .sidebar-toggle-button::before {
     content: "";
     width: 1px;
     height: 14px;
-    margin-inline-start: 2px;
     background-color: var(--background-modifier-border);
+}
+
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button::after {
+    margin-inline-start: 2px;
+}
+
+.mod-right-split .workspace-tab-header-container > .sidebar-toggle-button::before {
+    margin-inline-end: 2px;
 }
 
 .mod-sidedock .workspace-tab-header-container .workspace-tab-header {

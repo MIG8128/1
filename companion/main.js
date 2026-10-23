@@ -1,6 +1,11 @@
 /* Goguryeo Companion — things a CSS theme cannot do on its own.
 
-   All platforms: keeps the sidebar buttons out of the hidden ribbon.
+   All platforms: keeps the left sidebar button out of the hidden ribbon.
+   Desktop: keeps it at the start of the main tab bar, mirroring the right one.
+
+   Tab bars: a glass "thumb" sits under the active tab of every tab bar (main
+   tabs and sidebar pills) and slides to the new tab when it changes; the
+   theme styles it (.goguryeo-tab-thumb) and gives it the spring motion.
 
    Desktop touchscreens: swipe right from near the left edge to pull out the
    ribbon the Goguryeo theme hides. The ribbon follows the finger; let go past
@@ -14,6 +19,7 @@ const EDGE = 40; // px from the window's left edge where a swipe may start
 const OPEN_AT = 50; // px the finger must travel to keep the ribbon open
 const LOCK_AT = 10; // px of movement before deciding swipe vs. scroll
 const OPEN_CLASS = "goguryeo-touch-active";
+const THUMB_CLASS = "goguryeo-glass-thumbs";
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 
 module.exports = class GoguryeoCompanion extends Plugin {
@@ -25,9 +31,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
         // to a tab bar. Re-place the buttons once ready and on every CSS change.
         this.app.workspace.onLayoutReady(() => {
             this.patchRibbonIsShown();
+            this.patchUpdateFrameless();
             this.refreshFrame();
         });
         this.registerEvent(this.app.workspace.on("css-change", () => this.refreshFrame()));
+
+        this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
 
         if (!Platform.isDesktopApp) return;
 
@@ -58,8 +67,135 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
     }
 
+    // On Windows/Linux Obsidian keeps the right sidebar button at the right
+    // end of the main tab bar, but puts the left one inside the left sidebar
+    // while it is open. With Goguryeo on desktop, keep the left one at the
+    // start of the main tab bar too, so the two mirror each other. Runs right
+    // after each of Obsidian's layout passes, which would move it back.
+    patchUpdateFrameless() {
+        const workspace = this.app.workspace;
+        const original = workspace.updateFrameless;
+        if (typeof original !== "function") return;
+        const plugin = this;
+        workspace.updateFrameless = function (...args) {
+            const result = original.apply(this, args);
+            plugin.placeLeftToggle();
+            return result;
+        };
+        this.register(() => {
+            delete workspace.updateFrameless;
+            this.refreshFrame();
+        });
+    }
+
+    placeLeftToggle() {
+        if (!Platform.isDesktopApp || this.app.customCss?.theme !== "Goguryeo") return;
+        const { rootSplit, leftSidebarToggleButtonEl: button } = this.app.workspace;
+        const target = rootSplit?.containerEl.querySelector(".workspace-tabs.mod-top > .workspace-tab-header-container");
+        if (!button || !target) return;
+        // Obsidian animates a copy out of the old spot when it moves the
+        // button; drop those copies so only one button ever shows
+        document.querySelectorAll(".sidebar-toggle-button.mod-left:not(.mod-left-split-toggle)").forEach((el) => {
+            if (el !== button) el.remove();
+        });
+        if (target.firstElementChild !== button) target.prepend(button);
+    }
+
     refreshFrame() {
         window.requestAnimationFrame(() => this.app.workspace.updateFrameless?.());
+    }
+
+    // ---- Sliding glass under the active tab ----
+
+    setupTabThumbs() {
+        this.thumbs = new WeakMap(); // tab bar → its thumb
+        this.observed = new WeakSet(); // tab strips already watched
+        this.mutationObserver = new MutationObserver((mutations) => {
+            const relevant = mutations.some(
+                (m) => m.type === "childList" || m.target.classList?.contains("workspace-tab-header")
+            );
+            if (relevant) this.scheduleThumbs();
+        });
+        this.resizeObserver = new ResizeObserver(() => this.scheduleThumbs());
+        this.register(() => {
+            this.mutationObserver.disconnect();
+            this.resizeObserver.disconnect();
+            window.cancelAnimationFrame(this.thumbFrame);
+            this.removeThumbs();
+        });
+        for (const name of ["layout-change", "active-leaf-change", "css-change"]) {
+            this.registerEvent(this.app.workspace.on(name, () => this.scheduleThumbs()));
+        }
+        this.registerDomEvent(window, "resize", () => this.scheduleThumbs());
+        this.scheduleThumbs();
+    }
+
+    scheduleThumbs() {
+        if (this.thumbFrame) return;
+        this.thumbFrame = window.requestAnimationFrame(() => {
+            this.thumbFrame = 0;
+            this.updateThumbs();
+        });
+    }
+
+    removeThumbs() {
+        document.body.removeClass(THUMB_CLASS);
+        document.querySelectorAll(".goguryeo-tab-thumb").forEach((el) => el.remove());
+    }
+
+    updateThumbs() {
+        if (this.app.customCss?.theme !== "Goguryeo") {
+            this.removeThumbs();
+            return;
+        }
+        document.body.addClass(THUMB_CLASS);
+        for (const bar of document.querySelectorAll(".workspace-tab-header-container")) {
+            const strip = bar.querySelector(":scope > .workspace-tab-header-container-inner");
+            if (!strip) continue;
+            if (!this.observed.has(strip)) {
+                this.observed.add(strip);
+                this.mutationObserver.observe(strip, {
+                    subtree: true,
+                    childList: true,
+                    attributes: true,
+                    attributeFilter: ["class"],
+                });
+                this.resizeObserver.observe(strip);
+                this.registerDomEvent(strip, "scroll", () => this.scheduleThumbs(), { passive: true });
+            }
+            this.placeThumb(bar, strip);
+        }
+    }
+
+    placeThumb(bar, strip) {
+        let thumb = this.thumbs.get(bar);
+        const tab = strip.querySelector(":scope > .workspace-tab-header.is-active > .workspace-tab-header-inner");
+        if (!tab || bar.offsetWidth === 0) {
+            thumb?.hide();
+            return;
+        }
+        if (!thumb || !thumb.isConnected) {
+            thumb = bar.createDiv("goguryeo-tab-thumb");
+            this.thumbs.set(bar, thumb);
+        }
+        thumb.show();
+
+        // Slide (with the liquid swell) only when the active tab changed;
+        // follow scrolling and resizing instantly
+        const switched = thumb.gTab !== undefined && thumb.gTab !== tab;
+        thumb.toggleClass("is-placing", !switched);
+        const b = bar.getBoundingClientRect();
+        const t = tab.getBoundingClientRect();
+        thumb.style.setProperty("--g-thumb-x", `${t.left - b.left}px`);
+        thumb.style.setProperty("--g-thumb-y", `${t.top - b.top}px`);
+        thumb.style.setProperty("--g-thumb-w", `${t.width}px`);
+        thumb.style.setProperty("--g-thumb-h", `${t.height}px`);
+        if (switched) {
+            thumb.addClass("is-moving");
+            window.clearTimeout(thumb.gSwell);
+            thumb.gSwell = window.setTimeout(() => thumb.removeClass("is-moving"), 220);
+        }
+        thumb.gTab = tab;
     }
 
     // The ribbon, but only while the theme is auto-hiding it (it floats then)
