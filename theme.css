@@ -1541,6 +1541,28 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .
     pointer-events: none;
 }
 
+/* Scrolling down hides both bars. Obsidian slides the top row up with a
+   transform, and a transform drags fixed children along: the name pill (a
+   child of the top row) would jump up to the top for a moment. Slide the
+   row by its position instead, and let the pill slide down with the bar. */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
+    top: 0;
+    transition: opacity 0.2s ease-in-out, top 0.3s ease-in-out;
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
+    top: calc(var(--hidden-nav-offset) * -1);
+    transform: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
+    transition: transform 0.3s ease-out;
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
+    transform: translateY(calc(var(--navbar-height) + var(--navbar-bottom-offset)));
+}
+
 /* Keyboard open (bar gone): the name hides too */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):not(:has(.mobile-navbar)) .mod-root .workspace-leaf .view-header-title {
     display: none;
