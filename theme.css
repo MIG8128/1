@@ -850,8 +850,18 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
     box-shadow: inset 0 0 0 1px var(--glass-border), inset 0 1px 0 var(--glass-highlight);
 }
 
-/* Windows: the gaps in row 1 still drag the window; its pieces don't */
-body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .view-header {
+/* Windows: Obsidian makes its title bar no-drag and lets the tab bar drag
+   the window instead — but our tab bar sits in row 2. So the whole strip
+   above row 2 drags (short of the window buttons); row 1's pieces and the
+   sidebar pills punch no-drag holes in it, as they come later in the DOM. */
+body.is-hidden-frameless:not(.is-mobile):not(.is-grabbing):not(.is-fullscreen):not(.goguryeo-no-cards) .workspace::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: calc(var(--frame-right-space) + 18px);
+    height: var(--g-row2-top);
+    pointer-events: none;
     -webkit-app-region: drag;
 }
 
