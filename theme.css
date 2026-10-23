@@ -25,9 +25,9 @@ settings:
         title: Ribbon reveal zone
         description: Width of the invisible strip on the left edge that reveals the ribbon.
         type: variable-number-slider
-        default: 6
-        min: 2
-        max: 24
+        default: 12
+        min: 4
+        max: 40
         step: 1
         format: px
     -
@@ -154,7 +154,7 @@ body {
     --g-blur: 16px;
     --g-glass-tint: 62%;
     --g-line-height: 1.85;
-    --g-ribbon-hotzone: 6px;
+    --g-ribbon-hotzone: 12px;
     --g-ipad-toggle-offset: 0px;
 
     --g-gap: 8px;
@@ -780,7 +780,7 @@ body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary 
     z-index: calc(var(--layer-status-bar) + 1);
     opacity: 0;
     transform: translateX(calc(-100% - var(--g-gap) - 4px));
-    transition: transform 260ms var(--g-ease) 220ms, opacity 180ms ease 220ms;
+    transition: transform 260ms var(--g-ease) 400ms, opacity 180ms ease 400ms;
 }
 
 /* The header filler Obsidian draws above the ribbon */
@@ -796,14 +796,19 @@ body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary 
     padding: 0 0 var(--size-4-2);
 }
 
-/* Invisible reveal strip on the left edge (moves with the ribbon) */
+/* Hover zone: covers the ribbon plus the gap on its left and a strip on its
+   right, from below the title bar to the window bottom. Hidden, only that
+   right strip pokes in from the window edge; shown, the pointer can rest
+   anywhere from the very edge to just past the ribbon without closing it. */
 body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary::after {
     content: "";
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 100%;
-    width: calc(var(--g-gap) + 4px + var(--g-ribbon-hotzone));
+    z-index: -1;
+    top: calc(var(--g-gap) * -1);
+    bottom: calc(var(--g-gap) * -4);
+    left: calc(var(--g-gap) * -1 - 2px);
+    right: calc((var(--g-ribbon-hotzone) + 4px) * -1);
+    -webkit-app-region: no-drag;
 }
 
 body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within),
@@ -816,11 +821,11 @@ body.goguryeo-touch-active:not(.is-mobile) .workspace-ribbon.mod-primary {
 /* Touchscreen PCs: show a grab handle on the edge */
 @media (any-pointer: coarse) {
     body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary::after {
-        width: calc(var(--g-gap) + 4px + 18px);
+        right: calc((28px + 4px) * -1);
         background-image: linear-gradient(var(--text-faint), var(--text-faint));
         background-repeat: no-repeat;
-        background-size: 5px 48px;
-        background-position: calc(var(--g-gap) + 4px + 3px) center;
+        background-size: 6px 56px;
+        background-position: right 8px center;
     }
 
     body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within)::after {
