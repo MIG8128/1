@@ -1,0 +1,10 @@
+{
+  "id": "goguryeo-companion",
+  "name": "Goguryeo Companion",
+  "version": "0.1.0",
+  "minAppVersion": "1.9.0",
+  "description": "Touch gestures for the Goguryeo theme: swipe from the left edge to pull out the hidden ribbon.",
+  "author": "MIG&Claude (opus5.5)",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

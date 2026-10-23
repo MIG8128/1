@@ -828,7 +828,8 @@ body.goguryeo-touch-active:not(.is-mobile) .workspace-ribbon.mod-primary {
         background-position: right 8px center;
     }
 
-    body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within)::after {
+    body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within)::after,
+    body.goguryeo-touch-active .workspace-ribbon.mod-primary::after {
         background-image: none;
     }
 }
