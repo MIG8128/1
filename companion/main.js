@@ -3,6 +3,10 @@
    All platforms: keeps the left sidebar button out of the hidden ribbon.
    Desktop: keeps it at the start of the main tab bar, mirroring the right one.
 
+   iPhone & iPad: swipe in from the left/right edge to go back/forward
+   (only while both sidebars are closed); iPhone also gets a right sidebar
+   button, which Obsidian has none of on phones.
+
    Tab bars: a glass "thumb" sits under the active tab of every tab bar (main
    tabs and sidebar pills) and slides to the new tab when it changes; the
    theme styles it (.goguryeo-tab-thumb) and gives it the spring motion.
@@ -24,6 +28,8 @@ const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
 const SPLIT_CLASS = "goguryeo-split";
 const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
+const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
+const EDGE_SWIPE_AT = 80; // px to pull before letting go navigates
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
@@ -44,6 +50,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
+        if (Platform.isMobile) this.setupEdgeSwipe();
 
         if (!Platform.isDesktopApp) return;
 
@@ -127,6 +134,76 @@ module.exports = class GoguryeoCompanion extends Plugin {
             button.remove();
             document.body.removeClass(PHONE_RIGHT_CLASS);
         });
+    }
+
+    // ---- iPhone & iPad: swipe in from an edge to go back / forward ----
+
+    // Like Safari: start within EDGE_SWIPE_ZONE of the left edge and drag
+    // right to go back, or from the right edge leftwards to go forward. A
+    // round glass arrow follows the finger and fills in once the swipe has
+    // gone EDGE_SWIPE_AT; letting go then navigates, earlier cancels. Only
+    // while both sidebars are closed, nothing covers the note and there is
+    // somewhere to go.
+    setupEdgeSwipe() {
+        this.edgeArrow = document.body.createDiv("goguryeo-edge-arrow");
+        this.edgeSwipe = null;
+        this.register(() => this.edgeArrow.remove());
+        const opts = { passive: true, capture: true };
+        this.registerDomEvent(document, "touchstart", (e) => this.onEdgeStart(e), opts);
+        this.registerDomEvent(document, "touchmove", (e) => this.onEdgeMove(e), opts);
+        this.registerDomEvent(document, "touchend", () => this.onEdgeEnd(true), opts);
+        this.registerDomEvent(document, "touchcancel", () => this.onEdgeEnd(false), opts);
+    }
+
+    canEdgeSwipe() {
+        const { leftSplit, rightSplit } = this.app.workspace;
+        if (!leftSplit?.collapsed || !rightSplit?.collapsed) return false;
+        return !document.querySelector(".modal-container, .menu, .mobile-tab-switcher, .prompt");
+    }
+
+    onEdgeStart(e) {
+        this.edgeSwipe = null;
+        if (e.touches.length !== 1 || !this.canEdgeSwipe()) return;
+        const t = e.touches[0];
+        const dir = t.clientX <= EDGE_SWIPE_ZONE ? -1 : t.clientX >= window.innerWidth - EDGE_SWIPE_ZONE ? 1 : 0;
+        if (!dir) return;
+        const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
+        const history = leaf?.history;
+        const steps = dir < 0 ? history?.backHistory : history?.forwardHistory;
+        if (!steps?.length) return;
+        this.edgeSwipe = { dir, leaf, x0: t.clientX, y0: t.clientY, locked: false, armed: false };
+    }
+
+    onEdgeMove(e) {
+        const s = this.edgeSwipe;
+        if (!s) return;
+        const t = e.touches[0];
+        const dx = (t.clientX - s.x0) * -s.dir; // distance pulled inwards
+        const dy = t.clientY - s.y0;
+        if (!s.locked) {
+            if (Math.abs(dy) > LOCK_AT && Math.abs(dy) > Math.abs(dx)) {
+                this.edgeSwipe = null; // a scroll, not a swipe
+                return;
+            }
+            if (dx < LOCK_AT) return;
+            s.locked = true;
+            this.edgeArrow.toggleClass("is-back", s.dir < 0);
+            this.edgeArrow.toggleClass("is-forward", s.dir > 0);
+            setIcon(this.edgeArrow, s.dir < 0 ? "lucide-chevron-left" : "lucide-chevron-right");
+            this.edgeArrow.addClass("is-visible");
+        }
+        const pull = Math.min(dx, EDGE_SWIPE_AT * 1.25);
+        s.armed = dx >= EDGE_SWIPE_AT;
+        this.edgeArrow.toggleClass("is-armed", s.armed);
+        this.edgeArrow.style.top = `${t.clientY}px`;
+        this.edgeArrow.style.setProperty("--g-edge-pull", `${pull * 0.6}px`);
+    }
+
+    onEdgeEnd(finished) {
+        const s = this.edgeSwipe;
+        this.edgeSwipe = null;
+        this.edgeArrow?.removeClass("is-visible", "is-armed");
+        if (s?.locked && s.armed && finished) s.leaf.history.go(s.dir);
     }
 
     // ---- Sliding glass under the active tab ----
