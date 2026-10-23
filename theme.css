@@ -740,8 +740,25 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
     padding: 0 28px;
 }
 
+/* A short divider between tabs, Safari style: at the tab's own edge (it
+   clips anything outside), and gone beside the glass (active tab) or a
+   hovered tab and after the last */
 body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner::after {
-    display: none;
+    top: 25%;
+    inset-inline-end: 0;
+    height: 50%;
+    opacity: 1;
+    transition: opacity 0.15s ease;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header:is(.is-active, :has(+ .is-active), :last-child) .workspace-tab-header-inner::after {
+    opacity: 0;
+}
+
+@media (hover: hover) {
+    body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header:is(:hover, :has(+ :hover)) .workspace-tab-header-inner::after {
+        opacity: 0;
+    }
 }
 
 body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-title {
