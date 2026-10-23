@@ -20,6 +20,7 @@ const OPEN_AT = 50; // px the finger must travel to keep the ribbon open
 const LOCK_AT = 10; // px of movement before deciding swipe vs. scroll
 const OPEN_CLASS = "goguryeo-touch-active";
 const THUMB_CLASS = "goguryeo-glass-thumbs";
+const SLIDE_MS = 460; // how long the theme's tab slide takes (plus a little)
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 
 module.exports = class GoguryeoCompanion extends Plugin {
@@ -109,6 +110,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     setupTabThumbs() {
         this.thumbs = new WeakMap(); // tab bar → its thumb
+        this.thumbSpots = new WeakMap(); // tab bar → last active tab and where it was
         this.observed = new WeakSet(); // tab strips already watched
         this.mutationObserver = new MutationObserver((mutations) => {
             const relevant = mutations.some(
@@ -169,33 +171,55 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     placeThumb(bar, strip) {
         let thumb = this.thumbs.get(bar);
-        const tab = strip.querySelector(":scope > .workspace-tab-header.is-active > .workspace-tab-header-inner");
-        if (!tab || bar.offsetWidth === 0) {
+        const tab = strip.querySelector(":scope > .workspace-tab-header.is-active");
+        const inner = tab?.querySelector(":scope > .workspace-tab-header-inner");
+        if (!inner || bar.offsetWidth === 0) {
             thumb?.hide();
             return;
         }
-        if (!thumb || !thumb.isConnected) {
+        // Obsidian rebuilds a tab bar's children when tabs change, which
+        // drops the thumb; a new one starts from the last known spot
+        const fresh = !thumb || !thumb.isConnected;
+        if (fresh) {
             thumb = bar.createDiv("goguryeo-tab-thumb");
             this.thumbs.set(bar, thumb);
         }
         thumb.show();
 
-        // Slide (with the liquid swell) only when the active tab changed;
-        // follow scrolling and resizing instantly
-        const switched = thumb.gTab !== undefined && thumb.gTab !== tab;
-        thumb.toggleClass("is-placing", !switched);
         const b = bar.getBoundingClientRect();
-        const t = tab.getBoundingClientRect();
-        thumb.style.setProperty("--g-thumb-x", `${t.left - b.left}px`);
-        thumb.style.setProperty("--g-thumb-y", `${t.top - b.top}px`);
-        thumb.style.setProperty("--g-thumb-w", `${t.width}px`);
-        thumb.style.setProperty("--g-thumb-h", `${t.height}px`);
+        const t = inner.getBoundingClientRect();
+        const next = { tab, x: t.left - b.left, y: t.top - b.top, w: t.width, h: t.height };
+        const prev = this.thumbSpots.get(bar);
+
+        // A new active tab → slide there with the liquid swell. Otherwise
+        // (scrolling, resizing, tabs added or removed): nothing moved → leave
+        // it be; mid-slide → keep sliding toward the new spot; else jump.
+        const switched = !!prev && prev.tab !== tab;
+        const moved = !prev || ["x", "y", "w", "h"].some((k) => Math.abs(prev[k] - next[k]) > 0.5);
+        const sliding = Date.now() < (thumb.gSlideUntil ?? 0);
+        if (switched && fresh) {
+            thumb.addClass("is-placing");
+            this.setThumbSpot(thumb, prev);
+            void thumb.offsetWidth; // commit the start spot before sliding
+        }
         if (switched) {
+            thumb.removeClass("is-placing");
+            thumb.gSlideUntil = Date.now() + SLIDE_MS;
             thumb.addClass("is-moving");
             window.clearTimeout(thumb.gSwell);
             thumb.gSwell = window.setTimeout(() => thumb.removeClass("is-moving"), 220);
+        } else if (fresh || (moved && !sliding)) {
+            thumb.addClass("is-placing");
         }
-        thumb.gTab = tab;
+        if (fresh || moved || switched) this.setThumbSpot(thumb, next);
+        this.thumbSpots.set(bar, next);
+    }
+
+    setThumbSpot(thumb, spot) {
+        thumb.style.setProperty("--g-thumb-x", `${spot.x}px`);
+        thumb.style.setProperty("--g-thumb-y", `${spot.y}px`);
+        thumb.style.setProperty("--g-thumb-w", `${spot.w}px`);
+        thumb.style.setProperty("--g-thumb-h", `${spot.h}px`);
     }
 
     // The ribbon, but only while the theme is auto-hiding it (it floats then)
