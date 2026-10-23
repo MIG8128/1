@@ -13,7 +13,7 @@
    left to close. The open state is the body class "goguryeo-touch-active",
    which the theme styles. */
 
-const { Plugin, Platform } = require("obsidian");
+const { Plugin, Platform, setIcon } = require("obsidian");
 
 const EDGE = 40; // px from the window's left edge where a swipe may start
 const OPEN_AT = 50; // px the finger must travel to keep the ribbon open
@@ -23,6 +23,7 @@ const THUMB_CLASS = "goguryeo-glass-thumbs";
 const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
 const SPLIT_CLASS = "goguryeo-split";
+const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
@@ -42,6 +43,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.registerEvent(this.app.workspace.on("css-change", () => this.refreshFrame()));
 
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
+        this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
 
         if (!Platform.isDesktopApp) return;
 
@@ -108,6 +110,23 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     refreshFrame() {
         window.requestAnimationFrame(() => this.app.workspace.updateFrameless?.());
+    }
+
+    // ---- iPhone: a right sidebar button (Obsidian has none on phones) ----
+
+    setupPhoneRightToggle() {
+        if (!Platform.isPhone) return;
+        const button = document.body.createEl("button", {
+            cls: "goguryeo-right-toggle clickable-icon",
+            attr: { "aria-label": "Open right sidebar" },
+        });
+        setIcon(button, "lucide-panel-right");
+        button.addEventListener("click", () => this.app.workspace.rightSplit.toggle());
+        document.body.addClass(PHONE_RIGHT_CLASS);
+        this.register(() => {
+            button.remove();
+            document.body.removeClass(PHONE_RIGHT_CLASS);
+        });
     }
 
     // ---- Sliding glass under the active tab ----
