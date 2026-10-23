@@ -1,0 +1,189 @@
+/* 1. 본문(일반 텍스트) 줄 간격 늘리기 */
+:root {
+    --line-height-normal: 1.85;
+}
+
+/* 편집 모드(라이브 프리뷰/소스 뷰) 및 읽기 모드(Reading View)의 다양한 텍스트 요소 적용 */
+.markdown-source-view.mod-cm6 .cm-line,
+.markdown-reading-view p,
+.markdown-reading-view li,
+.markdown-reading-view blockquote,
+.markdown-reading-view table td {
+    line-height: 1.85 !important; /* 기본 줄 간격은 보통 1.5입니다. 1.8~2.0 추천 */
+}
+
+
+
+/* 볼드체(굵은 글씨) 색상 변경 */
+.theme-dark strong,
+.theme-dark .cm-strong {
+    color: #FFDAB9 !important; /* 다크 모드: 연한 살구색 */
+}
+
+.theme-light strong,
+.theme-light .cm-strong {
+    color: #C85A17 !important; /* 라이트 모드: 어두운 살구/오렌지색 (가독성 확보) */
+}
+
+
+
+/* 마크다운 문서(메인 에디터) 전체 배경색 변경 - 약간 짙은 회색 */
+.theme-dark .myclass {
+    background-color: #505050; 
+}
+
+
+
+/* 옵시디언 제목 색상 변수 정의 (!important로 테마 무시 방지) */
+
+/* 다크 모드 */
+.theme-dark {
+    /* 제목 1: 밝은 노란색 */
+    --h1-color: #F7E6C4FF !important; 
+    
+    /* 제목 2: 밝은 초록색 */
+    --h2-color: #DAF7C4FF !important; 
+    
+    /* 제목 3: 밝은 파란색 */
+    --h3-color: #C4E1F7FF !important; 
+    
+    /* 제목 4: 밝은 보라색 */
+    --h4-color: #dfc0fb !important; 
+    
+    /* 취소된 할 일 ([-]) 색상 변수 */
+    --task-cancel-color: #ef5350 !important;       /* 부드러운 밝은 빨간색 */
+    --task-cancel-border: #ef5350 !important;
+    --task-cancel-bg: rgba(239, 83, 80, 0.15) !important; /* 반투명 어두운 빨간색 배경 */
+}
+
+/* 라이트 모드 */
+.theme-light {
+    /* 제목 1: 어두운 황토/금색 계열 */
+    --h1-color: #B25E00 !important; 
+    
+    /* 제목 2: 어두운 초록색 계열 */
+    --h2-color: #2E7D32 !important; 
+    
+    /* 제목 3: 어두운 파란색 계열 */
+    --h3-color: #1565C0 !important; 
+    
+    /* 제목 4: 어두운 보라색/자주색 계열 */
+    --h4-color: #760ed1 !important; 
+    
+    /* 취소된 할 일 ([-]) 색상 변수 */
+    --task-cancel-color: #e53935 !important;       /* 선명한 빨간색 */
+    --task-cancel-border: #e53935 !important;
+    --task-cancel-bg: rgba(229, 57, 53, 0.08) !important; /* 연한 빨간색 배경 */
+}
+
+
+/* 제목 폰트 크기 및 색상 강제 적용 (Minimal 테마 등 고명시도 테마 호환) */
+
+/* 제목 1 (H1) */
+.markdown-rendered h1, 
+.markdown-preview-view h1,
+.cm-header-1 {
+    color: var(--h1-color) !important;
+    font-size: 1.85em !important;
+}
+
+/* 제목 2 (H2) */
+.markdown-rendered h2, 
+.markdown-preview-view h2,
+.cm-header-2 {
+    color: var(--h2-color) !important;
+    font-size: 1.55em !important;
+}
+
+/* 제목 3 (H3) */
+.markdown-rendered h3, 
+.markdown-preview-view h3,
+.cm-header-3 {
+    color: var(--h3-color) !important;
+    font-size: 1.3em !important;
+}
+
+/* 제목 4 (H4) */
+.markdown-rendered h4, 
+.markdown-preview-view h4,
+.cm-header-4 {
+    color: var(--h4-color) !important;
+    font-size: 1.15em !important;
+}
+
+
+
+/* 2. 취소된 할 일 (data-task="-") 스타일 커스텀 */
+
+/* 취소된 할 일 텍스트 스타일 (취소선 제거, 이미지와 일치) */
+.task-list-item[data-task="-"],
+.markdown-preview-view ul li[data-task="-"],
+.HyperMD-list-line[data-task="-"] {
+    text-decoration: none !important; /* 이미지처럼 취소선 제거 */
+    opacity: 0.85; /* 본문 텍스트보다 살짝 흐리게 */
+    color: var(--text-muted) !important;
+}
+
+/* 체크박스를 동그라미 모양으로 변경 및 텍스트 데코레이션 방지 */
+.task-list-item-checkbox {
+    text-decoration: none !important;
+    border-radius: 50% !important;
+}
+
+/* 취소된 할 일 체크박스 배경, 테두리 및 둥글기 설정 (둥글게) */
+[data-task="-"] .task-list-item-checkbox {
+    background-color: var(--task-cancel-bg) !important;
+    border: 2px solid var(--task-cancel-border) !important;
+    border-radius: 50% !important;
+    position: relative;
+    box-sizing: border-box !important;
+}
+
+/* 체크박스 내부의 체크표시를 빨간색 X 모양으로 변경 */
+[data-task="-"] .task-list-item-checkbox::after {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 10px !important;
+    height: 10px !important;
+    background-color: var(--task-cancel-color) !important;
+    transform: translate(-50%, -50%) !important;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E") !important;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E") !important;
+    -webkit-mask-size: contain !important;
+    mask-size: contain !important;
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important;
+    mask-position: center !important;
+    clip-path: none !important;
+}
+
+
+
+/* 3. 진행 중인 할 일 (data-task="/") 스타일 커스텀 */
+
+/* 진행 중인 할 일 텍스트 스타일 */
+.task-list-item[data-task="/"],
+.markdown-preview-view ul li[data-task="/"],
+.HyperMD-list-line[data-task="/"] {
+    text-decoration: none !important; /* 취소선 없음 */
+    opacity: 1 !important; /* 선명하게 */
+}
+
+/* 진행 중인 할 일 체크박스 배경 (하단 40%만 테마 색상으로 채움) 및 테두리 설정 (둥글게) */
+[data-task="/"] .task-list-item-checkbox {
+    background: linear-gradient(to top, var(--interactive-accent) 40%, var(--background-secondary) 40%) !important;
+    border: 2px solid var(--interactive-accent) !important;
+    border-radius: 50% !important;
+    position: relative;
+    box-sizing: border-box !important;
+}
+
+/* 진행 중인 할 일 체크박스의 기본 체크마크 완전히 숨기기 */
+[data-task="/"] .task-list-item-checkbox::after {
+    content: "" !important;
+    display: none !important;
+}

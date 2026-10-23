@@ -1,0 +1,1097 @@
+/* =========================================================================
+   Goguryeo — a glass theme for Obsidian (desktop, iPad, iPhone)
+   Built against Obsidian 1.14 class names.
+   ========================================================================= */
+
+/* @settings
+
+name: Goguryeo
+id: goguryeo
+settings:
+    -
+        id: goguryeo-layout
+        title: Layout (desktop)
+        type: heading
+        level: 1
+        collapsed: true
+    -
+        id: goguryeo-ribbon-static
+        title: Always show the ribbon
+        description: Off = the ribbon hides and slides out when the pointer touches the left edge.
+        type: class-toggle
+        default: false
+    -
+        id: g-ribbon-hotzone
+        title: Ribbon reveal zone
+        description: Width of the invisible strip on the left edge that reveals the ribbon.
+        type: variable-number-slider
+        default: 6
+        min: 2
+        max: 24
+        step: 1
+        format: px
+    -
+        id: goguryeo-no-cards
+        title: Turn off floating card layout
+        type: class-toggle
+        default: false
+    -
+        id: goguryeo-background
+        title: Background behind the glass
+        description: If Obsidian's "Translucent window" is on, your real wallpaper is used instead.
+        type: class-select
+        allowEmpty: false
+        default: goguryeo-bg-gradient
+        options:
+            -
+                label: Soft gradient
+                value: goguryeo-bg-gradient
+            -
+                label: Solid gray
+                value: goguryeo-bg-solid
+    -
+        id: goguryeo-glass
+        title: Glass
+        type: heading
+        level: 1
+        collapsed: true
+    -
+        id: g-blur
+        title: Blur strength
+        type: variable-number-slider
+        default: 16
+        min: 0
+        max: 40
+        step: 1
+        format: px
+    -
+        id: g-glass-tint
+        title: Glass opacity
+        description: Higher = more solid, lower = more see-through.
+        type: variable-number-slider
+        default: 62
+        min: 30
+        max: 95
+        step: 1
+        format: '%'
+    -
+        id: goguryeo-colors
+        title: Colors
+        type: heading
+        level: 1
+        collapsed: true
+    -
+        id: goguryeo-accent-info
+        title: Accent color
+        description: The accent is Apple green by default. Change it in Settings → Appearance → Accent color.
+        type: info-text
+        markdown: false
+    -
+        id: goguryeo-accent-links
+        title: Green links
+        description: Off = links are gray with a green underline.
+        type: class-toggle
+        default: false
+    -
+        id: goguryeo-plain-headings
+        title: Turn off colored headings
+        type: class-toggle
+        default: false
+    -
+        id: goguryeo-plain-bold
+        title: Turn off peach bold text
+        type: class-toggle
+        default: false
+    -
+        id: goguryeo-text
+        title: Text
+        type: heading
+        level: 1
+        collapsed: true
+    -
+        id: g-line-height
+        title: Line height
+        type: variable-number-slider
+        default: 1.85
+        min: 1.3
+        max: 2.2
+        step: 0.05
+    -
+        id: goguryeo-mobile
+        title: iPhone & iPad
+        type: heading
+        level: 1
+        collapsed: true
+    -
+        id: goguryeo-no-safari-bar
+        title: Turn off Safari-style bottom bar (iPhone)
+        description: Needs Obsidian's "Floating navigation" setting turned on.
+        type: class-toggle
+        default: false
+    -
+        id: goguryeo-no-top-toggles
+        title: Keep sidebar buttons in their default place
+        type: class-toggle
+        default: false
+    -
+        id: g-ipad-toggle-offset
+        title: iPad sidebar buttons — vertical adjust
+        type: variable-number-slider
+        default: 0
+        min: -40
+        max: 40
+        step: 1
+        format: px
+
+*/
+
+
+/* -------------------------------------------------------------------------
+   1. Palette — Apple system grays, green accent
+   ------------------------------------------------------------------------- */
+
+body {
+    --g-blur: 16px;
+    --g-glass-tint: 62%;
+    --g-line-height: 1.85;
+    --g-ribbon-hotzone: 6px;
+    --g-ipad-toggle-offset: 0px;
+
+    --g-gap: 8px;
+    --g-radius-card: 12px;
+    --g-radius-panel: 14px;
+    --g-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    --font-interface-theme: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", "Apple SD Gothic Neo",
+        "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+    --font-text-theme: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", "Apple SD Gothic Neo",
+        "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+    --font-monospace-theme: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+
+    --line-height-normal: var(--g-line-height);
+    --checkbox-radius: 50%;
+
+    --radius-s: 6px;
+    --radius-m: 8px;
+    --radius-l: 12px;
+    --radius-xl: 16px;
+}
+
+body.is-mobile {
+    --g-blur: 12px;
+}
+
+.theme-light {
+    --accent-h: 135;
+    --accent-s: 59%;
+    --accent-l: 42%;
+
+    --g-gray: #8e8e93;
+    --g-gray2: #aeaeb2;
+    --g-gray3: #c7c7cc;
+    --g-gray4: #d1d1d6;
+    --g-gray5: #e5e5ea;
+    --g-gray6: #f2f2f7;
+    --g-sidebar-base: #f5f5f8;
+
+    --background-primary: #ffffff;
+    --background-primary-alt: #f9f9fb;
+    --background-secondary: var(--g-sidebar-base);
+    --background-secondary-alt: var(--g-gray5);
+    --background-modifier-border: rgba(0, 0, 0, 0.09);
+    --background-modifier-border-hover: rgba(0, 0, 0, 0.14);
+    --background-modifier-border-focus: rgba(0, 0, 0, 0.2);
+    --background-modifier-hover: rgba(0, 0, 0, 0.045);
+    --background-modifier-active-hover: rgba(0, 0, 0, 0.07);
+    --background-modifier-form-field: rgba(0, 0, 0, 0.035);
+    --interactive-normal: #ffffff;
+    --interactive-hover: var(--g-gray6);
+
+    --text-normal: #1d1d1f;
+    --text-muted: #6e6e73;
+    --text-faint: #aeaeb2;
+    --divider-color: rgba(0, 0, 0, 0.08);
+
+    --g-canvas-solid: #e8e8ed;
+    --g-canvas: radial-gradient(120% 90% at 0% 0%, hsla(var(--accent-h), 45%, 82%, 0.45), transparent 60%),
+        radial-gradient(100% 80% at 100% 100%, rgba(170, 185, 215, 0.45), transparent 60%),
+        var(--g-canvas-solid);
+    --g-card-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+.theme-dark {
+    --accent-h: 135;
+    --accent-s: 64%;
+    --accent-l: 50%;
+
+    --g-gray: #8e8e93;
+    --g-gray2: #636366;
+    --g-gray3: #48484a;
+    --g-gray4: #3a3a3c;
+    --g-gray5: #2c2c2e;
+    --g-gray6: #1c1c1e;
+    --g-sidebar-base: #252527;
+
+    --background-primary: #1c1c1e;
+    --background-primary-alt: #232325;
+    --background-secondary: var(--g-sidebar-base);
+    --background-secondary-alt: var(--g-gray5);
+    --background-modifier-border: rgba(255, 255, 255, 0.10);
+    --background-modifier-border-hover: rgba(255, 255, 255, 0.15);
+    --background-modifier-border-focus: rgba(255, 255, 255, 0.22);
+    --background-modifier-hover: rgba(255, 255, 255, 0.06);
+    --background-modifier-active-hover: rgba(255, 255, 255, 0.10);
+    --background-modifier-form-field: rgba(255, 255, 255, 0.05);
+    --interactive-normal: var(--g-gray5);
+    --interactive-hover: var(--g-gray4);
+
+    --text-normal: #f5f5f7;
+    --text-muted: #a1a1a6;
+    --text-faint: #636366;
+    --divider-color: rgba(255, 255, 255, 0.08);
+
+    --g-canvas-solid: #111113;
+    --g-canvas: radial-gradient(120% 90% at 0% 0%, hsla(var(--accent-h), 30%, 28%, 0.35), transparent 60%),
+        radial-gradient(100% 80% at 100% 100%, rgba(80, 92, 125, 0.32), transparent 60%),
+        var(--g-canvas-solid);
+    --g-card-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.07), 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+body.goguryeo-bg-solid {
+    --g-canvas: var(--g-canvas-solid);
+}
+
+.theme-light,
+.theme-dark {
+    --text-selection: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.25);
+    --tag-color: var(--text-muted);
+    --tag-color-hover: var(--text-normal);
+    --tag-background: var(--background-modifier-hover);
+    --tag-background-hover: var(--background-modifier-active-hover);
+    --tag-border-width: 0px;
+}
+
+/* Links: gray with a green underline unless "Green links" is on */
+body:not(.goguryeo-accent-links) {
+    --link-color: var(--text-normal);
+    --link-color-hover: var(--text-accent);
+    --link-external-color: var(--text-normal);
+    --link-external-color-hover: var(--text-accent);
+    --link-unresolved-color: var(--text-muted);
+}
+
+body:not(.goguryeo-accent-links) :is(.internal-link, .external-link, .cm-hmd-internal-link .cm-underline, .cm-link .cm-underline, .cm-url .cm-underline) {
+    text-decoration-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.6);
+}
+
+
+/* -------------------------------------------------------------------------
+   2. Glass tokens (shared with Day Planner Pro and other plugins)
+   ------------------------------------------------------------------------- */
+
+body.theme-dark {
+    --glass-bg: color-mix(in srgb, var(--background-primary) var(--g-glass-tint), transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
+    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) var(--g-glass-tint), transparent);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-highlight: rgba(255, 255, 255, 0.07);
+    --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
+    --glass-blur: blur(var(--g-blur)) saturate(180%);
+    --glass-track: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+    --glass-track-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 1px 3px rgba(0, 0, 0, 0.18);
+    --glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+        color-mix(in srgb, var(--background-primary) 80%, transparent);
+    --glass-thumb-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06)),
+        color-mix(in srgb, color-mix(in srgb, var(--background-primary) 93%, var(--text-normal)) 85%, transparent);
+    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.08),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.10);
+    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 160px);
+    --glass-well: rgba(0, 0, 0, 0.18);
+    --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body.theme-light {
+    --glass-bg: color-mix(in srgb, var(--background-primary) calc(var(--g-glass-tint) + 6%), transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--background-primary) 84%, transparent);
+    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) calc(var(--g-glass-tint) + 6%), transparent);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --glass-highlight: rgba(255, 255, 255, 0.7);
+    --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.08);
+    --glass-blur: blur(var(--g-blur)) saturate(180%);
+    --glass-track: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.45)), rgba(0, 0, 0, 0.03);
+    --glass-track-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 1px 3px rgba(0, 0, 0, 0.06);
+    --glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+        color-mix(in srgb, var(--background-primary) 80%, transparent);
+    --glass-thumb-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06)),
+        color-mix(in srgb, color-mix(in srgb, var(--background-primary) 93%, var(--text-normal)) 85%, transparent);
+    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.10),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.60), inset 0 1px 0 rgba(255, 255, 255, 0.70),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.06);
+    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 160px);
+    --glass-well: rgba(0, 0, 0, 0.035);
+    --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.07), 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* No blur support: near-solid glass */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    body.theme-dark,
+    body.theme-light {
+        --glass-bg: color-mix(in srgb, var(--background-primary) 95%, transparent);
+        --glass-bg-strong: color-mix(in srgb, var(--background-primary) 97%, transparent);
+        --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) 95%, transparent);
+    }
+}
+
+/* "Reduce transparency" in system settings */
+@media (prefers-reduced-transparency: reduce) {
+    body.theme-dark,
+    body.theme-light {
+        --glass-bg: color-mix(in srgb, var(--background-primary) 97%, transparent);
+        --glass-bg-strong: var(--background-primary);
+        --glass-sidebar: var(--g-sidebar-base);
+        --glass-blur: none;
+        --glass-thumb: var(--background-secondary);
+        --glass-thumb-hover: var(--background-modifier-border);
+    }
+}
+
+/* Ready-made pieces for plugins */
+.glass-panel {
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+button.glass-btn {
+    background: var(--glass-thumb);
+    box-shadow: var(--glass-thumb-shadow);
+    border: none;
+    border-radius: 8px;
+    color: var(--text-normal);
+}
+
+button.glass-btn:hover {
+    background: var(--glass-thumb-hover);
+}
+
+.glass-track {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--glass-track);
+    box-shadow: var(--glass-track-shadow);
+}
+
+.glass-well input,
+.glass-well textarea,
+input.glass-well {
+    background-color: var(--glass-well);
+    box-shadow: var(--glass-well-shadow);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+}
+
+
+/* -------------------------------------------------------------------------
+   3. Text — line height, bold, headings (merged from gemin-theme.css)
+   ------------------------------------------------------------------------- */
+
+.markdown-source-view.mod-cm6 .cm-line,
+.markdown-reading-view p,
+.markdown-reading-view li,
+.markdown-reading-view blockquote,
+.markdown-reading-view table td {
+    line-height: var(--g-line-height);
+}
+
+body.theme-dark:not(.goguryeo-plain-bold) {
+    --bold-color: #ffdab9;
+}
+
+body.theme-light:not(.goguryeo-plain-bold) {
+    --bold-color: #c85a17;
+}
+
+body.theme-dark:not(.goguryeo-plain-headings) {
+    --h1-color: #f7e6c4;
+    --h2-color: #daf7c4;
+    --h3-color: #c4e1f7;
+    --h4-color: #dfc0fb;
+}
+
+body.theme-light:not(.goguryeo-plain-headings) {
+    --h1-color: #b25e00;
+    --h2-color: #2e7d32;
+    --h3-color: #1565c0;
+    --h4-color: #760ed1;
+}
+
+body {
+    --h1-size: 1.85em;
+    --h2-size: 1.55em;
+    --h3-size: 1.3em;
+    --h4-size: 1.15em;
+}
+
+/* cssclasses: myclass */
+.theme-dark .myclass {
+    background-color: #505050;
+}
+
+
+/* -------------------------------------------------------------------------
+   4. Tasks — round checkboxes, cancelled [-], in progress [/]
+      (merged from gemin-theme.css)
+   ------------------------------------------------------------------------- */
+
+.theme-dark {
+    --task-cancel-color: #ef5350;
+    --task-cancel-border: #ef5350;
+    --task-cancel-bg: rgba(239, 83, 80, 0.15);
+}
+
+.theme-light {
+    --task-cancel-color: #e53935;
+    --task-cancel-border: #e53935;
+    --task-cancel-bg: rgba(229, 57, 53, 0.08);
+}
+
+.task-list-item-checkbox {
+    text-decoration: none !important;
+    border-radius: 50% !important;
+}
+
+/* Cancelled [-]: no strikethrough, slightly faded, red X */
+.task-list-item[data-task="-"],
+.markdown-preview-view ul li[data-task="-"],
+.HyperMD-list-line[data-task="-"] {
+    text-decoration: none !important;
+    opacity: 0.85;
+    color: var(--text-muted) !important;
+}
+
+[data-task="-"] .task-list-item-checkbox {
+    background-color: var(--task-cancel-bg) !important;
+    border: 2px solid var(--task-cancel-border) !important;
+    border-radius: 50% !important;
+    position: relative;
+    box-sizing: border-box !important;
+}
+
+[data-task="-"] .task-list-item-checkbox::after {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 10px !important;
+    height: 10px !important;
+    background-color: var(--task-cancel-color) !important;
+    transform: translate(-50%, -50%) !important;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E") !important;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E") !important;
+    -webkit-mask-size: contain !important;
+    mask-size: contain !important;
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important;
+    mask-position: center !important;
+    clip-path: none !important;
+}
+
+/* In progress [/]: bottom 40% filled with the accent */
+.task-list-item[data-task="/"],
+.markdown-preview-view ul li[data-task="/"],
+.HyperMD-list-line[data-task="/"] {
+    text-decoration: none !important;
+    opacity: 1 !important;
+}
+
+[data-task="/"] .task-list-item-checkbox {
+    background: linear-gradient(to top, var(--interactive-accent) 40%, var(--background-secondary) 40%) !important;
+    border: 2px solid var(--interactive-accent) !important;
+    border-radius: 50% !important;
+    position: relative;
+    box-sizing: border-box !important;
+}
+
+[data-task="/"] .task-list-item-checkbox::after {
+    content: "" !important;
+    display: none !important;
+}
+
+
+/* -------------------------------------------------------------------------
+   5. Floating glass surfaces — menus, pop-ups, modals, notices, status bar
+   ------------------------------------------------------------------------- */
+
+body {
+    --menu-background: var(--glass-bg-strong);
+    --menu-backdrop-filter: var(--glass-blur);
+    --menu-border-color: var(--glass-border);
+    --menu-radius: 12px;
+    --menu-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+
+    --prompt-background: var(--glass-bg-strong);
+    --prompt-backdrop-filter: var(--glass-blur);
+    --prompt-border-color: var(--glass-border);
+
+    --modal-background: var(--glass-bg-strong);
+    --modal-border-color: var(--glass-border);
+    --modal-radius: 16px;
+
+    --status-bar-background: var(--glass-bg);
+    --status-bar-border-color: var(--glass-border);
+    --status-bar-radius: 10px 0 0 0;
+}
+
+.prompt {
+    border-radius: 16px;
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+.modal {
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+.suggestion-container,
+.popover.hover-popover,
+.notice {
+    background-color: var(--glass-bg-strong);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+.suggestion-container,
+.notice {
+    border-radius: 12px;
+}
+
+.popover.hover-popover {
+    border-radius: var(--g-radius-panel);
+}
+
+.popover.hover-popover .markdown-embed {
+    background-color: transparent;
+}
+
+.notice {
+    color: var(--text-normal);
+}
+
+.tooltip {
+    background-color: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-normal);
+    box-shadow: var(--glass-shadow);
+}
+
+.status-bar {
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Primary buttons in the accent */
+button.mod-cta {
+    border-radius: 8px;
+}
+
+
+/* -------------------------------------------------------------------------
+   6. Floating card layout (desktop)
+      Window = background canvas; editor and sidebars = rounded cards.
+   ------------------------------------------------------------------------- */
+
+body:not(.is-mobile) .app-container {
+    background: var(--g-canvas);
+}
+
+body.is-translucent:not(.is-fullscreen) .app-container {
+    background: transparent;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) {
+    --titlebar-background: transparent;
+    --titlebar-background-focused: transparent;
+    --tab-container-background: transparent;
+    --sidebar-tab-container-background: transparent;
+    --ribbon-background: transparent;
+    --ribbon-background-collapsed: transparent;
+    --tab-outline-width: 0px;
+    --tab-curve: 0px;
+    --tab-background-active: transparent;
+    --divider-color: transparent;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) :is(.horizontal-main-container, .workspace, .workspace-split.mod-root, .workspace-split.mod-sidedock) {
+    background-color: transparent;
+}
+
+/* Editor card */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs .workspace-tab-container {
+    box-sizing: border-box;
+    padding: 0 var(--g-gap) var(--g-gap);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs .workspace-tab-container > .workspace-leaf {
+    border-radius: var(--g-radius-card);
+    background-color: var(--background-primary);
+    box-shadow: var(--g-card-shadow);
+    overflow: hidden;
+}
+
+/* Sidebar cards (glass) */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs {
+    margin: var(--g-gap) 0 var(--g-gap) var(--g-gap);
+    border-radius: var(--g-radius-panel);
+    border: 1px solid var(--glass-border);
+    background-color: var(--glass-sidebar);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    overflow: hidden;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-right-split .workspace-tabs {
+    margin: var(--g-gap) var(--g-gap) var(--g-gap) 0;
+}
+
+/* Inside a sidebar card, everything that normally paints the sidebar color
+   becomes clear so the glass shows through. */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs > * {
+    --background-secondary: transparent;
+}
+
+/* Lighter, hairline dividers between stacked panes */
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-leaf-resize-handle:hover {
+    background-color: var(--background-modifier-border-hover);
+}
+
+
+/* -------------------------------------------------------------------------
+   7. Tabs
+      Sidebars: icons inside one bordered pill (like the Border theme),
+      active tab = raised glass button.
+      Editor tabs: soft pills, active tab = raised glass.
+   ------------------------------------------------------------------------- */
+
+body {
+    --tab-radius: 8px;
+    --tab-radius-active: 8px;
+}
+
+.workspace-tab-header-container .workspace-tab-header::before,
+.workspace-tab-header-container .workspace-tab-header::after {
+    display: none;
+}
+
+.workspace-tab-header-container .workspace-tab-header.is-active {
+    box-shadow: none;
+    background-color: transparent;
+}
+
+.workspace-tab-header-container .workspace-tab-header.is-active .workspace-tab-header-inner {
+    background: var(--glass-thumb);
+    box-shadow: var(--glass-thumb-shadow);
+}
+
+@media (hover: hover) {
+    .workspace-tab-header-container .workspace-tab-header:not(.is-active):hover {
+        background-color: transparent;
+        box-shadow: none;
+    }
+
+    .workspace-tab-header-container .workspace-tab-header:not(.is-active):hover .workspace-tab-header-inner {
+        background-color: var(--background-modifier-hover);
+    }
+}
+
+/* Sidebar tab pill */
+.mod-sidedock .workspace-tab-header-container-inner {
+    flex: 0 1 auto;
+    gap: 2px;
+    margin: 6px auto;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--glass-track);
+    box-shadow: var(--glass-track-shadow);
+}
+
+.mod-sidedock .workspace-tab-header-spacer {
+    flex-grow: 0;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header {
+    padding: 0;
+}
+
+.mod-sidedock .workspace-tab-header-inner {
+    padding: 0 9px;
+    border-radius: 7px;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header:not(.is-active) .workspace-tab-header-inner-icon {
+    opacity: 0.7;
+}
+
+
+/* -------------------------------------------------------------------------
+   8. Desktop ribbon — hidden, slides out like a drawer at the left edge
+      Mouse:      hover the left edge.
+      Touchscreen: a small grab handle shows on the left edge; tap it.
+      Plugins can add body.goguryeo-touch-active to keep it open.
+   ------------------------------------------------------------------------- */
+
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-left {
+    position: fixed;
+    top: calc(var(--header-height) + var(--g-gap));
+    bottom: calc(var(--g-gap) * 4);
+    left: var(--g-gap);
+    height: auto;
+    margin: 0;
+    padding: var(--size-4-2) 0;
+    overflow: visible;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--g-radius-panel);
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    z-index: calc(var(--layer-status-bar) + 1);
+    opacity: 0;
+    transform: translateX(calc(-100% - var(--g-gap) - 4px));
+    transition: transform 260ms var(--g-ease) 220ms, opacity 180ms ease 220ms;
+}
+
+/* The header filler Obsidian draws above the ribbon */
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-left::before {
+    display: none;
+}
+
+/* Invisible reveal strip on the left edge (moves with the ribbon) */
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-left::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 100%;
+    width: calc(var(--g-gap) + 4px + var(--g-ribbon-hotzone));
+}
+
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-left:is(:hover, :focus-within),
+body.goguryeo-touch-active:not(.is-mobile) .workspace-ribbon.mod-left {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0ms;
+}
+
+/* Touchscreen PCs: show a grab handle on the edge */
+@media (any-pointer: coarse) {
+    body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-left::after {
+        width: calc(var(--g-gap) + 4px + 18px);
+        background-image: linear-gradient(var(--text-faint), var(--text-faint));
+        background-repeat: no-repeat;
+        background-size: 5px 48px;
+        background-position: calc(var(--g-gap) + 4px + 3px) center;
+    }
+
+    body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-left:is(:hover, :focus-within)::after {
+        background-image: none;
+    }
+}
+
+
+/* -------------------------------------------------------------------------
+   9. Mobile — shared (iPhone + iPad)
+   ------------------------------------------------------------------------- */
+
+body.is-mobile {
+    --mobile-sidebar-background: var(--glass-sidebar);
+    --tab-switcher-menubar-background: var(--glass-bg);
+}
+
+/* Glass drawers. The blur lives on a pseudo-element so the drawer itself
+   does not trap fixed-position children (the iPad sidebar buttons). */
+.workspace-drawer {
+    isolation: isolate;
+    background-color: transparent;
+}
+
+.workspace-drawer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-color: var(--glass-sidebar);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 0.5px var(--glass-border);
+    pointer-events: none;
+}
+
+.mobile-tab-switcher-menubar {
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+
+
+/* -------------------------------------------------------------------------
+   10. iPhone — Safari-style bottom bar
+       [ ‹ › ]  [   file name   ]  [ ≡ ]
+       · › hides when there is nowhere to go forward
+       · tap the file name → tab overview
+       · search + new file appear only in the tab overview
+   ------------------------------------------------------------------------- */
+
+body.is-phone {
+    --g-nav-w: min(calc(100vw - 24px), 560px);
+    --g-nav-gap: 8px;
+    --g-nav-radius: 14px;
+    --g-nav-lead: calc(var(--navbar-height) * 2);
+}
+
+body.is-phone:has(.mobile-navbar-action-forward > button[aria-disabled="true"]) {
+    --g-nav-lead: var(--navbar-height);
+}
+
+/* The bar itself becomes a clear row; each group gets its own glass */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
+    --raised: none;
+    width: var(--g-nav-w);
+    max-width: none;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-actions {
+    gap: var(--g-nav-gap);
+    height: 100%;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action {
+    flex: 0 0 var(--navbar-height);
+    width: var(--navbar-height);
+    margin: 0;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-back, .mobile-navbar-action-forward, .mobile-navbar-action-menu) {
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), inset 0 0 0 0.5px var(--glass-border);
+    border-radius: var(--g-nav-radius);
+}
+
+/* ‹ and › share one rounded button */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-back {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-forward {
+    margin-inline-start: calc(var(--g-nav-gap) * -1);
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-forward:has(> button[aria-disabled="true"]) {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar-action-forward > button[aria-disabled="true"]) .mobile-navbar-action-back {
+    border-radius: var(--g-nav-radius);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-back > button[aria-disabled="true"] {
+    opacity: 0.35;
+}
+
+/* Search + new file live in the tab overview instead */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-quick-switcher, .mobile-navbar-action-new-tab) {
+    display: none;
+}
+
+/* The tabs button stretches into the centre slot and becomes an invisible
+   tap target; the note title is drawn underneath it (below). */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-tabs {
+    flex: 1 1 auto;
+    width: auto;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-tabs .clickable-icon {
+    opacity: 0;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-menu .navbar-action-flair {
+    display: none;
+}
+
+/* Content scrolls under the glass bar, so the fade mask is not needed */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root {
+    mask-image: none;
+    -webkit-mask-image: none;
+}
+
+/* The note title, moved into the centre of the bottom bar */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .mod-root .workspace-leaf .view-header-title-container {
+    display: flex;
+    position: fixed;
+    z-index: 1;
+    left: calc(50% - var(--g-nav-w) / 2 + var(--g-nav-lead) + var(--g-nav-gap));
+    width: calc(var(--g-nav-w) - var(--g-nav-lead) - var(--navbar-height) - var(--g-nav-gap) * 2);
+    bottom: calc(var(--navbar-bottom-offset) - var(--keyboard-height) - 2px);
+    height: var(--navbar-height);
+    margin: 0;
+    padding: 0 14px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--g-nav-radius);
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), inset 0 0 0 0.5px var(--glass-border);
+    pointer-events: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-parent {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-semibold);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Keyboard open (bar gone): keep the title out of the top header */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):not(:has(.mobile-navbar)) .mod-root .workspace-leaf .view-header-title-container {
+    visibility: hidden;
+}
+
+/* Tab overview open: the bar turns into a "Search files" pill above
+   Obsidian's own [+] [N tabs] [Done] row */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar {
+    z-index: calc(var(--layer-modal) + 1);
+    margin-bottom: calc(var(--navbar-bottom-offset) + 56px);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action-quick-switcher {
+    display: flex;
+    flex: 1 1 auto;
+    width: auto;
+    border-radius: var(--g-nav-radius);
+    background-color: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), inset 0 0 0 0.5px var(--glass-border);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action-quick-switcher .clickable-icon {
+    --icon-size: 18px;
+    gap: 8px;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action-quick-switcher .clickable-icon::after {
+    content: "Search files";
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+
+/* -------------------------------------------------------------------------
+   11. Sidebar buttons at the top centre
+       iPhone: the left-sidebar button (Obsidian has no right-sidebar
+               button on iPhone, so a theme cannot add one).
+       iPad:   both buttons, joined into one capsule.
+   ------------------------------------------------------------------------- */
+
+body.is-phone:not(.goguryeo-no-top-toggles):not(.goguryeo-no-safari-bar) .mod-root .view-header-left {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    height: var(--view-header-height);
+    z-index: 2;
+}
+
+body.is-phone:not(.goguryeo-no-top-toggles):not(.goguryeo-no-safari-bar) .mod-root .mod-left-split-toggle {
+    width: 56px;
+    border-radius: 999px;
+}
+
+body.is-tablet:not(.goguryeo-no-top-toggles) {
+    --file-header-justify: flex-start;
+    --g-ipad-toggle-top: calc(var(--safe-area-inset-top) + var(--header-height) + (var(--view-header-height) - 36px) / 2 + var(--g-ipad-toggle-offset));
+}
+
+body.is-tablet:not(.goguryeo-no-top-toggles) .sidebar-toggle-button:is(.mod-left, .mod-right) {
+    position: fixed;
+    top: var(--g-ipad-toggle-top);
+    width: 52px;
+    height: 36px;
+    padding: 0;
+    margin: 0;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--layer-popover);
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), inset 0 0 0 0.5px var(--glass-border);
+}
+
+body.is-tablet:not(.goguryeo-no-top-toggles) .sidebar-toggle-button.mod-left {
+    left: calc(50% - 52px);
+    border-radius: 18px 0 0 18px;
+}
+
+body.is-tablet:not(.goguryeo-no-top-toggles) .sidebar-toggle-button.mod-right {
+    left: 50%;
+    border-radius: 0 18px 18px 0;
+}
+
+
+/* -------------------------------------------------------------------------
+   12. Motion
+   ------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    body:not(.is-mobile) .workspace-ribbon.mod-left {
+        transition: none;
+    }
+}
