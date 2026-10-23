@@ -32,7 +32,7 @@ settings:
         format: px
     -
         id: goguryeo-no-cards
-        title: Turn off floating card layout
+        title: Turn off floating panel layout
         type: class-toggle
         default: false
     -
@@ -643,6 +643,43 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-right-split .workspace-tabs {
    becomes clear so the glass shows through. */
 body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs > * {
     --background-secondary: transparent;
+}
+
+/* Note header (‹ › and the path) floats as a glass bar. Notes scroll under
+   it; other views (Homepage, plugins…) simply start below it. */
+body:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-bar-offset: calc(var(--header-height) + 12px);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header {
+    position: absolute;
+    top: 6px;
+    left: var(--g-gap);
+    right: var(--g-gap);
+    z-index: 2;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--g-radius-card);
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
+    height: 100%;
+    padding-top: var(--g-bar-offset);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] > .view-content {
+    padding-top: 0;
+    --file-margins: calc(var(--g-bar-offset) + var(--size-4-8)) var(--size-4-8) var(--size-4-8);
+}
+
+/* Fade the note out in the thin gap above the bar so nothing peeks there */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] :is(.cm-scroller, .markdown-preview-view) {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
 }
 
 /* Vault name + help/settings under the left sidebar: its own small glass card */
