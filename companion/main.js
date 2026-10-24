@@ -3,8 +3,9 @@
    All platforms: keeps the left sidebar button out of the hidden ribbon.
    Desktop: keeps it at the start of the main tab bar, mirroring the right one.
 
-   iPhone & iPad: swipe in from the left/right edge to go back/forward
-   (only while both sidebars are closed); iPhone also gets a right sidebar
+   iPhone & iPad: swipe in from the left/right edge to go back/forward,
+   Safari style: the page follows the finger with the other page showing
+   underneath (only while both sidebars are closed); iPhone also gets a right sidebar
    button, which Obsidian has none of on phones.
 
    Tab bars: a glass "thumb" sits under the active tab of every tab bar (main
@@ -26,7 +27,7 @@
 
 const {
     Plugin, Platform, setIcon, normalizePath,
-    FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile,
+    FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, WorkspaceLeaf,
 } = require("obsidian");
 
 const EDGE = 40; // px from the window's left edge where a swipe may start
@@ -40,7 +41,9 @@ const SPLIT_CLASS = "goguryeo-split";
 const ONE_PANE_CLASS = "goguryeo-one-pane";
 const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
-const EDGE_SWIPE_AT = 80; // px to pull before letting go navigates
+const EDGE_SWIPE_AT = 0.35; // share of the width to pull before letting go navigates
+const SWIPE_SETTLE_MS = 280; // the page gliding the rest of the way (or back)
+const SWIPE_DRAW_MS = 400; // most to wait for the new page before uncovering it
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
@@ -382,20 +385,89 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // ---- iPhone & iPad: swipe in from an edge to go back / forward ----
 
     // Like Safari: start within EDGE_SWIPE_ZONE of the left edge and drag
-    // right to go back, or from the right edge leftwards to go forward. A
-    // round glass arrow follows the finger and fills in once the swipe has
-    // gone EDGE_SWIPE_AT; letting go then navigates, earlier cancels. Only
-    // while both sidebars are closed, nothing covers the note and there is
-    // somewhere to go.
+    // right to go back, or from the right edge leftwards to go forward. The
+    // page follows the finger and the one it goes to shows from underneath;
+    // letting go past EDGE_SWIPE_AT of the width (or with a flick) goes
+    // there, earlier springs back. Only while both sidebars are closed,
+    // nothing covers the note and there is somewhere to go.
+    //
+    // The page underneath is a copy of how it looked when it was left:
+    // Obsidian asks a leaf for its history state just before it leaves a
+    // page, so that is when the copy is taken. It is kept with that state,
+    // which is the very object that goes into the back/forward lists.
     setupEdgeSwipe() {
-        this.edgeArrow = document.body.createDiv("goguryeo-edge-arrow");
+        this.snapshots = new WeakMap();
         this.edgeSwipe = null;
-        this.register(() => this.edgeArrow.remove());
-        const opts = { passive: true, capture: true };
-        this.registerDomEvent(document, "touchstart", (e) => this.onEdgeStart(e), opts);
-        this.registerDomEvent(document, "touchmove", (e) => this.onEdgeMove(e), opts);
-        this.registerDomEvent(document, "touchend", () => this.onEdgeEnd(true), opts);
-        this.registerDomEvent(document, "touchcancel", () => this.onEdgeEnd(false), opts);
+        const proto = WorkspaceLeaf.prototype;
+        const own = Object.prototype.hasOwnProperty.call(proto, "getHistoryState");
+        const original = proto.getHistoryState;
+        const plugin = this;
+        const patched = function (...args) {
+            const state = original.apply(this, args);
+            try {
+                const snapshot = plugin.snapshotPage(this);
+                if (snapshot && state && typeof state === "object") plugin.snapshots.set(state, snapshot);
+            } catch (e) {
+                console.error("Goguryeo: page snapshot failed", e);
+            }
+            return state;
+        };
+        proto.getHistoryState = patched;
+        this.register(() => {
+            if (proto.getHistoryState !== patched) return;
+            if (own) proto.getHistoryState = original;
+            else delete proto.getHistoryState;
+        });
+        this.register(() => this.endPageSwipe());
+        this.registerDomEvent(document, "touchstart", (e) => this.onEdgeStart(e), { passive: true, capture: true });
+        this.registerDomEvent(document, "touchmove", (e) => this.onEdgeMove(e), { passive: false, capture: true });
+        this.registerDomEvent(document, "touchend", (e) => this.onEdgeEnd(e, true), { passive: true, capture: true });
+        this.registerDomEvent(document, "touchcancel", (e) => this.onEdgeEnd(e, false), { passive: true, capture: true });
+    }
+
+    // A still copy of a leaf's page: its content inside a bare copy of the
+    // content's frame (so the theme's rules for it still apply), plus where
+    // each scrolled part was scrolled to.
+    snapshotPage(leaf) {
+        const content = leaf.view?.contentEl;
+        if (!content || !leaf.view.navigation || !content.isConnected) return null;
+        const scrolls = [];
+        const walk = (el, path) => {
+            if (el.scrollTop || el.scrollLeft) scrolls.push([path, el.scrollTop, el.scrollLeft]);
+            const kids = el.children;
+            for (let i = 0; i < kids.length; i++) walk(kids[i], path.concat(i));
+        };
+        walk(content, []);
+        const frame = leaf.view.containerEl.cloneNode(false);
+        frame.classList.remove("goguryeo-swiping");
+        frame.appendChild(content.cloneNode(true));
+        return { frame, scrolls };
+    }
+
+    // A page for the swipe stage: the snapshot, or failing that a plain page
+    // with the entry's name
+    makeSwipePage(snapshot, entry) {
+        const page = createDiv("goguryeo-swipe-page");
+        if (snapshot) {
+            page.appendChild(snapshot.frame.cloneNode(true));
+        } else {
+            const blank = page.createDiv("goguryeo-swipe-blank");
+            if (entry?.icon) setIcon(blank.createDiv("goguryeo-swipe-blank-icon"), entry.icon);
+            blank.createDiv({ cls: "goguryeo-swipe-blank-title", text: entry?.title ?? "" });
+        }
+        return page;
+    }
+
+    restoreScrolls(page, snapshot) {
+        const content = page.querySelector(".view-content");
+        if (!content || !snapshot) return;
+        for (const [path, top, left] of snapshot.scrolls) {
+            let el = content;
+            for (const i of path) el = el?.children[i];
+            if (!el) continue;
+            el.scrollTop = top;
+            el.scrollLeft = left;
+        }
     }
 
     canEdgeSwipe() {
@@ -405,6 +477,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     }
 
     onEdgeStart(e) {
+        if (this.edgeSwipe?.settling) return;
         this.edgeSwipe = null;
         if (e.touches.length !== 1 || !this.canEdgeSwipe()) return;
         const t = e.touches[0];
@@ -413,13 +486,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
         const history = leaf?.history;
         const steps = dir < 0 ? history?.backHistory : history?.forwardHistory;
-        if (!steps?.length) return;
-        this.edgeSwipe = { dir, leaf, x0: t.clientX, y0: t.clientY, locked: false, armed: false };
+        if (!steps?.length || !leaf.view?.contentEl) return;
+        this.edgeSwipe = {
+            dir, leaf, entry: steps[steps.length - 1],
+            x0: t.clientX, y0: t.clientY, locked: false, x: t.clientX, t: e.timeStamp, v: 0,
+        };
     }
 
     onEdgeMove(e) {
         const s = this.edgeSwipe;
-        if (!s) return;
+        if (!s || s.settling) return;
         const t = e.touches[0];
         const dx = (t.clientX - s.x0) * -s.dir; // distance pulled inwards
         const dy = t.clientY - s.y0;
@@ -430,23 +506,94 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
             if (dx < LOCK_AT) return;
             s.locked = true;
-            this.edgeArrow.toggleClass("is-back", s.dir < 0);
-            this.edgeArrow.toggleClass("is-forward", s.dir > 0);
-            setIcon(this.edgeArrow, s.dir < 0 ? "lucide-chevron-left" : "lucide-chevron-right");
-            this.edgeArrow.addClass("is-visible");
+            this.startPageSwipe(s);
         }
-        const pull = Math.min(dx, EDGE_SWIPE_AT * 1.25);
-        s.armed = dx >= EDGE_SWIPE_AT;
-        this.edgeArrow.toggleClass("is-armed", s.armed);
-        this.edgeArrow.style.top = `${t.clientY}px`;
-        this.edgeArrow.style.setProperty("--g-edge-pull", `${pull * 0.6}px`);
+        e.preventDefault();
+        const dt = e.timeStamp - s.t;
+        if (dt > 0) s.v = 0.8 * ((t.clientX - s.x) / dt) + 0.2 * s.v;
+        s.x = t.clientX;
+        s.t = e.timeStamp;
+        this.setPageSwipe(s, Math.max(0, Math.min(s.width, dx)));
     }
 
-    onEdgeEnd(finished) {
+    onEdgeEnd(e, finished) {
+        const s = this.edgeSwipe;
+        if (!s || s.settling) return;
+        if (!s.locked) {
+            this.edgeSwipe = null;
+            return;
+        }
+        // A flick inwards goes even when short; a flick back cancels
+        const v = s.v * -s.dir; // px/ms, inwards
+        const go = finished && (v > 0.35 || (s.pulled >= s.width * EDGE_SWIPE_AT && v > -0.2));
+        this.settlePageSwipe(s, go);
+    }
+
+    // The stage covers the leaf's page: the page underneath (clipped to the
+    // part the top page has uncovered, and drifting in from a third of the
+    // way off) and the page on top (sliding with the finger, casting a
+    // shadow). Going back, the current page is on top; going forward, the
+    // next one slides in on top of it.
+    startPageSwipe(s) {
+        const { leaf, entry, dir } = s;
+        const frame = leaf.view.containerEl;
+        const current = this.snapshotPage(leaf);
+        const target = this.snapshots.get(entry);
+        const currentPage = this.makeSwipePage(current, null);
+        const targetPage = this.makeSwipePage(target, entry);
+        const stage = createDiv("goguryeo-swipe-stage");
+        stage.setAttr("inert", "");
+        s.under = dir < 0 ? targetPage : currentPage;
+        s.over = dir < 0 ? currentPage : targetPage;
+        s.under.addClass("is-under");
+        s.over.addClass("is-over");
+        stage.append(s.under, s.over);
+        frame.appendChild(stage);
+        frame.addClass("goguryeo-swiping");
+        this.restoreScrolls(currentPage, current);
+        this.restoreScrolls(targetPage, target);
+        s.stage = stage;
+        s.frame = frame;
+        s.width = stage.clientWidth || window.innerWidth;
+        this.setPageSwipe(s, 0);
+    }
+
+    // pulled: how far the finger has come in, 0…width
+    setPageSwipe(s, pulled) {
+        s.pulled = pulled;
+        const w = s.width;
+        const edge = s.dir < 0 ? pulled : w - pulled; // left edge of the top page
+        const underX = -(w - edge) / 3;
+        s.over.style.transform = `translateX(${edge}px)`;
+        s.under.style.transform = `translateX(${underX}px)`;
+        s.under.style.clipPath = `inset(0 ${w - edge + underX}px 0 ${-underX}px)`;
+        s.under.style.setProperty("--g-swipe-dim", String(0.18 * (1 - edge / w)));
+    }
+
+    settlePageSwipe(s, go) {
+        s.settling = true;
+        s.stage.addClass("is-settling");
+        this.setPageSwipe(s, go ? s.width : 0);
+        window.setTimeout(async () => {
+            if (go) {
+                // Let the new page draw before the copy lifts off it, but
+                // don't hold the screen if Obsidian takes its time
+                const sleep = (ms) => new Promise((r) => window.setTimeout(r, ms));
+                const nav = Promise.resolve(s.leaf.history.go(s.dir)).catch((e) => {
+                    console.error("Goguryeo: swipe navigation failed", e);
+                });
+                await Promise.race([nav.then(() => sleep(80)), sleep(SWIPE_DRAW_MS)]);
+            }
+            if (this.edgeSwipe === s) this.endPageSwipe();
+        }, SWIPE_SETTLE_MS);
+    }
+
+    endPageSwipe() {
         const s = this.edgeSwipe;
         this.edgeSwipe = null;
-        this.edgeArrow?.removeClass("is-visible", "is-armed");
-        if (s?.locked && s.armed && finished) s.leaf.history.go(s.dir);
+        if (!s?.stage) return;
+        s.stage.remove();
+        s.frame.removeClass("goguryeo-swiping");
     }
 
     // ---- Sliding glass under the active tab ----

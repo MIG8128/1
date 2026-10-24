@@ -1534,53 +1534,82 @@ body.is-mobile {
     -webkit-backdrop-filter: var(--glass-blur);
 }
 
-/* Back / forward edge swipe (companion plugin): a round glass arrow slides
-   in with the finger and fills with the accent once letting go will
-   navigate */
-.goguryeo-edge-arrow {
-    position: fixed;
-    z-index: var(--layer-popover);
-    top: 50%;
-    width: 44px;
-    height: 44px;
-    margin-top: -22px;
-    border-radius: 50%;
+/* Back / forward edge swipe (companion plugin), Safari style: the page
+   slides with the finger and the one it goes to shows from underneath. The
+   real page hides while a stage of still copies (.goguryeo-swipe-page)
+   plays it out over the leaf. */
+.goguryeo-swiping > .view-content {
+    visibility: hidden;
+}
+
+.goguryeo-swipe-stage {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .goguryeo-swipe-stage {
+    border-radius: 14.5px;
+}
+
+.goguryeo-swipe-page {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+}
+
+.goguryeo-swipe-page > .workspace-leaf-content {
+    position: absolute;
+    inset: 0;
+}
+
+.goguryeo-swipe-page > .workspace-leaf-content::after {
+    display: none;
+}
+
+/* The top page casts a shadow onto the one it uncovers, which is dimmed
+   a little until it is fully out */
+.goguryeo-swipe-page.is-over {
+    box-shadow: -10px 0 28px rgba(0, 0, 0, 0.3);
+}
+
+.goguryeo-swipe-page.is-under::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, var(--g-swipe-dim, 0));
+}
+
+.goguryeo-swipe-stage.is-settling > .goguryeo-swipe-page {
+    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1), clip-path 0.28s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.goguryeo-swipe-stage.is-settling > .goguryeo-swipe-page.is-under::after {
+    transition: background-color 0.28s ease-out;
+}
+
+/* No copy of that page yet (e.g. right after starting Obsidian): its
+   name and icon instead */
+.goguryeo-swipe-blank {
+    position: absolute;
+    inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: var(--text-normal);
-    background-color: var(--glass-bg-strong);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: inset 0 0 0 1px var(--glass-border), 0 6px 18px rgba(0, 0, 0, 0.3);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease, scale 0.2s ease;
+    gap: 10px;
+    padding: 0 32px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-semibold);
+    text-align: center;
 }
 
-.goguryeo-edge-arrow .svg-icon {
-    --icon-size: 20px;
-    --icon-stroke: 2.4px;
-}
-
-.goguryeo-edge-arrow.is-back {
-    left: -44px;
-    transform: translateX(var(--g-edge-pull, 0px));
-}
-
-.goguryeo-edge-arrow.is-forward {
-    right: -44px;
-    transform: translateX(calc(var(--g-edge-pull, 0px) * -1));
-}
-
-.goguryeo-edge-arrow.is-visible {
-    opacity: 1;
-}
-
-.goguryeo-edge-arrow.is-armed {
-    color: var(--text-on-accent);
-    background-color: var(--interactive-accent);
-    scale: 1.1;
+.goguryeo-swipe-blank-icon .svg-icon {
+    --icon-size: 32px;
+    color: var(--text-faint);
 }
 
 

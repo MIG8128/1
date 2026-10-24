@@ -27,7 +27,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   - split screen: `goguryeo-split`, `--g-root-top/left/right`, and `.goguryeo-current-pane` / `.goguryeo-last-pane` on the panes
   - iPhone: a right-sidebar button (`.goguryeo-right-toggle`), and tapping the folded name capsule brings the bars back (`app.mobileNavbar.restoreNavigation()`)
   - background image: turns the Style Settings value `--g-bg-image` (vault path, `![[embed]]` or web link) into `--g-bg-url` on every `css-change`
-  - iPhone and iPad: swipe in from the left or right edge to go back or forward, only while both sidebars are closed (`.goguryeo-edge-arrow`)
+  - iPhone and iPad: swipe in from the left or right edge to go back or forward, Safari style, only while both sidebars are closed. The page slides with the finger over a still copy of the other page (`.goguryeo-swipe-stage`). The copies are taken in a wrapper around `WorkspaceLeaf.prototype.getHistoryState`, which Obsidian calls just before leaving a page, and kept in a WeakMap keyed by that history entry. Right after a restart there are no copies yet, so the page underneath shows only the note's name and icon.
 - `GLASS.md`: the style contract for the user's other plugins (glass variables with fallbacks, recipes, motion, checklist). Keep it in sync when the glass tokens in section 2 change.
 - `deploy.ps1`: copies the theme and the plugin into the vault.
 - `tools/cdp.mjs`: a small DevTools client for inspecting the live Obsidian (see below).
