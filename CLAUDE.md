@@ -135,5 +135,5 @@ Get-CimInstance Win32_Process -Filter "Name='Obsidian.exe'" | Where-Object { $_.
 - An edge swipe occasionally takes 2–3 seconds to finish, when Obsidian itself is slow to open the note. The copy now lifts after 400ms at most, but a stall inside Obsidian still delays the start.
 - Maybe later (not asked for yet): the iPhone capsule and the short folder name on iPad too.
 - Light mode hasn't been reviewed.
-- Small leftovers: one link shows green while the others are gray. The Style Settings entries `goguryeo-no-top-toggles` and `g-ipad-toggle-offset` aren't used anymore and should be removed.
+- Small leftover: one link shows green while the others are gray.
 - macOS hasn't been tested (traffic-light spacing).

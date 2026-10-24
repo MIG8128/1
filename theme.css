@@ -198,20 +198,6 @@ settings:
         description: Needs Obsidian's "Floating navigation" setting turned on.
         type: class-toggle
         default: false
-    -
-        id: goguryeo-no-top-toggles
-        title: Keep sidebar buttons in their default place
-        type: class-toggle
-        default: false
-    -
-        id: g-ipad-toggle-offset
-        title: iPad sidebar buttons — vertical adjust
-        type: variable-number-slider
-        default: 0
-        min: -40
-        max: 40
-        step: 1
-        format: px
 
 */
 
@@ -225,7 +211,6 @@ body {
     --g-glass-tint: 62%;
     --g-line-height: 1.85;
     --g-ribbon-hotzone: 12px;
-    --g-ipad-toggle-offset: 0px;
 
     --g-gap: 10px;
     --g-radius-card: 14px;
