@@ -86,11 +86,11 @@ prefix.
 
 | Variable | Use it for |
 |---|---|
-| `--glass-bg` | panels and cards that float over content |
-| `--glass-bg-strong` | menus, pop-ups, sticky headers: anything text must stay readable on |
+| `--glass-bg` | panels and cards that float over content. One material for all glass: the sidebar gray at the user's "Glass opacity" setting, so it changes with that setting everywhere |
+| `--glass-bg-strong` | menus, pop-ups, sticky headers: anything text must stay readable on. The same material, 20% more solid than `--glass-bg` |
 | `--glass-border` | the 1px edge of any glass surface |
 | `--glass-shadow` | drop shadow of a floating surface |
-| `--glass-blur` | `backdrop-filter` of every glass surface (it is already `blur(...) saturate(180%)`) |
+| `--glass-blur` | `backdrop-filter` of every glass surface (it is already `blur(...) saturate(180%)`, the blur from the user's "Blur strength" setting). Never hard-code your own blur or glass color, or the settings won't reach your plugin |
 | `--glass-track` / `--glass-track-shadow` | the recessed bar of a segmented control or tab bar (darker than its surroundings) |
 | `--glass-thumb` / `--glass-thumb-hover` / `--glass-thumb-shadow` | the light glass under the selected segment; also small raised glass buttons |
 | `--glass-well` / `--glass-well-shadow` | sunken text inputs, search fields |

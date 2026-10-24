@@ -339,10 +339,20 @@ body:not(.goguryeo-accent-links) :is(.internal-link, .external-link, .cm-hmd-int
    ------------------------------------------------------------------------- */
 
 /* The glass is flat: no brighter top edge or sheen. --glass-highlight and
-   --glass-sheen stay defined (as transparent / none) for plugins that use them. */
+   --glass-sheen stay defined (as transparent / none) for plugins that use them.
+   One material for all glass: every surface is the sidebar gray at the
+   "Glass opacity" setting, blurred by "Blur strength". (Glass mixed from the
+   note's own color looked the same at any opacity over the note.) Menus and
+   pop-ups stay 20% more solid so their text reads; the frosted band behind
+   the toolbar rows fades the note's own color a little less. */
+body {
+    --g-glass-strong-tint: min(100%, calc(var(--g-glass-tint) + 20%));
+    --g-band-tint: max(0%, calc(var(--g-glass-tint) - 7%));
+}
+
 body.theme-dark {
-    --glass-bg:color-mix(in srgb, var(--background-primary) var(--g-glass-tint), transparent);
-    --glass-bg-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
+    --glass-bg: color-mix(in srgb, var(--g-sidebar-base) var(--g-glass-tint), transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--g-sidebar-base) var(--g-glass-strong-tint), transparent);
     --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) var(--g-sidebar-tint, var(--g-glass-tint)), transparent);
     --glass-border: rgba(255, 255, 255, 0.10);
     --glass-highlight: transparent;
@@ -362,8 +372,8 @@ body.theme-dark {
 }
 
 body.theme-light {
-    --glass-bg: color-mix(in srgb, var(--background-primary) calc(var(--g-glass-tint) + 6%), transparent);
-    --glass-bg-strong: color-mix(in srgb, var(--background-primary) 84%, transparent);
+    --glass-bg: color-mix(in srgb, var(--g-sidebar-base) min(100%, calc(var(--g-glass-tint) + 6%)), transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--g-sidebar-base) min(100%, calc(var(--g-glass-strong-tint) + 2%)), transparent);
     --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) calc(var(--g-sidebar-tint, var(--g-glass-tint)) + 6%), transparent);
     --glass-border: rgba(0, 0, 0, 0.08);
     --glass-highlight: transparent;
@@ -383,8 +393,8 @@ body.theme-light {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     body.theme-dark,
     body.theme-light {
-        --glass-bg: color-mix(in srgb, var(--background-primary) 95%, transparent);
-        --glass-bg-strong: color-mix(in srgb, var(--background-primary) 97%, transparent);
+        --glass-bg: color-mix(in srgb, var(--g-sidebar-base) 95%, transparent);
+        --glass-bg-strong: color-mix(in srgb, var(--g-sidebar-base) 97%, transparent);
         --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) 95%, transparent);
     }
 }
@@ -393,8 +403,8 @@ body.theme-light {
 @media (prefers-reduced-transparency: reduce) {
     body.theme-dark,
     body.theme-light {
-        --glass-bg: color-mix(in srgb, var(--background-primary) 97%, transparent);
-        --glass-bg-strong: var(--background-primary);
+        --glass-bg: color-mix(in srgb, var(--g-sidebar-base) 97%, transparent);
+        --glass-bg-strong: var(--g-sidebar-base);
         --glass-sidebar: var(--g-sidebar-base);
         --glass-blur: none;
         --glass-thumb: var(--background-secondary);
@@ -789,7 +799,7 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
     left: 0;
     right: 0;
     height: calc(var(--g-bar-offset) + 8px);
-    background-color: color-mix(in srgb, var(--background-primary) 55%, transparent);
+    background-color: color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
@@ -1335,8 +1345,8 @@ body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-head
     border-radius: 8px;
     background: var(--glass-thumb);
     box-shadow: var(--glass-thumb-shadow);
-    -webkit-backdrop-filter: blur(10px) saturate(1.8);
-    backdrop-filter: blur(10px) saturate(1.8);
+    -webkit-backdrop-filter: blur(calc(var(--g-blur) * 0.625)) saturate(1.8);
+    backdrop-filter: blur(calc(var(--g-blur) * 0.625)) saturate(1.8);
     transform: translate(var(--g-thumb-x), var(--g-thumb-y));
     pointer-events: none;
     transition: transform 0.42s cubic-bezier(0.3, 1.3, 0.4, 1), width 0.42s cubic-bezier(0.3, 1.3, 0.4, 1),
@@ -2131,7 +2141,7 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher:
     right: 0;
     bottom: 0;
     height: calc(var(--navbar-bottom-offset) + var(--navbar-height) * 2 + 60px);
-    background-color: color-mix(in srgb, var(--g-split-canvas) 55%, transparent);
+    background-color: color-mix(in srgb, var(--g-split-canvas) var(--g-band-tint), transparent);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     -webkit-mask-image: linear-gradient(to top, #000 70%, transparent);
