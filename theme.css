@@ -131,16 +131,6 @@ settings:
         step: 1
         format: '%'
     -
-        id: g-note-opacity
-        title: Main area opacity
-        description: How solid the note panes are over the background. Lower = more background shows through. Until you move it, it follows Glass opacity - 10% more solid with an image (72% at the default), 22% less with a color (40%).
-        type: variable-number-slider
-        default: 72
-        min: 0
-        max: 100
-        step: 1
-        format: '%'
-    -
         id: g-sidebar-tint
         title: Sidebar opacity
         description: How solid the sidebars are, with or without a background. Until you move it, it follows Glass opacity.
@@ -2219,18 +2209,18 @@ body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb {
        or link) into --g-bg-url.
    ------------------------------------------------------------------------- */
 
-/* Until the user moves Main area opacity, the note follows Glass opacity:
-   72% with an image, 40% with a color at the default 62% */
+/* The note is the same glass, set by Glass opacity: a little more solid
+   than the sidebars over an image (72% at the default 62%) */
 body {
     --g-bg-blur: 0px;
     --g-bg-dim: 40%;
-    --g-note-opacity: min(100%, calc(var(--g-glass-tint) + 10%));
+    --g-note-tint: min(100%, calc(var(--g-glass-tint) + 10%));
 }
 
-/* A plain color needs no help with legibility, so let more of it through.
-   :where() keeps this below the user's own Style Settings value. */
-body:where(.goguryeo-bg-color) {
-    --g-note-opacity: max(0%, calc(var(--g-glass-tint) - 22%));
+/* A plain color needs no help with legibility, so let more of it through
+   (40% at the default) */
+body.goguryeo-bg-color {
+    --g-note-tint: max(0%, calc(var(--g-glass-tint) - 22%));
 }
 
 .theme-light {
@@ -2244,7 +2234,7 @@ body:where(.goguryeo-bg-color) {
 }
 
 body:is(.goguryeo-bg-color, .goguryeo-bg-image) {
-    --g-note-bg: color-mix(in srgb, var(--background-primary) var(--g-note-opacity), transparent);
+    --g-note-bg: color-mix(in srgb, var(--background-primary) var(--g-note-tint), transparent);
 }
 
 body.goguryeo-bg-color .app-container {

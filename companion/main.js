@@ -128,14 +128,11 @@ class GoguryeoSettingTab extends PluginSettingTab {
             "g-bg-image": ["goguryeo-bg-image"],
             "g-bg-blur": ["goguryeo-bg-image"],
             "g-bg-dim": ["goguryeo-bg-image"],
-            "g-note-opacity": ["goguryeo-bg-color", "goguryeo-bg-image"],
         };
         // Starting values the theme picks itself, unlike the fixed default:
-        // both follow Glass opacity until moved
-        const glass = get("g-glass-tint") ?? config["g-glass-tint"]?.default;
+        // Sidebar opacity follows Glass opacity until moved
         const startsAt = {
-            "g-note-opacity": type === "goguryeo-bg-color" ? Math.max(0, glass - 22) : Math.min(100, glass + 10),
-            "g-sidebar-tint": glass,
+            "g-sidebar-tint": get("g-glass-tint") ?? config["g-glass-tint"]?.default,
         };
 
         for (const s of Object.values(config)) {
