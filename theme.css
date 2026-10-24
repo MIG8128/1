@@ -1151,8 +1151,9 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
     mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
 }
 
-/* Vault name + help/settings under the left sidebar: its own small glass card */
-body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-sidedock-vault-profile {
+/* Vault name + help/settings under the left sidebar: its own small glass card
+   (as specific as Obsidian's rule, which paints it solid) */
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
     width: auto;
     margin: 0 0 var(--g-gap) var(--g-gap);
     border: 1px solid var(--glass-border);
