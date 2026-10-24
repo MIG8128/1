@@ -357,6 +357,26 @@ module.exports = class GoguryeoCompanion extends Plugin {
             button.remove();
             document.body.removeClass(PHONE_RIGHT_CLASS);
         });
+        this.setupNameCapsule();
+    }
+
+    // ---- iPhone: the name capsule brings the bars back ----
+
+    // Scrolling down folds the bottom bar into a small capsule with just the
+    // note's name (the theme, on body.is-hidden-nav). The name is Obsidian's
+    // title, which renames the note when tapped; while folded, a tap brings
+    // the bars back instead, like Safari.
+    setupNameCapsule() {
+        const onTap = (e) => {
+            if (!document.body.hasClass("is-hidden-nav")) return;
+            if (!e.target.closest?.(".mod-root .view-header-title")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.app.mobileNavbar?.restoreNavigation();
+        };
+        const opts = { passive: false, capture: true };
+        this.registerDomEvent(document, "touchstart", onTap, opts);
+        this.registerDomEvent(document, "mousedown", onTap, opts);
     }
 
     // ---- iPhone & iPad: swipe in from an edge to go back / forward ----

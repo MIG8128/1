@@ -25,7 +25,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   - desktop touch: swipe from the left edge to open the ribbon (`goguryeo-touch-active`)
   - sliding glass under the active tab of every tab bar (`.goguryeo-tab-thumb`, `goguryeo-glass-thumbs`). Its motion copies the user's Day Planner Pro "GlassSegmented" component: 0.42s `cubic-bezier(0.3,1.3,0.4,1)`, plus a separate `scale: 1.06 1.12` swell held for 320ms.
   - split screen: `goguryeo-split`, `--g-root-top/left/right`, and `.goguryeo-current-pane` / `.goguryeo-last-pane` on the panes
-  - iPhone: a right-sidebar button (`.goguryeo-right-toggle`)
+  - iPhone: a right-sidebar button (`.goguryeo-right-toggle`), and tapping the folded name capsule brings the bars back (`app.mobileNavbar.restoreNavigation()`)
   - background image: turns the Style Settings value `--g-bg-image` (vault path, `![[embed]]` or web link) into `--g-bg-url` on every `css-change`
   - iPhone and iPad: swipe in from the left or right edge to go back or forward, only while both sidebars are closed (`.goguryeo-edge-arrow`)
 - `GLASS.md`: the style contract for the user's other plugins (glass variables with fallbacks, recipes, motion, checklist). Keep it in sync when the glass tokens in section 2 change.
@@ -78,7 +78,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - **Flat glass:** no brighter top edge, no top sheen, no top-to-bottom gradients on controls.
 - **Windows window buttons (— ▢ ✕) stay native** in the top-right corner, and the right sidebar starts below them. The user rejected moving or restyling them twice.
 - Desktop: the ribbon auto-hides. The tab row stretches across the full width under a path row (iPad Safari style). The sidebar tab pills span the full sidebar width. Split screen uses one shared toolbar with panes as cards and a green edge on the current pane.
-- iPhone: round glass buttons. The top row is `(◧) (folder path) (📖 ⋯) (◨)` and the bottom bar is `( ‹ › ) ( note name ) (≡)`. Tapping the name opens the tab overview, which holds Search and ＋.
+- iPhone: round glass buttons. The top row is `(◧) (folder path) (📖 ⋯) (◨)` and the bottom bar is `( ‹ › ) ( note name ) (≡)`. Tapping the name opens the tab overview, which holds Search and ＋. Scrolling down folds the bottom bar into a small capsule with just the name (Safari style).
 - The user's other plugins are Day Planner Pro (their own plugin, which has the glass tokens), Style Settings, Typewriter Scrolling, Dayloom and others. Minimal Theme Settings is turned off.
 
 ## Open items

@@ -1591,6 +1591,8 @@ body.is-mobile {
        · round glass buttons, like iOS
        · › hides when there is nowhere to go forward
        · tap the file name → tab overview (search + new file live there)
+       · scrolling down folds the bottom bar into a small name capsule; tap
+         it to bring the bars back
        · ◨ and the back/forward edge swipes come from the companion plugin
    ------------------------------------------------------------------------- */
 
@@ -1746,11 +1748,39 @@ body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-ro
 }
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
-    transition: transform 0.3s ease-out;
+    transition-property: left, width, height, bottom, padding, font-size;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out;
+}
+
+/* …except the name: like Safari, the bottom bar folds into a small capsule
+   holding just the name. Tapping it brings the bars back (the companion
+   plugin; otherwise the tap would rename the note). The name lives in the
+   top row, which Obsidian fades out; that row slides off screen anyway, so
+   fade its other pieces instead. */
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
+    opacity: 1;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header > :not(.view-header-title-container),
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
+    transition: opacity 0.2s ease-in-out;
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header > :not(.view-header-title-container),
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
+    opacity: 0;
 }
 
 body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
-    transform: translateY(calc(var(--navbar-height) + var(--navbar-bottom-offset)));
+    --g-capsule-w: min(var(--g-nav-w) * 0.5, 220px);
+    left: calc(50% - var(--g-capsule-w) / 2);
+    width: var(--g-capsule-w);
+    height: 34px;
+    bottom: max(var(--safe-area-inset-bottom) - 4px, 8px);
+    padding: 0 14px;
+    font-size: var(--font-ui-smaller);
+    pointer-events: auto;
 }
 
 /* Keyboard open (bar gone): the name hides too */
