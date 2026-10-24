@@ -383,7 +383,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // Like a browser's address bar: tapping the path (row 1 on desktop and
     // iPad, the folder pill on top on iPhone) opens Ctrl+O instead of
-    // renaming the note or revealing a folder. On iPhone the note's name sits
+    // renaming the note or revealing a folder; only a folder that has a
+    // folder note opens that note. On iPhone the note's name sits
     // in the bottom bar and keeps opening the tab overview. However it opens
     // (the tap, Ctrl+O, the command palette), the search field opens in the
     // capsule and the list drops down right below it.
@@ -393,6 +394,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
             : ".mod-root .view-header-title-container";
         this.registerDomEvent(document, "click", (e) => {
             if (!e.target.closest?.(path)) return;
+            // A folder with a folder note is a link: the Folder notes plugin
+            // marks it and opens the note
+            if (e.target.closest(".view-header-breadcrumb.has-folder-note")) {
+                this.haptic();
+                return;
+            }
             e.preventDefault();
             e.stopImmediatePropagation();
             this.haptic();
