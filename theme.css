@@ -111,11 +111,11 @@ settings:
     -
         id: g-bg-dim
         title: Dim the image
-        description: Darkens it in dark mode, lightens it in light mode.
+        description: Darkens it toward black in dark mode, lightens it toward white in light mode. 100% hides it.
         type: variable-number-slider
-        default: 20
+        default: 40
         min: 0
-        max: 90
+        max: 100
         step: 1
         format: '%'
     -
@@ -1918,16 +1918,18 @@ body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb {
 
 body {
     --g-bg-blur: 0px;
-    --g-bg-dim: 20%;
+    --g-bg-dim: 40%;
     --g-note-opacity: 72%;
 }
 
 .theme-light {
     --g-bg-color: #c8d4e0;
+    --g-bg-veil: #ffffff;
 }
 
 .theme-dark {
     --g-bg-color: #1d2a36;
+    --g-bg-veil: #000000;
 }
 
 body:is(.goguryeo-bg-color, .goguryeo-bg-image) {
@@ -1951,7 +1953,7 @@ body.goguryeo-bg-image .app-container::before {
     z-index: -1;
     inset: calc(var(--g-bg-blur) * -2);
     background:
-        linear-gradient(color-mix(in srgb, var(--background-primary) var(--g-bg-dim), transparent) 0 0),
+        linear-gradient(color-mix(in srgb, var(--g-bg-veil) var(--g-bg-dim), transparent) 0 0),
         var(--g-bg-url, none) center / cover no-repeat;
     filter: blur(var(--g-bg-blur));
     pointer-events: none;
