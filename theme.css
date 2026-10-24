@@ -811,10 +811,21 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
 /* A short divider between tabs, Safari style: at the tab's own edge (it
    clips anything outside), and gone beside the glass (active tab) or a
    hovered tab and after the last */
+.theme-dark {
+    --g-tab-divider: rgba(255, 255, 255, 0.34);
+}
+
+.theme-light {
+    --g-tab-divider: rgba(0, 0, 0, 0.22);
+}
+
 body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner::after {
     top: 25%;
     inset-inline-end: 0;
+    width: 2px;
     height: 50%;
+    border-radius: 1px;
+    background-color: var(--g-tab-divider);
     opacity: 1;
     transition: opacity 0.15s ease;
 }
