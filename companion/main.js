@@ -49,7 +49,13 @@ const PILL_FLICK = 0.5; // px/ms: a flick of the name pill acts even when short
 const SWIPE_DRAW_MS = 400; // most to wait for the new page before uncovering it
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
-const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
+const OMNI_CLASS = "goguryeo-omnibox"; // the quick switcher docked on the path capsule
+const OMNI_MIN_WIDTH = 420; // px it takes at least (the iPhone folder pill is small)
+const OMNI_MARGIN = 8; // px it keeps from the window edges
+const OMNI_MS = 320; // the list unrolling below the capsule
+const OMNI_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // a soft spring, settling past its spot and back
+const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the end, so its shadow shows
+const SNAP ="transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
 
 const isImage = (file) => file instanceof TFile && IMAGE_EXTENSIONS.includes(file.extension.toLowerCase());
@@ -375,10 +381,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // ---- The path capsule opens the quick switcher ----
 
-    // Like Safari's address bar: tapping the path (row 1 on desktop and
+    // Like a browser's address bar: tapping the path (row 1 on desktop and
     // iPad, the folder pill on top on iPhone) opens Ctrl+O instead of
     // renaming the note or revealing a folder. On iPhone the note's name sits
-    // in the bottom bar and keeps opening the tab overview.
+    // in the bottom bar and keeps opening the tab overview. However it opens
+    // (the tap, Ctrl+O, the command palette), the search field opens in the
+    // capsule and the list drops down right below it.
     setupPathSwitcher() {
         const path = Platform.isPhone
             ? ".mod-root .view-header-title-parent"
@@ -390,6 +398,61 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.haptic();
             this.app.commands.executeCommandById("switcher:open");
         }, { capture: true });
+
+        this.app.workspace.onLayoutReady(() => {
+            const command = this.app.commands.commands["switcher:open"];
+            const callback = command?.callback;
+            if (!callback) return;
+            command.callback = (...args) => {
+                const from = this.pathCapsule();
+                const result = callback.apply(command, args);
+                if (from) this.dockSwitcher(from);
+                return result;
+            };
+            this.register(() => { command.callback = callback; });
+        });
+    }
+
+    // The current note's path capsule, while it's on screen
+    pathCapsule() {
+        const header = this.app.workspace.getMostRecentLeaf()?.view?.containerEl.querySelector(":scope > .view-header");
+        const el = header?.querySelector(Platform.isPhone ? ".view-header-title-parent" : ".view-header-title-container");
+        const rect = el?.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0) return null;
+        // A pill's 999px would make the dropped-down list an oval
+        const radius = Math.min(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, rect.height / 2);
+        return { rect, radius: `${radius}px` };
+    }
+
+    // Moves the switcher onto the capsule: the theme places it from
+    // --g-omni-* (.goguryeo-omnibox), at least OMNI_MIN_WIDTH wide so the
+    // list has room. The list then unrolls from the capsule's outline while
+    // the dimming fades in.
+    dockSwitcher({ rect: c, radius }) {
+        const prompt = [...document.querySelectorAll(".modal-container .prompt")].pop();
+        const container = prompt?.parentElement;
+        if (!container) return;
+        const box = container.getBoundingClientRect();
+        const room = box.width - OMNI_MARGIN * 2;
+        const width = Math.min(Math.max(c.width, OMNI_MIN_WIDTH), room);
+        const left = Math.min(Math.max(c.left - box.left, OMNI_MARGIN), box.width - OMNI_MARGIN - width);
+        container.addClass(OMNI_CLASS);
+        container.style.setProperty("--g-omni-top", `${c.top - box.top}px`);
+        container.style.setProperty("--g-omni-left", `${left}px`);
+        container.style.setProperty("--g-omni-width", `${width}px`);
+        container.style.setProperty("--g-omni-height", `${c.height}px`);
+        container.style.setProperty("--g-omni-radius", radius);
+
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const p = prompt.getBoundingClientRect();
+        const start = `inset(0 ${Math.max(0, p.right - c.right)}px ${Math.max(0, p.height - c.height)}px ${Math.max(0, c.left - p.left)}px round ${radius})`;
+        const end = parseFloat(getComputedStyle(prompt).borderTopLeftRadius) + SHADOW_ROOM;
+        prompt.animate(
+            [{ clipPath: start }, { clipPath: `inset(-${SHADOW_ROOM}px round ${end}px)` }],
+            { duration: OMNI_MS, easing: OMNI_EASE },
+        );
+        const dim = container.querySelector(".modal-bg");
+        if (dim) dim.animate([{ opacity: 0 }, { opacity: getComputedStyle(dim).opacity }], { duration: OMNI_MS, easing: "ease-out" });
     }
 
     // ---- iPhone: haptics ----

@@ -610,6 +610,38 @@ body {
     box-shadow: var(--glass-shadow);
 }
 
+/* The quick switcher as an address bar (the companion docks it on the path
+   capsule: .goguryeo-omnibox, --g-omni-*): the search field sits right in
+   the capsule, the list drops down below it */
+body .modal-container.goguryeo-omnibox .prompt {
+    top: var(--g-omni-top);
+    bottom: auto;
+    left: var(--g-omni-left);
+    width: var(--g-omni-width);
+    height: auto;
+    max-width: none;
+    max-height: calc(100% - var(--g-omni-top) - 16px - var(--keyboard-height, 0px));
+    margin: 0;
+    padding-bottom: 0;
+    border-radius: var(--g-omni-radius);
+}
+
+/* On iPhone Obsidian's switcher is a sheet with the field at the bottom */
+body .modal-container.goguryeo-omnibox .prompt-input-container {
+    order: -1;
+    width: auto;
+    height: var(--g-omni-height);
+    margin: 0;
+    flex-shrink: 0;
+}
+
+body .modal-container.goguryeo-omnibox .prompt-input {
+    height: 100%;
+    padding-block: 0;
+    padding-inline: 16px 40px;
+    font-size: var(--font-ui-medium);
+}
+
 .modal {
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
