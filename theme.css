@@ -1256,7 +1256,31 @@ body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-head
 }
 
 .mod-sidedock .workspace-tab-header-container .workspace-tab-header-inner {
+    position: relative;
     justify-content: center;
+}
+
+/* The same divider as the editor tabs (section 6), between the icons */
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header-inner::after {
+    content: "";
+    position: absolute;
+    top: 25%;
+    inset-inline-end: 0;
+    width: 2px;
+    height: 50%;
+    border-radius: 1px;
+    background-color: var(--g-tab-divider);
+    transition: opacity 0.15s ease;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header:is(.is-active, :has(+ .is-active), :last-child) .workspace-tab-header-inner::after {
+    opacity: 0;
+}
+
+@media (hover: hover) {
+    .mod-sidedock .workspace-tab-header-container .workspace-tab-header:is(:hover, :has(+ :hover)) .workspace-tab-header-inner::after {
+        opacity: 0;
+    }
 }
 
 /* Obsidian reserves room for the window buttons as padding inside the tab
