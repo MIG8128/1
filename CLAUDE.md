@@ -35,6 +35,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - `GLASS.md`: the style contract for the user's other plugins (glass variables with fallbacks, recipes, motion, checklist). Keep it in sync when the glass tokens in section 2 change.
 - `deploy.ps1`: copies the theme and the plugin into the user's vault. Run it only after the change passed the sandbox test.
 - `sandbox/` (gitignored): the test Obsidian, see "User's vault & testing (sandbox)".
+- `.claude/agents/goguryeo-runner.md`: the Haiku agent that runs the sandbox, version bump, commit and deploy steps (see Workflow).
 - `tools/cdp.mjs`: the old DevTools client for the user's own Obsidian (port 9222). **Never use it.** Use `sandbox/cdp.mjs` instead.
 - `gemin-theme.css`: the user's old snippet, already merged into sections 3–4. Kept for reference only.
 
@@ -43,6 +44,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - **One fix at a time.** Make one change, test it in the sandbox, commit it, then report briefly, saying what was checked. The user then tests it on their own devices.
 - **Mock up visual changes in the design tool before building.** That's the Design canvas artifact "Goguryeo glass directions": https://claude.ai/artifact/GaRE4WK9qs73cGQMrUqxsP. It holds directions A–D, split-screen E/F, and the iPhone and iPad artboards.
 - **Edit in this repo, never in the vault.** After the sandbox test passes, run `powershell -ExecutionPolicy Bypass -File deploy.ps1`. The vault is `C:\Users\MIG\Documents\obsidian\mig8128\.obsidian\` (theme in `themes/Goguryeo`, plugin in `plugins/goguryeo-companion`). The user reloads Obsidian with Ctrl+R.
+- **Smart model thinks, cheap model runs** (the user asked, to save tokens): the main session (Opus) reads the code, decides, edits `theme.css` / `companion/main.js`, writes the exact test JS and commit message, and looks at the key screenshots itself (the user wants to see them). The mechanical steps go to the Haiku agent `goguryeo-runner` (`.claude/agents/goguryeo-runner.md`): copy the build, launch/close the sandbox, reload the plugin, run the given evals and shots, bump the version, commit, deploy. Give it every step and snippet in full; it doesn't design or debug. Hand it one batch per fix (e.g. "copy, launch, run these 3 evals, these 2 shots, close"), not one call per command. Do a one-line check or a quick follow-up eval yourself when that's cheaper than a new handoff.
 - **Bump the version with every change** (the user asked, for file management): add 0.0.1 to the last number (0.1.0 → 0.1.1 → 0.1.2) in the manifest of what changed: `manifest.json` for `theme.css`, `companion/manifest.json` for `companion/main.js`, both when both changed. Do it in the same commit as the change, before deploying, and say the new version in the report. Keep three numbers (x.y.z): Obsidian compares versions as semver.
 - **Git:** one commit per verified step, on branch `main`, ending with the Co-Authored-By line. The git history describes every decision in detail.
 
