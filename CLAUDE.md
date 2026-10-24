@@ -28,6 +28,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   - iPhone: a right-sidebar button (`.goguryeo-right-toggle`)
   - background image: turns the Style Settings value `--g-bg-image` (vault path, `![[embed]]` or web link) into `--g-bg-url` on every `css-change`
   - iPhone and iPad: swipe in from the left or right edge to go back or forward, only while both sidebars are closed (`.goguryeo-edge-arrow`)
+- `GLASS.md`: the style contract for the user's other plugins (glass variables with fallbacks, recipes, motion, checklist). Keep it in sync when the glass tokens in section 2 change.
 - `deploy.ps1`: copies the theme and the plugin into the vault.
 - `tools/cdp.mjs`: a small DevTools client for inspecting the live Obsidian (see below).
 - `gemin-theme.css`: the user's old snippet, already merged into sections 3–4. Kept for reference only.
