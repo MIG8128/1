@@ -2,6 +2,7 @@
 
    All platforms: keeps the left sidebar button out of the hidden ribbon.
    Desktop: keeps it at the start of the main tab bar, mirroring the right one.
+   In a narrow window, sidebars that would squeeze the note float over it.
 
    iPhone & iPad: swipe in from the left/right edge to go back/forward,
    Safari style: the page follows the finger with the other page showing
@@ -49,6 +50,9 @@ const PILL_FLICK = 0.5; // px/ms: a flick of the name pill acts even when short
 const SWIPE_DRAW_MS = 400; // most to wait for the new page before uncovering it
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
+const FLOAT_LEFT_CLASS = "goguryeo-float-left";
+const FLOAT_RIGHT_CLASS = "goguryeo-float-right";
+const NOTE_MIN_WIDTH = 480; // px the note keeps beside docked sidebars; below it they float over it
 const OMNI_CLASS = "goguryeo-omnibox"; // the quick switcher docked on the path capsule
 const OMNI_MIN_WIDTH = 420; // px it takes at least (the iPhone folder pill is small)
 const OMNI_MARGIN = 8; // px it keeps from the window edges
@@ -194,6 +198,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.setupBackgroundPickers();
 
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
+        this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
@@ -331,6 +336,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         workspace.updateFrameless = function (...args) {
             const result = original.apply(this, args);
             plugin.placeLeftToggle();
+            plugin.placeFloatingFrameSpace();
             return result;
         };
         this.register(() => {
@@ -354,6 +360,72 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     refreshFrame() {
         window.requestAnimationFrame(() => this.app.workspace.updateFrameless?.());
+    }
+
+    // ---- Narrow window: sidebars float over the note ----
+
+    // Docked sidebars take their width from the note. When the window can't
+    // give the note NOTE_MIN_WIDTH beside both, the right one floats over the
+    // note (the theme styles the body classes), and when even the left one
+    // alone is too much, both do. Only the window and sidebar widths decide,
+    // not which sidebars are open, so opening one never makes the other jump.
+    setupFloatingSidebars() {
+        if (!Platform.isDesktopApp) return;
+        this.registerDomEvent(window, "resize", () => this.updateFloatingSidebars());
+        for (const name of ["layout-change", "resize", "css-change"]) {
+            this.registerEvent(this.app.workspace.on(name, () => this.updateFloatingSidebars()));
+        }
+        this.registerDomEvent(document, "pointerdown", (e) => this.onFloatingDismiss(e), { capture: true });
+        this.register(() => {
+            document.body.removeClass(FLOAT_LEFT_CLASS, FLOAT_RIGHT_CLASS);
+            this.refreshFrame();
+        });
+        this.updateFloatingSidebars();
+    }
+
+    updateFloatingSidebars() {
+        const { leftSplit, rightSplit } = this.app.workspace;
+        let left = false, right = false;
+        if (this.app.customCss?.theme === "Goguryeo" && !Platform.isMobile) {
+            const room = window.innerWidth - NOTE_MIN_WIDTH;
+            left = leftSplit.size > room;
+            right = leftSplit.size + rightSplit.size > room;
+        }
+        // When both float, they work like the iPad's drawers: opening one
+        // closes the other
+        const was = this.sidebarsOpen;
+        const open = { left: !leftSplit.collapsed, right: !rightSplit.collapsed };
+        this.sidebarsOpen = open;
+        if (left && right && was && open.left && open.right) {
+            if (!was.left) rightSplit.collapse();
+            else if (!was.right) leftSplit.collapse();
+        }
+        const body = document.body;
+        if (body.hasClass(FLOAT_LEFT_CLASS) === left && body.hasClass(FLOAT_RIGHT_CLASS) === right) return;
+        body.toggleClass(FLOAT_LEFT_CLASS, left);
+        body.toggleClass(FLOAT_RIGHT_CLASS, right);
+        this.refreshFrame(); // the note now reaches a top corner, or no longer does
+    }
+
+    // A click in the note closes the sidebars floating over it
+    onFloatingDismiss(e) {
+        const { rootSplit, leftSplit, rightSplit } = this.app.workspace;
+        if (!rootSplit?.containerEl.contains(e.target) || e.target.closest(".sidebar-toggle-button")) return;
+        const body = document.body;
+        if (body.hasClass(FLOAT_LEFT_CLASS) && !leftSplit.collapsed) leftSplit.collapse();
+        if (body.hasClass(FLOAT_RIGHT_CLASS) && !rightSplit.collapsed) rightSplit.collapse();
+    }
+
+    // Obsidian keeps the room for the window buttons only in the panes that
+    // reach a top corner, and a docked sidebar takes the corner from the
+    // note. A floating one doesn't, so the note's top pane keeps that room.
+    placeFloatingFrameSpace() {
+        if (!Platform.isDesktopApp) return;
+        const body = document.body;
+        const tops = this.app.workspace.rootSplit?.containerEl.querySelectorAll(".workspace-tabs.mod-top");
+        if (!tops?.length) return;
+        if (body.hasClass(FLOAT_LEFT_CLASS)) tops[0].addClass("mod-top-left-space");
+        if (body.hasClass(FLOAT_RIGHT_CLASS)) tops[tops.length - 1].addClass("mod-top-right-space");
     }
 
     // ---- iPhone: a right sidebar button (Obsidian has none on phones) ----

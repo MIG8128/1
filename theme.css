@@ -1231,6 +1231,31 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
     padding-bottom: calc(var(--g-status-bar-height) + var(--g-gap));
 }
 
+/* Narrow window: a sidebar that would leave the note too little room floats
+   over the note instead of pushing it aside, and the note keeps the full
+   width. The companion picks which ones (goguryeo-float-left / -right) and
+   closes them on a click in the note. */
+body:is(.goguryeo-float-left, .goguryeo-float-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace {
+    position: relative;
+}
+
+body.goguryeo-float-left:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split,
+body.goguryeo-float-right:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: var(--layer-sidedock);
+    max-width: calc(100% - 48px);
+}
+
+body.goguryeo-float-left:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split {
+    left: 0;
+}
+
+body.goguryeo-float-right:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+    right: 0;
+}
+
 /* Lighter, hairline dividers between stacked panes */
 body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-leaf-resize-handle:hover {
     background-color: var(--background-modifier-border-hover);
