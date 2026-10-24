@@ -790,6 +790,27 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
     --tab-max-width: none;
 }
 
+/* Only one tab in a pane: like Safari, no tab row; the note moves up under
+   row 1. The bar itself stays (it carries the lifted buttons), it just
+   paints nothing and lets clicks through. */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header)) {
+    --g-bar-offset: calc(var(--g-row2-top) + 2px);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header)) > .workspace-tab-header-container {
+    background: none;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header)) > .workspace-tab-header-container > :is(.workspace-tab-header-container-inner, .goguryeo-tab-thumb) {
+    visibility: hidden;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    pointer-events: auto;
+}
+
 body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-container-inner {
     flex: 1 1 auto;
     min-width: 0;
