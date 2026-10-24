@@ -91,9 +91,11 @@ class BackgroundImageModal extends FuzzySuggestModal {
     }
 }
 
-// The theme's Background options in one place, with an image picker. The
-// values stay in Style Settings (the theme reads them from there), so both
-// pages always show the same thing.
+// Every option of the theme, the same list Style Settings shows, read from
+// the theme's @settings block as Style Settings parsed it. The values stay
+// in Style Settings (the theme reads them from there), so both pages always
+// show the same thing. Here the Background options only show when they
+// apply, and the image gets a picker instead of a path field.
 class GoguryeoSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
         super(app, plugin);
@@ -104,78 +106,107 @@ class GoguryeoSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         const manager = this.app.plugins.plugins["obsidian-style-settings"]?.settingsManager;
-        if (!manager) {
-            containerEl.createEl("p", { text: "Turn on the Style Settings plugin to set a background." });
+        const config = manager?.config?.goguryeo;
+        if (!config) {
+            containerEl.createEl("p", { text: "Turn on the Style Settings plugin to change the theme's options." });
             return;
         }
-        const get = (id, fallback) => manager.getSetting("goguryeo", id) ?? fallback;
+        const get = (id) => manager.getSetting("goguryeo", id);
         const set = (id, value) => manager.setSetting("goguryeo", id, value);
-        const slider = (name, desc, id, fallback) => new Setting(containerEl)
-            .setName(name)
-            .setDesc(desc)
-            .addSlider((sl) => sl.setLimits(0, id === "g-bg-blur" ? 60 : 100, 1)
-                .setValue(get(id, fallback))
-                .setDynamicTooltip()
-                .onChange((value) => set(id, value)));
+        const type = get("goguryeo-bg") ?? "goguryeo-bg-none";
+        const mode = document.body.hasClass("theme-light") ? "light" : "dark";
+        // Background options that only matter with some backgrounds
+        const shownWith = {
+            "g-bg-color": ["goguryeo-bg-color"],
+            "g-bg-image": ["goguryeo-bg-image"],
+            "g-bg-blur": ["goguryeo-bg-image"],
+            "g-bg-dim": ["goguryeo-bg-image"],
+            "g-note-opacity": ["goguryeo-bg-color", "goguryeo-bg-image"],
+        };
+        // Starting values the theme picks itself, unlike the fixed default
+        const startsAt = {
+            "g-note-opacity": type === "goguryeo-bg-color" ? 40 : 72,
+            "g-sidebar-tint": get("g-glass-tint") ?? config["g-glass-tint"]?.default,
+        };
 
-        containerEl.createEl("h3", { text: "Background" });
-        const type = get("goguryeo-bg", "goguryeo-bg-none");
-        new Setting(containerEl)
-            .setName("Background")
-            .setDesc("What shows behind the glass. With a color or an image, the note area turns see-through too.")
-            .addDropdown((d) => d
-                .addOptions({
-                    "goguryeo-bg-none": "Plain (theme gray)",
-                    "goguryeo-bg-color": "Color",
-                    "goguryeo-bg-image": "Image",
-                })
-                .setValue(type)
-                .onChange((value) => {
-                    set("goguryeo-bg", value);
-                    this.display();
-                }));
-
-        if (type === "goguryeo-bg-color") {
-            const mode = document.body.hasClass("theme-light") ? "light" : "dark";
-            const fallback = getComputedStyle(document.body).getPropertyValue("--g-bg-color").trim();
-            new Setting(containerEl)
-                .setName("Color")
-                .setDesc(`For ${mode} mode.`)
-                .addColorPicker((c) => c.setValue(get(`g-bg-color@@${mode}`, fallback))
-                    .onChange((value) => set(`g-bg-color@@${mode}`, value)));
-        }
-
-        if (type === "goguryeo-bg-image") {
-            const current = this.plugin.getBackgroundImage();
-            const image = new Setting(containerEl)
-                .setName("Image")
-                .setDesc(current || "None yet. Choose one.")
-                .addButton((b) => b.setButtonText("Choose from vault").setCta()
-                    .onClick(() => this.plugin.chooseBackgroundImage(() => this.display())))
-                .addButton((b) => b.setButtonText("From this device…")
-                    .onClick(() => this.plugin.importBackgroundImage(() => this.display())));
-            const file = current && this.app.vault.getFileByPath(current);
-            if (file) {
-                image.settingEl.addClass("goguryeo-bg-setting");
-                image.infoEl.prepend(createEl("img", {
-                    cls: "goguryeo-bg-preview",
-                    attr: { src: this.app.vault.getResourcePath(file) },
-                }));
+        for (const s of Object.values(config)) {
+            if (shownWith[s.id] && !shownWith[s.id].includes(type)) continue;
+            if (s.type === "heading") {
+                new Setting(containerEl).setName(s.title).setHeading();
+                continue;
             }
-            slider("Blur the image", "In px.", "g-bg-blur", 0);
-            slider("Dim the image", "Darkens it in dark mode, lightens it in light mode. 100 hides it.", "g-bg-dim", 40);
+            if (s.type === "info-text") {
+                // The one pointing to this page is for Style Settings only
+                if (s.id !== "goguryeo-companion-info") {
+                    new Setting(containerEl).setName(s.title).setDesc(s.description ?? "");
+                }
+                continue;
+            }
+            if (s.id === "g-bg-image") {
+                this.imagePicker();
+                continue;
+            }
+            const key = s.type === "variable-themed-color" ? `${s.id}@@${mode}` : s.id;
+            const row = new Setting(containerEl).setName(s.title).setDesc(s.description ?? "");
+            const value = get(key) ?? startsAt[s.id] ?? (s.type === "variable-themed-color" ? s[`default-${mode}`] : s.default);
+            switch (s.type) {
+                case "class-toggle":
+                    row.addToggle((t) => t.setValue(!!value).onChange((v) => set(key, v)));
+                    break;
+                case "class-select":
+                case "variable-select":
+                    row.addDropdown((d) => {
+                        for (const o of s.options) {
+                            if (typeof o === "string") d.addOption(o, o);
+                            else d.addOption(o.value, o.label);
+                        }
+                        // Picking a background shows the options that go with it
+                        d.setValue(value ?? "").onChange((v) => {
+                            set(key, v);
+                            if (s.id === "goguryeo-bg") this.display();
+                        });
+                    });
+                    break;
+                case "variable-number-slider":
+                    row.addSlider((sl) => sl.setLimits(s.min, s.max, s.step)
+                        .setValue(value)
+                        .setDynamicTooltip()
+                        .onChange((v) => set(key, v)));
+                    break;
+                case "variable-color":
+                case "variable-themed-color":
+                    if (s.type === "variable-themed-color") row.setDesc(`${s.description ?? ""} For ${mode} mode.`.trim());
+                    row.addColorPicker((c) => c.setValue(value ?? "").onChange((v) => set(key, v)));
+                    break;
+                default: // variable-text, variable-number
+                    row.addText((t) => t.setValue(value == null ? "" : String(value)).onChange((v) => {
+                        set(key, s.type === "variable-number" ? Number(v) : v);
+                    }));
+            }
+            row.addExtraButton((b) => b.setIcon("reset").setTooltip("Restore default").onClick(() => {
+                manager.clearSetting("goguryeo", key);
+                this.display();
+            }));
         }
+    }
 
-        if (type !== "goguryeo-bg-none") {
-            slider("Main area opacity", "How solid the note panes are. Lower = more background shows through.",
-                "g-note-opacity", type === "goguryeo-bg-color" ? 40 : 72);
+    imagePicker() {
+        const current = this.plugin.getBackgroundImage();
+        const image = new Setting(this.containerEl)
+            .setName("Image")
+            .setDesc(current || "None yet. Choose one, or right-click an image in the file list → Use as background.")
+            .addButton((b) => b.setButtonText("Choose from vault").setCta()
+                .onClick(() => this.plugin.chooseBackgroundImage(() => this.display())))
+            .addButton((b) => b.setButtonText("From this device…")
+                .onClick(() => this.plugin.importBackgroundImage(() => this.display())));
+        const file = current && this.app.vault.getFileByPath(current);
+        if (file) {
+            image.settingEl.addClass("goguryeo-bg-setting");
+            image.infoEl.prepend(createEl("img", {
+                cls: "goguryeo-bg-preview",
+                attr: { src: this.app.vault.getResourcePath(file) },
+            }));
         }
-        slider("Sidebar opacity", "How solid the sidebars are.", "g-sidebar-tint", get("g-glass-tint", 62));
-
-        containerEl.createEl("p", {
-            cls: "setting-item-description",
-            text: "Tip: right-click any image in the file list → Use as background.",
-        });
     }
 }
 

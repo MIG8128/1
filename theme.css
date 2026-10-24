@@ -9,6 +9,12 @@ name: Goguryeo
 id: goguryeo
 settings:
     -
+        id: goguryeo-companion-info
+        title: Also in Goguryeo Companion
+        description: Settings → Goguryeo Companion has all these options too, plus an image picker for the background. Both pages change the same values.
+        type: info-text
+        markdown: false
+    -
         id: goguryeo-layout
         title: Layout (desktop)
         type: heading
@@ -66,12 +72,6 @@ settings:
         type: heading
         level: 1
         collapsed: true
-    -
-        id: goguryeo-bg-info
-        title: Easier with a picker
-        description: Settings → Goguryeo Companion has these same options, plus an image picker with previews.
-        type: info-text
-        markdown: false
     -
         id: goguryeo-bg
         title: Background
