@@ -1620,7 +1620,8 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
        · round glass buttons, like iOS
        · › hides when there is nowhere to go forward
        · tap the file name → tab overview (search + new file live there)
-       · drag the name up → tab overview; sideways → the tab beside it
+       · drag the name up → tab overview; sideways → the tab beside it,
+         or past the last tab → a new tab
        · scrolling down folds the bottom bar into a small name capsule; tap
          it to bring the bars back
        · ◨ and the back/forward edge swipes come from the companion plugin

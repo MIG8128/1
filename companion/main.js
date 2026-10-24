@@ -44,6 +44,7 @@ const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward 
 const EDGE_SWIPE_AT = 0.35; // share of the width to pull before letting go navigates
 const SWIPE_SETTLE_MS = 280; // the page gliding the rest of the way (or back)
 const PILL_SWIPE_AT = 56; // px to drag the name pill before letting go acts
+const NEW_TAB = "new-tab"; // the name pill's target past the last tab
 const PILL_FLICK = 0.5; // px/ms: a flick of the name pill acts even when short
 const SWIPE_DRAW_MS = 400; // most to wait for the new page before uncovering it
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
@@ -406,7 +407,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // Like Safari's address bar: drag the name pill up to see all tabs, or
     // sideways to go to the tab beside it (to the left → the next tab, to
-    // the right → the previous one). The pill follows the finger and ticks
+    // the right → the previous one; to the left on the last tab → a new tab). The pill follows the finger and ticks
     // once it's far enough that letting go acts; a flick acts too. A plain
     // tap still opens the tab overview (Obsidian's button under the pill).
     setupNameGestures() {
@@ -470,8 +471,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         d.t = e.timeStamp;
         let armed;
         if (d.axis === "x") {
-            d.target = dx < 0 ? d.next : d.prev;
-            const shift = d.target ? dx : dx / 3; // no tab that way: it only gives a little
+            // Past the last tab, like Safari, a new tab
+            d.target = dx < 0 ? d.next ?? NEW_TAB : d.prev;
+            const shift = d.target ? dx : dx / 3; // before the first tab: it only gives a little
             d.pill.style.translate = `${shift}px 0`;
             d.pill.style.opacity = String(1 - Math.min(Math.abs(shift) / d.pill.offsetWidth, 1) * 0.7);
             armed = !!d.target && Math.abs(dx) >= PILL_SWIPE_AT;
@@ -494,7 +496,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         let act = finished && d.armed;
         if (finished && !act) {
             const flick = d.axis === "x"
-                ? d.target && Math.abs(d.vx) > PILL_FLICK && Math.sign(d.vx) === (d.target === d.next ? -1 : 1)
+                ? d.target && Math.abs(d.vx) > PILL_FLICK && Math.sign(d.vx) === (d.target === d.prev ? 1 : -1)
                 : d.vy < -PILL_FLICK;
             if (flick) {
                 act = true;
@@ -517,15 +519,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
     }
 
     // The pill slides out the way it was pushed; the next tab's pill and
-    // page come in from the other side
+    // page (or a new tab's) come in from the other side
     switchTabFromPill(d) {
-        const toward = d.target === d.next ? -1 : 1; // the way the finger went
-        const { pill, target } = d;
+        const toward = d.target === d.prev ? 1 : -1; // the way the finger went
+        const { pill } = d;
         pill.style.transition = "translate 0.14s ease-in, opacity 0.14s ease-in";
         pill.style.translate = `${toward * pill.offsetWidth * 0.6}px 0`;
         pill.style.opacity = "0";
         window.setTimeout(() => {
             pill.style.transition = pill.style.translate = pill.style.opacity = "";
+            const target = d.target === NEW_TAB ? this.app.workspace.getLeaf("tab") : d.target;
             this.app.workspace.setActiveLeaf(target, { focus: true });
             const easing = "cubic-bezier(0.25, 0.8, 0.25, 1)";
             const from = -toward;
