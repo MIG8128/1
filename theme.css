@@ -67,6 +67,12 @@ settings:
         level: 1
         collapsed: true
     -
+        id: goguryeo-bg-info
+        title: Easier with a picker
+        description: Settings → Goguryeo Companion has these same options, plus an image picker with previews.
+        type: info-text
+        markdown: false
+    -
         id: goguryeo-bg
         title: Background
         description: What shows behind the glass. With a color or an image, the note area turns see-through too.
@@ -95,7 +101,7 @@ settings:
     -
         id: g-bg-image
         title: Background image
-        description: Easiest is Settings → Goguryeo Companion → Choose, or right-click an image → Use as background. You can also type a vault path (Attachments/wall.jpg), ![[wall.jpg]] or a web link. Needs the Goguryeo Companion plugin.
+        description: A vault path (Attachments/wall.jpg), ![[wall.jpg]] or a web link. Easier - Settings → Goguryeo Companion → Choose from vault. Needs the Goguryeo Companion plugin.
         type: variable-text
         default: ''
         quotes: true
@@ -2049,6 +2055,23 @@ body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+/* ...and its settings tab: a preview of the current background image */
+.goguryeo-bg-setting .setting-item-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.goguryeo-bg-preview {
+    width: 160px;
+    height: 96px;
+    margin-bottom: 4px;
+    border-radius: 10px;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px var(--background-modifier-border);
 }
 
 .goguryeo-image-suggestion > img {

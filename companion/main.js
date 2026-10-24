@@ -75,6 +75,9 @@ class BackgroundImageModal extends FuzzySuggestModal {
     }
 }
 
+// The theme's Background options in one place, with an image picker. The
+// values stay in Style Settings (the theme reads them from there), so both
+// pages always show the same thing.
 class GoguryeoSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
         super(app, plugin);
@@ -84,23 +87,78 @@ class GoguryeoSettingTab extends PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
-        const current = this.plugin.getBackgroundImage();
+        const manager = this.app.plugins.plugins["obsidian-style-settings"]?.settingsManager;
+        if (!manager) {
+            containerEl.createEl("p", { text: "Turn on the Style Settings plugin to set a background." });
+            return;
+        }
+        const get = (id, fallback) => manager.getSetting("goguryeo", id) ?? fallback;
+        const set = (id, value) => manager.setSetting("goguryeo", id, value);
+        const slider = (name, desc, id, fallback) => new Setting(containerEl)
+            .setName(name)
+            .setDesc(desc)
+            .addSlider((sl) => sl.setLimits(0, id === "g-bg-blur" ? 60 : 100, 1)
+                .setValue(get(id, fallback))
+                .setDynamicTooltip()
+                .onChange((value) => set(id, value)));
+
+        containerEl.createEl("h3", { text: "Background" });
+        const type = get("goguryeo-bg", "goguryeo-bg-none");
         new Setting(containerEl)
-            .setName("Background image")
-            .setDesc(current || "None. Pick one and the theme's Background switches to Image.")
-            .addButton((b) => b.setButtonText("Choose from vault").setCta()
-                .onClick(() => this.plugin.chooseBackgroundImage(() => this.display())))
-            .addButton((b) => b.setButtonText("From this device…")
-                .onClick(() => this.plugin.importBackgroundImage(() => this.display())))
-            .addExtraButton((b) => b.setIcon("x").setTooltip("Remove the background image")
-                .onClick(() => {
-                    this.plugin.setBackgroundImage(null);
+            .setName("Background")
+            .setDesc("What shows behind the glass. With a color or an image, the note area turns see-through too.")
+            .addDropdown((d) => d
+                .addOptions({
+                    "goguryeo-bg-none": "Plain (theme gray)",
+                    "goguryeo-bg-color": "Color",
+                    "goguryeo-bg-image": "Image",
+                })
+                .setValue(type)
+                .onChange((value) => {
+                    set("goguryeo-bg", value);
                     this.display();
                 }));
+
+        if (type === "goguryeo-bg-color") {
+            const mode = document.body.hasClass("theme-light") ? "light" : "dark";
+            const fallback = getComputedStyle(document.body).getPropertyValue("--g-bg-color").trim();
+            new Setting(containerEl)
+                .setName("Color")
+                .setDesc(`For ${mode} mode.`)
+                .addColorPicker((c) => c.setValue(get(`g-bg-color@@${mode}`, fallback))
+                    .onChange((value) => set(`g-bg-color@@${mode}`, value)));
+        }
+
+        if (type === "goguryeo-bg-image") {
+            const current = this.plugin.getBackgroundImage();
+            const image = new Setting(containerEl)
+                .setName("Image")
+                .setDesc(current || "None yet. Choose one.")
+                .addButton((b) => b.setButtonText("Choose from vault").setCta()
+                    .onClick(() => this.plugin.chooseBackgroundImage(() => this.display())))
+                .addButton((b) => b.setButtonText("From this device…")
+                    .onClick(() => this.plugin.importBackgroundImage(() => this.display())));
+            const file = current && this.app.vault.getFileByPath(current);
+            if (file) {
+                image.settingEl.addClass("goguryeo-bg-setting");
+                image.infoEl.prepend(createEl("img", {
+                    cls: "goguryeo-bg-preview",
+                    attr: { src: this.app.vault.getResourcePath(file) },
+                }));
+            }
+            slider("Blur the image", "In px.", "g-bg-blur", 0);
+            slider("Dim the image", "Darkens it in dark mode, lightens it in light mode. 100 hides it.", "g-bg-dim", 40);
+        }
+
+        if (type !== "goguryeo-bg-none") {
+            slider("Main area opacity", "How solid the note panes are. Lower = more background shows through.",
+                "g-note-opacity", type === "goguryeo-bg-color" ? 40 : 72);
+        }
+        slider("Sidebar opacity", "How solid the sidebars are.", "g-sidebar-tint", get("g-glass-tint", 62));
+
         containerEl.createEl("p", {
             cls: "setting-item-description",
-            text: "Blur, dimming and opacity are in Style Settings → Goguryeo → Background. "
-                + "You can also right-click an image in the file list → Use as background.",
+            text: "Tip: right-click any image in the file list → Use as background.",
         });
     }
 }
