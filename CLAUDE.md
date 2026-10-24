@@ -66,7 +66,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - Obsidian rebuilds a tab bar's children and drops foreign elements, so the plugin remembers each bar's last thumb position.
 - When Obsidian moves the sidebar toggle, it leaves an animating clone. Compare against `app.workspace.leftSidebarToggleButtonEl`.
 - iPhone: Obsidian hides the bars on scroll with a transform on `.view-header`. The theme slides it with `top` instead, because a transform would drag the fixed note-name pill along with it.
-- iPhone: there's no right-sidebar button in Obsidian (the plugin adds one). The title container uses `display: contents`, so the folder path stays on top and the note name moves to the bottom bar.
+- iPhone: there's no right-sidebar button in Obsidian (the plugin adds one). The title container uses `display: contents`, so only the note's folder stays on top (for a folder note, the folder around it) and the note name moves to the bottom bar.
 - iPad: the note area has `padding-top` for the status bar. The plugin adds it to `--g-root-top`.
 - Settings opens in its own window (a separate DevTools target titled "Settings - …", url about:blank), so `cdp.mjs shot` of the main window doesn't show it; capture that target instead.
 - You can extract Obsidian's own CSS and JS from `%APPDATA%\obsidian\obsidian-1.14.5.asar` (it's a plain asar file) to look up class names.

@@ -1586,7 +1586,7 @@ body.is-mobile {
 
 /* -------------------------------------------------------------------------
    10. iPhone
-       top:     (◧)  ( 일상 · 기록 / 여행 )  (📖 ⋯)  (◨)
+       top:     (◧)  ( 여행 )  (📖 ⋯)  (◨)   only the note's folder
        bottom:  ( ‹ › )  (   file name   )  (≡)
        · round glass buttons, like iOS
        · › hides when there is nowhere to go forward
@@ -1839,6 +1839,27 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-heade
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent:empty {
     visibility: hidden;
+}
+
+/* A whole path doesn't fit on a phone: like Safari showing just the site,
+   only the folder the note is in. Each crumb is followed by a separator,
+   so the last crumb is the 2nd from the end. A folder note's last crumb
+   is its own folder (the folder notes plugin marks the title), so take
+   the one before, if there is one. */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > * {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2),
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(4) {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2):not(:first-child) {
+    display: none;
 }
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-breadcrumb-separator {
