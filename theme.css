@@ -133,7 +133,7 @@ settings:
     -
         id: g-note-opacity
         title: Main area opacity
-        description: How solid the note panes are over the background. Lower = more background shows through. Starts at 72% with an image, 40% with a color.
+        description: How solid the note panes are over the background. Lower = more background shows through. Until you move it, it follows Glass opacity - 10% more solid with an image (72% at the default), 22% less with a color (40%).
         type: variable-number-slider
         default: 72
         min: 0
@@ -2219,16 +2219,18 @@ body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb {
        or link) into --g-bg-url.
    ------------------------------------------------------------------------- */
 
+/* Until the user moves Main area opacity, the note follows Glass opacity:
+   72% with an image, 40% with a color at the default 62% */
 body {
     --g-bg-blur: 0px;
     --g-bg-dim: 40%;
-    --g-note-opacity: 72%;
+    --g-note-opacity: min(100%, calc(var(--g-glass-tint) + 10%));
 }
 
 /* A plain color needs no help with legibility, so let more of it through.
    :where() keeps this below the user's own Style Settings value. */
 body:where(.goguryeo-bg-color) {
-    --g-note-opacity: 40%;
+    --g-note-opacity: max(0%, calc(var(--g-glass-tint) - 22%));
 }
 
 .theme-light {
