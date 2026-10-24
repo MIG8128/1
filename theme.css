@@ -2153,6 +2153,37 @@ body.goguryeo-bg-image .app-container::before {
     pointer-events: none;
 }
 
+/* Mobile keyboard: Obsidian shortens the app to end above it, but the
+   keyboard's rounded corners show what's below. The picture (with its dim
+   and blur) already spans the screen, as the app box is not positioned;
+   a plain color and, on iPhone, the note's tint carry on down there too. */
+body.is-mobile.goguryeo-bg-color .app-container {
+    isolation: isolate;
+}
+
+body.is-mobile.goguryeo-bg-color .app-container::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;
+    background-color: var(--g-bg-color);
+    pointer-events: none;
+}
+
+body.is-phone:is(.goguryeo-bg-color, .goguryeo-bg-image) .app-container::after {
+    content: "";
+    position: absolute;
+    top: calc(100vh - var(--keyboard-height));
+    left: 0;
+    right: 0;
+    height: var(--keyboard-height);
+    background-color: var(--g-note-bg);
+    pointer-events: none;
+}
+
 /* Phones paint the note area itself too */
 body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root {
     background-color: transparent;
