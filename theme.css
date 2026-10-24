@@ -1074,6 +1074,25 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mo
     contain: size style !important;
 }
 
+/* The card can't clip with overflow: hidden (Obsidian's), as Safari clips
+   the pinned toolbar inside it too, so the iPad showed no toolbar. The
+   pieces round off themselves instead (16px card less its 1.5px border). */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    overflow: visible;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf {
+    border-radius: 14.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+    border-radius: 14.5px 14.5px 0 0;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
+    clip-path: inset(0 round 14.5px);
+}
+
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-current-pane) .workspace-leaf-content > .view-header {
     display: none;
 }
