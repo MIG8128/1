@@ -120,10 +120,20 @@ settings:
         format: '%'
     -
         id: g-note-opacity
-        title: Note area opacity
-        description: Lower = more of the background shows through the note.
+        title: Main area opacity
+        description: How solid the note panes are over the background. Lower = more background shows through. Starts at 72% with an image, 40% with a color.
         type: variable-number-slider
         default: 72
+        min: 0
+        max: 100
+        step: 1
+        format: '%'
+    -
+        id: g-sidebar-tint
+        title: Sidebar opacity
+        description: How solid the sidebars are, with or without a background. Until you move it, it follows Glass opacity.
+        type: variable-number-slider
+        default: 62
         min: 0
         max: 100
         step: 1
@@ -336,7 +346,7 @@ body:not(.goguryeo-accent-links) :is(.internal-link, .external-link, .cm-hmd-int
 body.theme-dark {
     --glass-bg:color-mix(in srgb, var(--background-primary) var(--g-glass-tint), transparent);
     --glass-bg-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
-    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) var(--g-glass-tint), transparent);
+    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) var(--g-sidebar-tint, var(--g-glass-tint)), transparent);
     --glass-border: rgba(255, 255, 255, 0.10);
     --glass-highlight: transparent;
     --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
@@ -357,7 +367,7 @@ body.theme-dark {
 body.theme-light {
     --glass-bg: color-mix(in srgb, var(--background-primary) calc(var(--g-glass-tint) + 6%), transparent);
     --glass-bg-strong: color-mix(in srgb, var(--background-primary) 84%, transparent);
-    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) calc(var(--g-glass-tint) + 6%), transparent);
+    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) calc(var(--g-sidebar-tint, var(--g-glass-tint)) + 6%), transparent);
     --glass-border: rgba(0, 0, 0, 0.08);
     --glass-highlight: transparent;
     --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.08);
@@ -1920,6 +1930,12 @@ body {
     --g-bg-blur: 0px;
     --g-bg-dim: 40%;
     --g-note-opacity: 72%;
+}
+
+/* A plain color needs no help with legibility, so let more of it through.
+   :where() keeps this below the user's own Style Settings value. */
+body:where(.goguryeo-bg-color) {
+    --g-note-opacity: 40%;
 }
 
 .theme-light {
