@@ -2257,6 +2257,26 @@ body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .view-
     background-color: transparent;
 }
 
+/* Bases: Obsidian sets its table, card and kanban colors on body, so they
+   keep the solid note color. Clear them; cards keep a faint neutral lift */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .view-content {
+    --bases-table-group-background: transparent;
+    --bases-table-header-background: transparent;
+    --bases-table-summary-background: transparent;
+    --bases-cards-background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+    --bases-cards-cover-background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+    --bases-kanban-column-background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+    --bases-kanban-column-header-background: transparent;
+    --bases-kanban-card-background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+    --bases-kanban-cover-background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+}
+
+/* ...the sticky header and footer frost the rows scrolling under them */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root :is(.bases-thead, .bases-table-footer) {
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+
 /* iPad: the strip above the note, under the status bar, matches the note so
    the clock stays readable */
 body.is-tablet:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace > .mod-root {
