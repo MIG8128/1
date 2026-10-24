@@ -32,31 +32,24 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   - iPhone haptics: `haptic()` calls `Capacitor.Plugins.Haptics.impact({style: "LIGHT"})`, which Obsidian's iOS app registers. It fires on every tap on a control (buttons, icons, bars, path, menus, tab overview, file list; not the note text), on the name capsule, and each time an edge swipe crosses its go point. **Every new phone interaction must call it.**
 - `GLASS.md`: the style contract for the user's other plugins (glass variables with fallbacks, recipes, motion, checklist). Keep it in sync when the glass tokens in section 2 change.
 - `deploy.ps1`: copies the theme and the plugin into the vault.
-- `tools/cdp.mjs`: a small DevTools client for inspecting the live Obsidian (see below).
+- `tools/cdp.mjs`: a small DevTools client for the live Obsidian. **Not to be used anymore** (see "No access to Obsidian").
 - `gemin-theme.css`: the user's old snippet, already merged into sections 3–4. Kept for reference only.
 
 ## Workflow (the user wants this)
 
-- **One fix at a time.** Make one change, verify it, commit it, then report briefly. The user tests on their own devices too.
+- **One fix at a time.** Make one change, commit it, then report briefly. The user tests it on their own devices (Claude can't use Obsidian anymore).
 - **Mock up visual changes in the design tool before building.** That's the Design canvas artifact "Goguryeo glass directions": https://claude.ai/artifact/GaRE4WK9qs73cGQMrUqxsP. It holds directions A–D, split-screen E/F, and the iPhone and iPad artboards.
 - **Edit in this repo, never in the vault.** Then run `powershell -ExecutionPolicy Bypass -File deploy.ps1`. The vault is `C:\Users\MIG\Documents\obsidian\mig8128\.obsidian\` (theme in `themes/Goguryeo`, plugin in `plugins/goguryeo-companion`). The user reloads Obsidian with Ctrl+R.
 - **Git:** one commit per verified step, on branch `main`, ending with the Co-Authored-By line. The git history describes every decision in detail.
 
-## Verifying in the live Obsidian (instead of guessing)
+## No access to Obsidian (the user revoked it on 2026-10-24)
 
-1. The user has allowed restarting Obsidian without asking ("restart it your own").
-2. Close it gracefully with `CloseMainWindow`, then relaunch it:
-   `C:\Users\MIG\AppData\Local\Programs\Obsidian\Obsidian.exe --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1`
-3. Use `node tools/cdp.mjs eval "<js>"` (or `evalfile <file>`) and `node tools/cdp.mjs shot <out.png> [scale]`.
-4. Reload the theme with `app.customCss.requestLoadTheme()`.
-5. Reload the plugin with `app.plugins.disablePlugin/enablePlugin("goguryeo-companion")`.
-6. **Phone and iPad preview:**
-   - Use `electronWindow.setBounds({width:430,height:932})` for iPhone or `1180x820` for iPad, then `app.emulateMobile(true)`, which reloads Obsidian.
-   - Phone mode means a window narrower than 600px.
-   - Afterwards, always restore: `app.emulateMobile(false)`, `electronWindow.maximize()`, `setAlwaysOnTop(false)`.
-7. **Screenshots in the background:** while the window is covered or hidden, Windows pauses requestAnimationFrame and CSS transitions. Either use `electronWindow.setAlwaysOnTop(true)`, or inject `*{transition:none!important}` to measure end states, and remove it afterwards. A hidden window can also return a stale frame after a theme reload; check computed styles, or retake the shot, before trusting it.
-8. **Simulated touches:** `new Touch(...)` with `new TouchEvent(...)` dispatched on `document` works for testing gestures.
-9. **The debug port closes** whenever the user restarts Obsidian normally.
+**Claude has no permission to use Obsidian.** The earlier permission ("restart it your own") is withdrawn. The user said: "you don't have a permission to use obsidian from now on", after a test opened their notes one by one.
+
+- Don't start, close, restart or control Obsidian. Don't connect to it (no `tools/cdp.mjs`, no debug port, no screenshots, no phone or iPad preview).
+- **Never open, read, list or search the user's notes or vault files**, not even file names. This includes the Obsidian `app` API (`app.vault`, opening leaves) and reading files under `C:\Users\MIG\Documents\obsidian\mig8128\` directly. Reading another plugin's code under `.obsidian/plugins/` counts too, so ask first.
+- Work from the code in this repo and Obsidian's own CSS/JS (the asar file, see the gotchas). For class names you can't find there, ask the user.
+- The user tests every change on their own devices. Say clearly what you couldn't check, and what they should look at.
 
 ## Obsidian 1.14.5 gotchas (all verified)
 
