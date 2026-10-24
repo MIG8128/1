@@ -190,6 +190,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
         if (Platform.isMobile) this.setupEdgeSwipe();
+        this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
         if (Platform.isMobile) this.setupHaptics();
 
         if (!Platform.isDesktopApp) return;
@@ -370,6 +371,25 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
         this.setupNameCapsule();
         this.setupNameGestures();
+    }
+
+    // ---- The path capsule opens the quick switcher ----
+
+    // Like Safari's address bar: tapping the path (row 1 on desktop and
+    // iPad, the folder pill on top on iPhone) opens Ctrl+O instead of
+    // renaming the note or revealing a folder. On iPhone the note's name sits
+    // in the bottom bar and keeps opening the tab overview.
+    setupPathSwitcher() {
+        const path = Platform.isPhone
+            ? ".mod-root .view-header-title-parent"
+            : ".mod-root .view-header-title-container";
+        this.registerDomEvent(document, "click", (e) => {
+            if (!e.target.closest?.(path)) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            this.haptic();
+            this.app.commands.executeCommandById("switcher:open");
+        }, { capture: true });
     }
 
     // ---- iPhone: haptics ----
