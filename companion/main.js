@@ -366,9 +366,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // On Windows/Linux Obsidian keeps the right sidebar button at the right
     // end of the main tab bar, but puts the left one inside the left sidebar
-    // while it is open. With Goguryeo on desktop, keep the left one at the
-    // start of the main tab bar too, so the two mirror each other. Runs right
-    // after each of Obsidian's layout passes, which would move it back.
+    // while it is open (and the right one inside the right sidebar too, in
+    // full screen and on macOS). With Goguryeo on desktop, keep both in the
+    // main tab bar, the left one at its start and the right one at its end,
+    // so they mirror each other and never jump. Runs right after each of
+    // Obsidian's layout passes, which would move them back.
     patchUpdateFrameless() {
         const workspace = this.app.workspace;
         const original = workspace.updateFrameless;
@@ -376,7 +378,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const plugin = this;
         workspace.updateFrameless = function (...args) {
             const result = original.apply(this, args);
-            plugin.placeLeftToggle();
+            plugin.placeSidebarToggles();
             plugin.placeFloatingFrameSpace();
             return result;
         };
@@ -386,17 +388,20 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
     }
 
-    placeLeftToggle() {
+    placeSidebarToggles() {
         if (!Platform.isDesktopApp || this.app.customCss?.theme !== "Goguryeo") return;
-        const { rootSplit, leftSidebarToggleButtonEl: button } = this.app.workspace;
-        const target = rootSplit?.containerEl.querySelector(".workspace-tabs.mod-top > .workspace-tab-header-container");
-        if (!button || !target) return;
-        // Obsidian animates a copy out of the old spot when it moves the
-        // button; drop those copies so only one button ever shows
-        document.querySelectorAll(".sidebar-toggle-button.mod-left:not(.mod-left-split-toggle)").forEach((el) => {
-            if (el !== button) el.remove();
+        const { rootSplit, leftSidebarToggleButtonEl: left, rightSidebarToggleButtonEl: right } = this.app.workspace;
+        const bars = rootSplit?.containerEl.querySelectorAll(".workspace-tabs.mod-top > .workspace-tab-header-container");
+        if (!bars?.length) return;
+        // Obsidian animates a copy out of the old spot when it moves a
+        // button; drop those copies so only one of each ever shows
+        document.querySelectorAll(".sidebar-toggle-button:is(.mod-left, .mod-right):not(.mod-left-split-toggle)").forEach((el) => {
+            if (el !== left && el !== right) el.remove();
         });
-        if (target.firstElementChild !== button) target.prepend(button);
+        const first = bars[0];
+        const last = bars[bars.length - 1];
+        if (left && first.firstElementChild !== left) first.prepend(left);
+        if (right && last.lastElementChild !== right) last.append(right);
     }
 
     refreshFrame() {

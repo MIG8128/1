@@ -21,7 +21,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - `manifest.json`: theme manifest. Author is "MIG&Claude (opus5.5)".
 - `companion/`: the **Goguryeo Companion** plugin (`main.js` in plain CommonJS with no build step, and `manifest.json`). It does what CSS can't. It mostly sets body classes or CSS variables, which the theme then styles:
   - keeps the left sidebar button out of the hidden ribbon (patches `leftRibbon.containerEl.isShown`)
-  - keeps the left sidebar button at the start of the main tab bar on desktop (wraps `workspace.updateFrameless`)
+  - keeps both sidebar buttons in the main tab bar on desktop, ◧ at its start and ◨ at its end, also in full screen where Obsidian would move ◨ into the right sidebar (wraps `workspace.updateFrameless`)
   - desktop touch: swipe from the left edge to open the ribbon (`goguryeo-touch-active`)
   - sliding glass under the active tab of every tab bar (`.goguryeo-tab-thumb`, `goguryeo-glass-thumbs`). Its motion copies the user's Day Planner Pro "GlassSegmented" component: 0.42s `cubic-bezier(0.3,1.3,0.4,1)`, plus a separate `scale: 1.06 1.12` swell held for 320ms.
   - split screen: `goguryeo-split`, `--g-root-top/left/right`, and `.goguryeo-current-pane` / `.goguryeo-last-pane` on the panes
