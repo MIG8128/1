@@ -813,10 +813,12 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
    hovered tab and after the last */
 .theme-dark {
     --g-tab-divider: rgba(255, 255, 255, 0.34);
+    --g-sidebar-tab-divider: rgba(255, 255, 255, 0.2);
 }
 
 .theme-light {
     --g-tab-divider: rgba(0, 0, 0, 0.22);
+    --g-sidebar-tab-divider: rgba(0, 0, 0, 0.13);
 }
 
 body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner::after {
@@ -1260,16 +1262,16 @@ body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-head
     justify-content: center;
 }
 
-/* The same divider as the editor tabs (section 6), between the icons */
+/* Like the editor tab divider (section 6), but a softer hairline between
+   the icons */
 .mod-sidedock .workspace-tab-header-container .workspace-tab-header-inner::after {
     content: "";
     position: absolute;
     top: 25%;
     inset-inline-end: 0;
-    width: 2px;
+    width: 1px;
     height: 50%;
-    border-radius: 1px;
-    background-color: var(--g-tab-divider);
+    background-color: var(--g-sidebar-tab-divider);
     transition: opacity 0.15s ease;
 }
 
