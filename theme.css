@@ -1968,7 +1968,10 @@ body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .works
     background-color: var(--g-note-bg);
 }
 
+/* Views paint their own --background-primary (Day Planner Pro, Dayloom and
+   other plugin views); inside a pane it is clear, the pane already tints */
 body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .view-content {
+    --background-primary: transparent;
     background-color: transparent;
 }
 
