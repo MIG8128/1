@@ -16,7 +16,8 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   9. Mobile shared (drawers, edge-swipe arrow)
   10. iPhone
   11. iPad
-  12. Motion
+  12. Background (Plain / Color / Image behind everything; the note area turns see-through)
+  13. Motion
 - `manifest.json`: theme manifest. Author is "MIG&Claude (opus5.5)".
 - `companion/`: the **Goguryeo Companion** plugin (`main.js` in plain CommonJS with no build step, and `manifest.json`). It does what CSS can't. It mostly sets body classes or CSS variables, which the theme then styles:
   - keeps the left sidebar button out of the hidden ribbon (patches `leftRibbon.containerEl.isShown`)
@@ -25,6 +26,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   - sliding glass under the active tab of every tab bar (`.goguryeo-tab-thumb`, `goguryeo-glass-thumbs`). Its motion copies the user's Day Planner Pro "GlassSegmented" component: 0.42s `cubic-bezier(0.3,1.3,0.4,1)`, plus a separate `scale: 1.06 1.12` swell held for 320ms.
   - split screen: `goguryeo-split`, `--g-root-top/left/right`, and `.goguryeo-current-pane` / `.goguryeo-last-pane` on the panes
   - iPhone: a right-sidebar button (`.goguryeo-right-toggle`)
+  - background image: turns the Style Settings value `--g-bg-image` (vault path, `![[embed]]` or web link) into `--g-bg-url` on every `css-change`
   - iPhone and iPad: swipe in from the left or right edge to go back or forward, only while both sidebars are closed (`.goguryeo-edge-arrow`)
 - `deploy.ps1`: copies the theme and the plugin into the vault.
 - `tools/cdp.mjs`: a small DevTools client for inspecting the live Obsidian (see below).
@@ -49,7 +51,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
    - Use `electronWindow.setBounds({width:430,height:932})` for iPhone or `1180x820` for iPad, then `app.emulateMobile(true)`, which reloads Obsidian.
    - Phone mode means a window narrower than 600px.
    - Afterwards, always restore: `app.emulateMobile(false)`, `electronWindow.maximize()`, `setAlwaysOnTop(false)`.
-7. **Screenshots in the background:** while the window is covered or hidden, Windows pauses requestAnimationFrame and CSS transitions. Either use `electronWindow.setAlwaysOnTop(true)`, or inject `*{transition:none!important}` to measure end states, and remove it afterwards.
+7. **Screenshots in the background:** while the window is covered or hidden, Windows pauses requestAnimationFrame and CSS transitions. Either use `electronWindow.setAlwaysOnTop(true)`, or inject `*{transition:none!important}` to measure end states, and remove it afterwards. A hidden window can also return a stale frame after a theme reload; check computed styles, or retake the shot, before trusting it.
 8. **Simulated touches:** `new Touch(...)` with `new TouchEvent(...)` dispatched on `document` works for testing gestures.
 9. **The debug port closes** whenever the user restarts Obsidian normally.
 
@@ -70,7 +72,8 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 ## User preferences and decisions
 
 - Write in English. The user writes in short sentences and likes seeing screenshots and checks.
-- **No gradient backgrounds.** The glass comes from light, blur and content scrolling underneath.
+- **No gradient backgrounds.** The glass comes from light, blur and content scrolling underneath, or the user's own background (section 12).
+- **Flat glass:** no brighter top edge, no top sheen, no top-to-bottom gradients on controls.
 - **Windows window buttons (— ▢ ✕) stay native** in the top-right corner, and the right sidebar starts below them. The user rejected moving or restyling them twice.
 - Desktop: the ribbon auto-hides. The tab row stretches across the full width under a path row (iPad Safari style). The sidebar tab pills span the full sidebar width. Split screen uses one shared toolbar with panes as cards and a green edge on the current pane.
 - iPhone: round glass buttons. The top row is `(◧) (folder path) (📖 ⋯) (◨)` and the bottom bar is `( ‹ › ) ( note name ) (≡)`. Tapping the name opens the tab overview, which holds Search and ＋.

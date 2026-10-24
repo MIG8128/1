@@ -15,9 +15,13 @@
    ribbon the Goguryeo theme hides. The ribbon follows the finger; let go past
    OPEN_AT to keep it open. Tap outside it, tap one of its icons, or swipe it
    left to close. The open state is the body class "goguryeo-touch-active",
-   which the theme styles. */
+   which the theme styles.
 
-const { Plugin, Platform, setIcon } = require("obsidian");
+   Background: the theme's "Background image" setting holds a vault path, an
+   embed (![[wall.jpg]]) or a web link. CSS can only load the link, so this
+   turns the setting into a URL the theme reads as --g-bg-url. */
+
+const { Plugin, Platform, setIcon, normalizePath } = require("obsidian");
 
 const EDGE = 40; // px from the window's left edge where a swipe may start
 const OPEN_AT = 50; // px the finger must travel to keep the ribbon open
@@ -48,6 +52,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
         this.registerEvent(this.app.workspace.on("css-change", () => this.refreshFrame()));
 
+        this.app.workspace.onLayoutReady(() => this.updateBackground());
+        this.registerEvent(this.app.workspace.on("css-change", () => this.updateBackground()));
+
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
         if (Platform.isMobile) this.setupEdgeSwipe();
@@ -65,8 +72,27 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     onunload() {
         document.body.removeClass(OPEN_CLASS);
+        document.body.style.removeProperty("--g-bg-url");
         const ribbon = this.getRibbon();
         if (ribbon) this.clearInline(ribbon);
+    }
+
+    updateBackground() {
+        const body = document.body;
+        const raw = getComputedStyle(body).getPropertyValue("--g-bg-image").trim()
+            .replace(/^(["'])(.*)\1$/, "$2")
+            .replace(/^!?\[\[([^|\]]+).*\]\]$/, "$1")
+            .trim();
+        let url = "";
+        if (/^[a-z][a-z0-9+.-]+:/i.test(raw)) {
+            url = raw;
+        } else if (raw) {
+            const file = this.app.metadataCache.getFirstLinkpathDest(raw, "")
+                ?? this.app.vault.getFileByPath(normalizePath(raw));
+            if (file) url = this.app.vault.getResourcePath(file);
+        }
+        if (url) body.style.setProperty("--g-bg-url", `url("${url.replace(/"/g, "%22")}")`);
+        else body.style.removeProperty("--g-bg-url");
     }
 
     patchRibbonIsShown() {

@@ -61,6 +61,74 @@ settings:
         step: 1
         format: '%'
     -
+        id: goguryeo-background
+        title: Background
+        type: heading
+        level: 1
+        collapsed: true
+    -
+        id: goguryeo-bg
+        title: Background
+        description: What shows behind the glass. With a color or an image, the note area turns see-through too.
+        type: class-select
+        allowEmpty: false
+        default: goguryeo-bg-none
+        options:
+            -
+                label: Plain (theme gray)
+                value: goguryeo-bg-none
+            -
+                label: Color
+                value: goguryeo-bg-color
+            -
+                label: Image
+                value: goguryeo-bg-image
+    -
+        id: g-bg-color
+        title: Background color
+        description: Used when Background is Color.
+        type: variable-themed-color
+        format: hex
+        opacity: false
+        default-light: '#c8d4e0'
+        default-dark: '#1d2a36'
+    -
+        id: g-bg-image
+        title: Background image
+        description: Used when Background is Image. A picture in your vault (Attachments/wall.jpg, or ![[wall.jpg]]) or a web link. Needs the Goguryeo Companion plugin.
+        type: variable-text
+        default: ''
+        quotes: true
+    -
+        id: g-bg-blur
+        title: Blur the image
+        type: variable-number-slider
+        default: 0
+        min: 0
+        max: 60
+        step: 1
+        format: px
+    -
+        id: g-bg-dim
+        title: Dim the image
+        description: Darkens it in dark mode, lightens it in light mode.
+        type: variable-number-slider
+        default: 20
+        min: 0
+        max: 90
+        step: 1
+        format: '%'
+    -
+        id: g-note-opacity
+        title: Note area opacity
+        description: Lower = more of the background shows through the note.
+        type: variable-number-slider
+        default: 72
+        min: 0
+        max: 100
+        step: 1
+        format: '%'
+    -
         id: goguryeo-colors
         title: Colors
         type: heading
@@ -1835,7 +1903,84 @@ body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb {
 
 
 /* -------------------------------------------------------------------------
-   12. Motion
+   12. Background — a color or a picture behind everything, so the glass has
+       something to show. The note area turns see-through over it. The
+       companion plugin turns the image setting (--g-bg-image, a vault path
+       or link) into --g-bg-url.
+   ------------------------------------------------------------------------- */
+
+body {
+    --g-bg-blur: 0px;
+    --g-bg-dim: 20%;
+    --g-note-opacity: 72%;
+}
+
+.theme-light {
+    --g-bg-color: #c8d4e0;
+}
+
+.theme-dark {
+    --g-bg-color: #1d2a36;
+}
+
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) {
+    --g-note-bg: color-mix(in srgb, var(--background-primary) var(--g-note-opacity), transparent);
+}
+
+body.goguryeo-bg-color .app-container {
+    background-color: var(--g-bg-color);
+}
+
+body.goguryeo-bg-image .app-container {
+    isolation: isolate;
+    background-color: var(--background-primary);
+}
+
+/* The picture, with the dim veil on top; oversized so the blur has no
+   soft edges */
+body.goguryeo-bg-image .app-container::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: calc(var(--g-bg-blur) * -2);
+    background:
+        linear-gradient(color-mix(in srgb, var(--background-primary) var(--g-bg-dim), transparent) 0 0),
+        var(--g-bg-url, none) center / cover no-repeat;
+    filter: blur(var(--g-bg-blur));
+    pointer-events: none;
+}
+
+/* Phones paint the note area itself too */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root {
+    background-color: transparent;
+}
+
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .workspace-leaf {
+    background-color: var(--g-note-bg);
+}
+
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .view-content {
+    background-color: transparent;
+}
+
+/* iPad: the strip above the note, under the status bar, matches the note so
+   the clock stays readable */
+body.is-tablet:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace > .mod-root {
+    background-image: linear-gradient(var(--g-note-bg) 0 0);
+    background-size: 100% var(--safe-area-inset-top);
+    background-repeat: no-repeat;
+}
+
+/* Split screen: the canvas between the cards shows the background too, and
+   the cards take their color from the pane inside */
+body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-cards) .workspace-split.mod-root,
+body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    background-color: transparent;
+}
+
+
+/* -------------------------------------------------------------------------
+   13. Motion
    ------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
