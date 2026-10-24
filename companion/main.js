@@ -43,6 +43,8 @@ const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
 const EDGE_SWIPE_AT = 0.35; // share of the width to pull before letting go navigates
 const SWIPE_SETTLE_MS = 280; // the page gliding the rest of the way (or back)
+const PILL_SWIPE_AT = 56; // px to drag the name pill before letting go acts
+const PILL_FLICK = 0.5; // px/ms: a flick of the name pill acts even when short
 const SWIPE_DRAW_MS = 400; // most to wait for the new page before uncovering it
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
@@ -366,6 +368,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             document.body.removeClass(PHONE_RIGHT_CLASS);
         });
         this.setupNameCapsule();
+        this.setupNameGestures();
     }
 
     // ---- iPhone: haptics ----
@@ -394,8 +397,147 @@ module.exports = class GoguryeoCompanion extends Plugin {
             ".suggestion-item", ".checkbox-container", ".dropdown",
         ].join(", ");
         this.registerDomEvent(document, "click", (e) => {
+            if (Date.now() <= (this.suppressClickUntil ?? 0)) return; // a drag on the name pill
             if (e.target.closest?.(controls)) this.haptic();
         }, { capture: true });
+    }
+
+    // ---- iPhone: the name pill's gestures ----
+
+    // Like Safari's address bar: drag the name pill up to see all tabs, or
+    // sideways to go to the tab beside it (to the left → the next tab, to
+    // the right → the previous one). The pill follows the finger and ticks
+    // once it's far enough that letting go acts; a flick acts too. A plain
+    // tap still opens the tab overview (Obsidian's button under the pill).
+    setupNameGestures() {
+        this.pillDrag = null;
+        this.suppressClickUntil = 0;
+        this.registerDomEvent(document, "touchstart", (e) => this.onPillStart(e), { passive: true, capture: true });
+        this.registerDomEvent(document, "touchmove", (e) => this.onPillMove(e), { passive: false, capture: true });
+        this.registerDomEvent(document, "touchend", () => this.onPillEnd(true), { passive: true, capture: true });
+        this.registerDomEvent(document, "touchcancel", () => this.onPillEnd(false), { passive: true, capture: true });
+        // A drag still ends in a click on the button under the pill
+        this.registerDomEvent(document, "click", (e) => {
+            if (Date.now() > this.suppressClickUntil) return;
+            if (!e.target.closest?.(".mobile-navbar-action-tabs")) return;
+            e.preventDefault();
+            e.stopPropagation();
+        }, { capture: true });
+    }
+
+    onPillStart(e) {
+        if (this.pillDrag?.axis) return; // a second finger
+        this.pillDrag = null;
+        if (e.touches.length !== 1 || document.body.hasClass("is-hidden-nav")) return;
+        if (!e.target.closest?.(".mobile-navbar-action-tabs")) return;
+        const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
+        const pill = leaf?.view?.containerEl.querySelector(".view-header-title");
+        if (!pill) return;
+        const tabs = leaf.parent?.children ?? [];
+        const i = tabs.indexOf(leaf);
+        const t = e.touches[0];
+        this.pillDrag = {
+            pill, axis: null, armed: false,
+            prev: i > 0 ? tabs[i - 1] : null,
+            next: i >= 0 && i < tabs.length - 1 ? tabs[i + 1] : null,
+            x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, t: e.timeStamp, vx: 0, vy: 0,
+        };
+    }
+
+    onPillMove(e) {
+        const d = this.pillDrag;
+        if (!d) return;
+        const t = e.touches[0];
+        const dx = t.clientX - d.x0;
+        const dy = t.clientY - d.y0;
+        if (!d.axis) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < LOCK_AT) return;
+            d.axis = Math.abs(dx) > Math.abs(dy) ? "x" : dy < 0 ? "y" : null;
+            if (!d.axis) {
+                this.pillDrag = null; // pulled down: not ours
+                return;
+            }
+            d.pill.style.transition = "none";
+        }
+        e.preventDefault();
+        const dt = e.timeStamp - d.t;
+        if (dt > 0) {
+            d.vx = 0.8 * ((t.clientX - d.x) / dt) + 0.2 * d.vx;
+            d.vy = 0.8 * ((t.clientY - d.y) / dt) + 0.2 * d.vy;
+        }
+        d.x = t.clientX;
+        d.y = t.clientY;
+        d.t = e.timeStamp;
+        let armed;
+        if (d.axis === "x") {
+            d.target = dx < 0 ? d.next : d.prev;
+            const shift = d.target ? dx : dx / 3; // no tab that way: it only gives a little
+            d.pill.style.translate = `${shift}px 0`;
+            d.pill.style.opacity = String(1 - Math.min(Math.abs(shift) / d.pill.offsetWidth, 1) * 0.7);
+            armed = !!d.target && Math.abs(dx) >= PILL_SWIPE_AT;
+        } else {
+            const up = Math.max(0, -dy);
+            d.pill.style.translate = `0 ${-up * 0.6}px`;
+            d.pill.style.scale = String(1 - Math.min(up / 150, 1) * 0.08);
+            armed = up >= PILL_SWIPE_AT;
+        }
+        if (armed !== d.armed) this.haptic();
+        d.armed = armed;
+    }
+
+    onPillEnd(finished) {
+        const d = this.pillDrag;
+        this.pillDrag = null;
+        if (!d?.axis) return;
+        this.suppressClickUntil = Date.now() + 500;
+        // A flick acts even when short (and ticks, as it never got to)
+        let act = finished && d.armed;
+        if (finished && !act) {
+            const flick = d.axis === "x"
+                ? d.target && Math.abs(d.vx) > PILL_FLICK && Math.sign(d.vx) === (d.target === d.next ? -1 : 1)
+                : d.vy < -PILL_FLICK;
+            if (flick) {
+                act = true;
+                this.haptic();
+            }
+        }
+        if (act && d.axis === "x") this.switchTabFromPill(d);
+        else this.settlePill(d.pill);
+        if (act && d.axis === "y") this.app.mobileTabSwitcher?.show();
+    }
+
+    settlePill(pill) {
+        pill.style.transition = "translate 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), scale 0.3s ease, opacity 0.3s ease";
+        pill.style.translate = "";
+        pill.style.scale = "";
+        pill.style.opacity = "";
+        window.setTimeout(() => {
+            if (pill.style.translate === "" && pill.style.scale === "") pill.style.transition = "";
+        }, 320);
+    }
+
+    // The pill slides out the way it was pushed; the next tab's pill and
+    // page come in from the other side
+    switchTabFromPill(d) {
+        const toward = d.target === d.next ? -1 : 1; // the way the finger went
+        const { pill, target } = d;
+        pill.style.transition = "translate 0.14s ease-in, opacity 0.14s ease-in";
+        pill.style.translate = `${toward * pill.offsetWidth * 0.6}px 0`;
+        pill.style.opacity = "0";
+        window.setTimeout(() => {
+            pill.style.transition = pill.style.translate = pill.style.opacity = "";
+            this.app.workspace.setActiveLeaf(target, { focus: true });
+            const easing = "cubic-bezier(0.25, 0.8, 0.25, 1)";
+            const from = -toward;
+            target.view?.containerEl.querySelector(".view-header-title")?.animate(
+                [{ translate: `${from * 40}px 0`, opacity: 0 }, { translate: "0 0", opacity: 1 }],
+                { duration: 260, easing },
+            );
+            target.view?.contentEl?.animate(
+                [{ transform: `translateX(${from * 48}px)`, opacity: 0.4 }, { transform: "none", opacity: 1 }],
+                { duration: 260, easing },
+            );
+        }, 140);
     }
 
     // ---- iPhone: the name capsule brings the bars back ----

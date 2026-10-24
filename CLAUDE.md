@@ -79,7 +79,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - **Flat glass:** no brighter top edge, no top sheen, no top-to-bottom gradients on controls.
 - **Windows window buttons (— ▢ ✕) stay native** in the top-right corner, and the right sidebar starts below them. The user rejected moving or restyling them twice.
 - Desktop: the ribbon auto-hides. The tab row stretches across the full width under a path row (iPad Safari style). The sidebar tab pills span the full sidebar width. Split screen uses one shared toolbar with panes as cards and a green edge on the current pane.
-- iPhone: round glass buttons. The top row is `(◧) (folder path) (📖 ⋯) (◨)` and the bottom bar is `( ‹ › ) ( note name ) (≡)`. Tapping the name opens the tab overview, which holds Search and ＋. Scrolling down folds the bottom bar into a small capsule with just the name (Safari style).
+- iPhone: round glass buttons. The top row is `(◧) (folder path) (📖 ⋯) (◨)` and the bottom bar is `( ‹ › ) ( note name ) (≡)`. Tapping the name opens the tab overview, which holds Search and ＋. Scrolling down folds the bottom bar into a small capsule with just the name (Safari style). Like Safari's address bar, the name pill also takes gestures (companion): drag up to open the tab overview (`app.mobileTabSwitcher.show()`), or sideways to go to the tab beside it (left goes to the next tab, right to the previous).
 - The user's other plugins are Day Planner Pro (their own plugin, which has the glass tokens), Style Settings, Typewriter Scrolling, Dayloom and others. Minimal Theme Settings is turned off.
 
 ## Open items
