@@ -95,7 +95,7 @@ settings:
     -
         id: g-bg-image
         title: Background image
-        description: Used when Background is Image. A picture in your vault (Attachments/wall.jpg, or ![[wall.jpg]]) or a web link. Needs the Goguryeo Companion plugin.
+        description: Easiest is Settings → Goguryeo Companion → Choose, or right-click an image → Use as background. You can also type a vault path (Attachments/wall.jpg), ![[wall.jpg]] or a web link. Needs the Goguryeo Companion plugin.
         type: variable-text
         default: ''
         quotes: true
@@ -2041,6 +2041,23 @@ body.is-tablet:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace > .mod-root
 body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-cards) .workspace-split.mod-root,
 body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     background-color: transparent;
+}
+
+
+/* The companion plugin's image picker: a small preview before each path */
+.goguryeo-image-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.goguryeo-image-suggestion > img {
+    flex: none;
+    width: 56px;
+    height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    background-color: var(--background-modifier-hover);
 }
 
 

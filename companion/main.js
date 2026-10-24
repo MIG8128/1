@@ -19,9 +19,15 @@
 
    Background: the theme's "Background image" setting holds a vault path, an
    embed (![[wall.jpg]]) or a web link. CSS can only load the link, so this
-   turns the setting into a URL the theme reads as --g-bg-url. */
+   turns the setting into a URL the theme reads as --g-bg-url. Typing a
+   path is no fun, so the plugin also offers pickers that fill the setting
+   in: its settings tab, "Use as background" on an image's file menu, and
+   two commands (from the vault, or from this device). */
 
-const { Plugin, Platform, setIcon, normalizePath } = require("obsidian");
+const {
+    Plugin, Platform, setIcon, normalizePath,
+    FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile,
+} = require("obsidian");
 
 const EDGE = 40; // px from the window's left edge where a swipe may start
 const OPEN_AT = 50; // px the finger must travel to keep the ribbon open
@@ -38,6 +44,66 @@ const EDGE_SWIPE_AT = 80; // px to pull before letting go navigates
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
 const SNAP = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
+
+const isImage = (file) => file instanceof TFile && IMAGE_EXTENSIONS.includes(file.extension.toLowerCase());
+
+// Search the vault's images, each shown with a small preview
+class BackgroundImageModal extends FuzzySuggestModal {
+    constructor(app, onChoose) {
+        super(app);
+        this.onChoose = onChoose;
+        this.setPlaceholder("Pick a background image…");
+    }
+
+    getItems() {
+        return this.app.vault.getFiles().filter(isImage);
+    }
+
+    getItemText(file) {
+        return file.path;
+    }
+
+    renderSuggestion(match, el) {
+        el.addClass("goguryeo-image-suggestion");
+        el.createEl("img", { attr: { src: this.app.vault.getResourcePath(match.item), loading: "lazy" } });
+        super.renderSuggestion(match, el);
+    }
+
+    onChooseItem(file) {
+        this.onChoose(file);
+    }
+}
+
+class GoguryeoSettingTab extends PluginSettingTab {
+    constructor(app, plugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display() {
+        const { containerEl } = this;
+        containerEl.empty();
+        const current = this.plugin.getBackgroundImage();
+        new Setting(containerEl)
+            .setName("Background image")
+            .setDesc(current || "None. Pick one and the theme's Background switches to Image.")
+            .addButton((b) => b.setButtonText("Choose from vault").setCta()
+                .onClick(() => this.plugin.chooseBackgroundImage(() => this.display())))
+            .addButton((b) => b.setButtonText("From this device…")
+                .onClick(() => this.plugin.importBackgroundImage(() => this.display())))
+            .addExtraButton((b) => b.setIcon("x").setTooltip("Remove the background image")
+                .onClick(() => {
+                    this.plugin.setBackgroundImage(null);
+                    this.display();
+                }));
+        containerEl.createEl("p", {
+            cls: "setting-item-description",
+            text: "Blur, dimming and opacity are in Style Settings → Goguryeo → Background. "
+                + "You can also right-click an image in the file list → Use as background.",
+        });
+    }
+}
 
 module.exports = class GoguryeoCompanion extends Plugin {
     onload() {
@@ -55,6 +121,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
         this.app.workspace.onLayoutReady(() => this.updateBackground());
         this.registerEvent(this.app.workspace.on("css-change", () => this.updateBackground()));
+        this.setupBackgroundPickers();
 
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
@@ -94,6 +161,77 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         if (url) body.style.setProperty("--g-bg-url", `url("${url.replace(/"/g, "%22")}")`);
         else body.style.removeProperty("--g-bg-url");
+    }
+
+    // ---- Background image pickers ----
+
+    setupBackgroundPickers() {
+        this.addSettingTab(new GoguryeoSettingTab(this.app, this));
+        this.addCommand({
+            id: "choose-background-image",
+            name: "Choose background image",
+            callback: () => this.chooseBackgroundImage(),
+        });
+        this.addCommand({
+            id: "import-background-image",
+            name: "Background image from this device",
+            callback: () => this.importBackgroundImage(),
+        });
+        this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+            if (!isImage(file)) return;
+            menu.addItem((item) => item.setTitle("Use as background").setIcon("image")
+                .onClick(() => this.setBackgroundImage(file)));
+        }));
+    }
+
+    // The value lives in Style Settings, next to the theme's other options
+    getStyleSettings() {
+        const manager = this.app.plugins.plugins["obsidian-style-settings"]?.settingsManager;
+        if (!manager) new Notice("Goguryeo: turn on the Style Settings plugin to set a background.");
+        return manager;
+    }
+
+    getBackgroundImage() {
+        return this.app.plugins.plugins["obsidian-style-settings"]?.settingsManager
+            ?.getSetting("goguryeo", "g-bg-image") || "";
+    }
+
+    // A file switches the theme's Background to Image; null clears it
+    setBackgroundImage(file) {
+        const manager = this.getStyleSettings();
+        if (!manager) return;
+        if (file) {
+            manager.setSetting("goguryeo", "g-bg-image", file.path);
+            manager.setSetting("goguryeo", "goguryeo-bg", "goguryeo-bg-image");
+        } else {
+            manager.clearSetting("goguryeo", "g-bg-image");
+            if (manager.getSetting("goguryeo", "goguryeo-bg") === "goguryeo-bg-image") {
+                manager.setSetting("goguryeo", "goguryeo-bg", "goguryeo-bg-none");
+            }
+        }
+    }
+
+    chooseBackgroundImage(done) {
+        new BackgroundImageModal(this.app, (file) => {
+            this.setBackgroundImage(file);
+            done?.();
+        }).open();
+    }
+
+    // Pick a picture from the computer or the phone's photos; it is copied
+    // into the attachments folder so every device gets it with the vault
+    importBackgroundImage(done) {
+        const input = createEl("input", { attr: { type: "file", accept: "image/*" } });
+        input.addEventListener("change", async () => {
+            const picked = input.files?.[0];
+            if (!picked) return;
+            const path = await this.app.fileManager.getAvailablePathForAttachment(picked.name);
+            const file = await this.app.vault.createBinary(path, await picked.arrayBuffer());
+            this.setBackgroundImage(file);
+            new Notice(`Background image saved as ${file.path}`);
+            done?.();
+        });
+        input.click();
     }
 
     patchRibbonIsShown() {
