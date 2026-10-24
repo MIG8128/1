@@ -13,7 +13,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   6. Floating panel layout (desktop + iPad: path row, tab row, split screen)
   7. Tabs (sidebar pills, sliding glass thumb)
   8. Auto-hide ribbon
-  9. Mobile shared (drawers, edge-swipe arrow)
+  9. Mobile shared (drawers, the edge-swipe page stage)
   10. iPhone
   11. iPad
   12. Background (Plain / Color / Image behind everything; the note area turns see-through)
@@ -25,7 +25,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   - desktop touch: swipe from the left edge to open the ribbon (`goguryeo-touch-active`)
   - sliding glass under the active tab of every tab bar (`.goguryeo-tab-thumb`, `goguryeo-glass-thumbs`). Its motion copies the user's Day Planner Pro "GlassSegmented" component: 0.42s `cubic-bezier(0.3,1.3,0.4,1)`, plus a separate `scale: 1.06 1.12` swell held for 320ms.
   - split screen: `goguryeo-split`, `--g-root-top/left/right`, and `.goguryeo-current-pane` / `.goguryeo-last-pane` on the panes
-  - iPhone: a right-sidebar button (`.goguryeo-right-toggle`), and tapping the folded name capsule brings the bars back (`app.mobileNavbar.restoreNavigation()`)
+  - iPhone: a right-sidebar button (`.goguryeo-right-toggle`, a mirrored copy of Obsidian's own sidebar icon so it matches ◧); Safari gestures on the bottom name pill (`onPill*`: drag up opens `app.mobileTabSwitcher.show()`, drag sideways calls `workspace.setActiveLeaf` on the neighbouring tab, and the click after a drag is swallowed); and tapping the folded name capsule brings the bars back (`app.mobileNavbar.restoreNavigation()`)
   - background image: turns the Style Settings value `--g-bg-image` (vault path, `![[embed]]` or web link) into `--g-bg-url` on every `css-change`
   - iPhone and iPad: swipe in from the left or right edge to go back or forward, Safari style, only while both sidebars are closed. The page slides with the finger over a still copy of the other page (`.goguryeo-swipe-stage`). The copies are taken in a wrapper around `WorkspaceLeaf.prototype.getHistoryState`, which Obsidian calls just before leaving a page, and kept in a WeakMap keyed by that history entry. Right after a restart there are no copies yet, so the page underneath shows only the note's name and icon.
   - iPhone haptics: `haptic()` calls `Capacitor.Plugins.Haptics.impact({style: "LIGHT"})`, which Obsidian's iOS app registers. It fires on every tap on a control (buttons, icons, bars, path, menus, tab overview, file list; not the note text), on the name capsule, and each time an edge swipe crosses its go point. **Every new phone interaction must call it.**
@@ -43,7 +43,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 
 ## Verifying in the live Obsidian (instead of guessing)
 
-1. Ask the user before restarting Obsidian.
+1. The user has allowed restarting Obsidian without asking ("restart it your own").
 2. Close it gracefully with `CloseMainWindow`, then relaunch it:
    `C:\Users\MIG\AppData\Local\Programs\Obsidian\Obsidian.exe --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1`
 3. Use `node tools/cdp.mjs eval "<js>"` (or `evalfile <file>`) and `node tools/cdp.mjs shot <out.png> [scale]`.
@@ -61,13 +61,18 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 
 - The left ribbon only has the class `mod-primary`, never `mod-left`. Sidebars and the sidebar buttons have both classes.
 - `body` has `contain: strict`, so `position: fixed` elements still have an offsetParent, and `isShown()` is true for them.
-- `.workspace-leaf` has `contain: strict !important`. A fixed element inside a pane is positioned relative to that pane. Split mode relaxes this to `contain: size style !important`.
+- `.workspace-leaf` has `contain: strict !important`. A fixed element inside a pane is positioned relative to that pane. Split mode relaxes this to `contain: size !important`. Use plain `size`: a value Safari rejects would bring back Obsidian's strict.
 - Obsidian gives sidebar `.workspace-tabs` `width: 100%`. Use `width: auto` when adding margins.
 - The tab close button has `inset-inline-end: 0`. Cancel it if you set `left`, or the button covers the whole tab.
 - Obsidian rebuilds a tab bar's children and drops foreign elements, so the plugin remembers each bar's last thumb position.
 - When Obsidian moves the sidebar toggle, it leaves an animating clone. Compare against `app.workspace.leftSidebarToggleButtonEl`.
 - iPhone: Obsidian hides the bars on scroll with a transform on `.view-header`. The theme slides it with `top` instead, because a transform would drag the fixed note-name pill along with it.
 - iPhone: there's no right-sidebar button in Obsidian (the plugin adds one). The title container uses `display: contents`, so only the note's folder stays on top (for a folder note, the folder around it) and the note name moves to the bottom bar.
+- **The preview is Chromium, and the real iPhone and iPad run Safari (WebKit).** Safari clips `position: fixed` children with any ancestor's `overflow: hidden`, especially a rounded one. Chrome doesn't, so the preview can't show this. That's why the iPad toolbar vanished in card mode: in split mode, `.workspace-tabs`, `.workspace-tab-container`, `.workspace-leaf` and `.workspace-leaf-content` are now `overflow: visible`, and `.view-content` clips itself with `clip-path`. Never put a clipping box around fixed UI.
+- On iPhone and iPad, plugin (`main.js`) changes only load after Obsidian is fully closed and reopened; the theme CSS applies as soon as it syncs. Tell the user this whenever a change is in the plugin.
+- iPhone: Obsidian brings the bars back by itself when the note is scrolled to the top. To test the folded capsule, scroll the note down first (set `scrollTop` and dispatch `scroll` events), don't just call `hideNavigation()`.
+- iPhone: the ◧ button carries Obsidian's `.mod-raised` gradient; the theme removes it.
+- Obsidian's mobile API: `app.mobileNavbar` (`hideNavigation`, `restoreNavigation`, `tabButtonEl`), `app.mobileTabSwitcher` (`show`, `hide`, `isVisible`), `leaf.history` (`backHistory`, `forwardHistory`, `go(n)`). `WorkspaceLeaf.prototype.getHistoryState` runs just before a leaf leaves a page.
 - iPad: the note area has `padding-top` for the status bar. The plugin adds it to `--g-root-top`.
 - Settings opens in its own window (a separate DevTools target titled "Settings - …", url about:blank), so `cdp.mjs shot` of the main window doesn't show it; capture that target instead.
 - You can extract Obsidian's own CSS and JS from `%APPDATA%\obsidian\obsidian-1.14.5.asar` (it's a plain asar file) to look up class names.
@@ -75,6 +80,9 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 ## User preferences and decisions
 
 - Write in English. The user writes in short sentences and likes seeing screenshots and checks.
+- **iPhone UI needs haptics.** Every touch control or gesture the companion adds must call `this.haptic()`: on a tap, and when a gesture crosses its go point. The user insisted ("remember!").
+- iPhone and iPad gestures follow iOS Safari: edge swipe with the other page underneath, a name pill that folds into a capsule on scroll, and drag the pill up or sideways.
+- When the user describes a change exactly, building it directly is fine without a design-canvas mockup first; check it with screenshots.
 - **No gradient backgrounds.** The glass comes from light, blur and content scrolling underneath, or the user's own background (section 12).
 - **Flat glass:** no brighter top edge, no top sheen, no top-to-bottom gradients on controls.
 - **Windows window buttons (— ▢ ✕) stay native** in the top-right corner, and the right sidebar starts below them. The user rejected moving or restyling them twice.
@@ -84,7 +92,11 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 
 ## Open items
 
-- Not yet checked on a real iPhone or iPad: notch and home-bar spacing, tab previews, the feel of the animations.
+- **Waiting on the user's real iPhone:** the folded name capsule, the edge-swipe page stage, the name-pill gestures, and how strong the haptics feel. On iPad, the edge swipe. All were tested only in the preview with simulated touches and a stand-in Haptics plugin.
+- Not yet checked on a real iPhone or iPad: notch and home-bar spacing, tab previews.
+- The iPad toolbar fix (`8a1fb45`, `1eb0bf1`): the user confirmed the buttons came back after the first commit. The path row after the second commit hasn't been confirmed yet.
+- An edge swipe occasionally takes 2–3 seconds to finish, when Obsidian itself is slow to open the note. The copy now lifts after 400ms at most, but a stall inside Obsidian still delays the start.
+- Maybe later (not asked for yet): the iPhone capsule and the short folder name on iPad too.
 - Light mode hasn't been reviewed.
 - Small leftovers: one link shows green while the others are gray. The Style Settings entries `goguryeo-no-top-toggles` and `g-ipad-toggle-offset` aren't used anymore and should be removed.
 - macOS hasn't been tested (traffic-light spacing).
