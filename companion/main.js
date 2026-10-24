@@ -53,6 +53,13 @@ const LAST_PANE_CLASS = "goguryeo-last-pane";
 const FLOAT_LEFT_CLASS = "goguryeo-float-left";
 const FLOAT_RIGHT_CLASS = "goguryeo-float-right";
 const NOTE_MIN_WIDTH = 480; // px the note keeps beside docked sidebars; below it they float over it
+const PEEK_OPTION_CLASS = "goguryeo-peek-sidebars"; // the theme's "Bring out closed sidebars" option
+const PEEK_CLASS = { left: "goguryeo-peek-left", right: "goguryeo-peek-right" };
+const FLOAT_CLASS = { left: FLOAT_LEFT_CLASS, right: FLOAT_RIGHT_CLASS };
+const PEEK_DWELL_MS = 150; // the pointer rests at an edge this long before the sidebar comes out
+const PEEK_LEAVE_MS = 400; // and stays away this long before it goes again (the ribbon's delay)
+const PEEK_REACH = 16; // px past the sidebar the pointer may wander without closing it
+const PEEK_TOP = 40; // px at the top where the window edges belong to the title bar
 const OMNI_CLASS = "goguryeo-omnibox"; // the quick switcher docked on the path capsule
 const OMNI_MIN_WIDTH = 420; // px it takes at least (the iPhone folder pill is small)
 const OMNI_MARGIN = 8; // px it keeps from the window edges
@@ -230,6 +237,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
+        this.app.workspace.onLayoutReady(() => this.setupSidebarPeek());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
@@ -422,29 +430,48 @@ module.exports = class GoguryeoCompanion extends Plugin {
             left = leftSplit.size > room;
             right = leftSplit.size + rightSplit.size > room;
         }
+        const body = document.body;
         // When both float, they work like the iPad's drawers: opening one
-        // closes the other
+        // closes the other. A peeking sidebar floats too.
         const was = this.sidebarsOpen;
         const open = { left: !leftSplit.collapsed, right: !rightSplit.collapsed };
         this.sidebarsOpen = open;
-        if (left && right && was && open.left && open.right) {
-            if (!was.left) rightSplit.collapse();
-            else if (!was.right) leftSplit.collapse();
+        const floats = (side, byWidth) => byWidth || body.hasClass(PEEK_CLASS[side]);
+        if (floats("left", left) && floats("right", right) && was && open.left && open.right) {
+            if (!was.left) this.closeSidebar("right");
+            else if (!was.right) this.closeSidebar("left");
         }
-        const body = document.body;
+        // A peeking sidebar closed some other way (a command, a click in the
+        // note) stops peeking once it has slid shut
+        for (const side of ["left", "right"]) {
+            if (!open[side] && body.hasClass(PEEK_CLASS[side])) this.endPeek(side);
+        }
         if (body.hasClass(FLOAT_LEFT_CLASS) === left && body.hasClass(FLOAT_RIGHT_CLASS) === right) return;
         body.toggleClass(FLOAT_LEFT_CLASS, left);
         body.toggleClass(FLOAT_RIGHT_CLASS, right);
         this.refreshFrame(); // the note now reaches a top corner, or no longer does
     }
 
+    isFloating(side) {
+        return document.body.hasClass(FLOAT_CLASS[side]) || document.body.hasClass(PEEK_CLASS[side]);
+    }
+
+    split(side) {
+        return side === "left" ? this.app.workspace.leftSplit : this.app.workspace.rightSplit;
+    }
+
+    closeSidebar(side) {
+        if (document.body.hasClass(PEEK_CLASS[side])) this.endPeek(side);
+        else this.split(side).collapse();
+    }
+
     // A click in the note closes the sidebars floating over it
     onFloatingDismiss(e) {
-        const { rootSplit, leftSplit, rightSplit } = this.app.workspace;
+        const { rootSplit } = this.app.workspace;
         if (!rootSplit?.containerEl.contains(e.target) || e.target.closest(".sidebar-toggle-button")) return;
-        const body = document.body;
-        if (body.hasClass(FLOAT_LEFT_CLASS) && !leftSplit.collapsed) leftSplit.collapse();
-        if (body.hasClass(FLOAT_RIGHT_CLASS) && !rightSplit.collapsed) rightSplit.collapse();
+        for (const side of ["left", "right"]) {
+            if (this.isFloating(side) && !this.split(side).collapsed) this.closeSidebar(side);
+        }
     }
 
     // Obsidian keeps the room for the window buttons only in the panes that
@@ -452,11 +479,127 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // note. A floating one doesn't, so the note's top pane keeps that room.
     placeFloatingFrameSpace() {
         if (!Platform.isDesktopApp) return;
-        const body = document.body;
         const tops = this.app.workspace.rootSplit?.containerEl.querySelectorAll(".workspace-tabs.mod-top");
         if (!tops?.length) return;
-        if (body.hasClass(FLOAT_LEFT_CLASS)) tops[0].addClass("mod-top-left-space");
-        if (body.hasClass(FLOAT_RIGHT_CLASS)) tops[tops.length - 1].addClass("mod-top-right-space");
+        if (this.isFloating("left")) tops[0].addClass("mod-top-left-space");
+        if (this.isFloating("right")) tops[tops.length - 1].addClass("mod-top-right-space");
+    }
+
+    // ---- Closed sidebars come out at the window edges (theme option) ----
+
+    // Like the hidden ribbon: rest the pointer on the left or right edge and
+    // the closed sidebar there opens over the note (the left one with the
+    // ribbon beside it); move away and it closes again. It really opens
+    // (Obsidian's own expand, so its views draw as usual), marked as peeking
+    // so the theme floats it.
+    setupSidebarPeek() {
+        if (!Platform.isDesktopApp) return;
+        this.peekTimers = { left: null, right: null };
+        this.peekFrames = { left: 0, right: 0 };
+        this.updatePeekZone();
+        this.registerEvent(this.app.workspace.on("css-change", () => this.updatePeekZone()));
+        this.registerDomEvent(document, "pointermove", (e) => this.onPeekMove(e), { passive: true });
+        this.registerDomEvent(document.documentElement, "pointerleave", (e) => this.onPeekMove(e, true));
+        this.register(() => {
+            for (const side of ["left", "right"]) {
+                window.clearTimeout(this.peekTimers[side]?.id);
+                window.cancelAnimationFrame(this.peekFrames[side]);
+                document.body.removeClass(PEEK_CLASS[side]);
+            }
+        });
+    }
+
+    // The theme's "Edge reveal zone", shared with the ribbon
+    updatePeekZone() {
+        this.peekZone = parseFloat(getComputedStyle(document.body).getPropertyValue("--g-ribbon-hotzone")) || 12;
+    }
+
+    peekEnabled() {
+        return document.body.hasClass(PEEK_OPTION_CLASS) && !Platform.isMobile
+            && this.app.customCss?.theme === "Goguryeo";
+    }
+
+    // Runs `fn` after `ms`, unless the same kind of wait is already running
+    waitPeek(side, kind, ms, fn) {
+        if (this.peekTimers[side]?.kind === kind) return;
+        window.clearTimeout(this.peekTimers[side]?.id);
+        const id = window.setTimeout(() => {
+            this.peekTimers[side] = null;
+            fn();
+        }, ms);
+        this.peekTimers[side] = { kind, id };
+    }
+
+    stopWaitingPeek(side) {
+        window.clearTimeout(this.peekTimers[side]?.id);
+        this.peekTimers[side] = null;
+    }
+
+    onPeekMove(e, left) {
+        if (e.pointerType === "touch") return;
+        const busy = document.querySelector(".modal-container, .menu");
+        for (const side of ["left", "right"]) {
+            const split = this.split(side);
+            if (document.body.hasClass(PEEK_CLASS[side])) {
+                if (split.collapsed) continue; // already closing
+                // A menu opened from it (a file's right-click menu) keeps it out too
+                if ((!left && this.nearPeek(side, e)) || busy || this.holdsPeek(split)) this.stopWaitingPeek(side);
+                else this.waitPeek(side, "leave", PEEK_LEAVE_MS, () => this.endPeek(side));
+            } else if (!left && !busy && e.buttons === 0 && split.collapsed && this.peekEnabled() && this.atEdge(side, e)) {
+                this.waitPeek(side, "open", PEEK_DWELL_MS, () => this.startPeek(side));
+            } else {
+                this.stopWaitingPeek(side);
+            }
+        }
+    }
+
+    atEdge(side, e) {
+        if (e.clientY < PEEK_TOP) return false;
+        return side === "left" ? e.clientX <= this.peekZone : e.clientX >= window.innerWidth - this.peekZone;
+    }
+
+    // Over the sidebar, the ribbon beside it, or the edge strip
+    nearPeek(side, e) {
+        const r = this.split(side).containerEl.getBoundingClientRect();
+        return side === "left"
+            ? e.clientX <= Math.max(r.right, this.peekZone) + PEEK_REACH
+            : e.clientX >= Math.min(r.left, window.innerWidth - this.peekZone) - PEEK_REACH;
+    }
+
+    // Typing in the sidebar (its search, a rename) keeps it out until a
+    // click elsewhere
+    holdsPeek(split) {
+        const active = document.activeElement;
+        return split.containerEl.contains(active) && active.matches("input, textarea, [contenteditable='true']");
+    }
+
+    startPeek(side) {
+        const split = this.split(side);
+        if (!split.collapsed || !this.peekEnabled()) return;
+        window.cancelAnimationFrame(this.peekFrames[side]);
+        document.body.addClass(PEEK_CLASS[side]);
+        split.expand();
+    }
+
+    // Closes it, and stops floating it only once it has slid shut, or the
+    // note would jump while it closes
+    endPeek(side) {
+        const split = this.split(side);
+        this.stopWaitingPeek(side);
+        if (!split.collapsed) split.collapse();
+        window.cancelAnimationFrame(this.peekFrames[side]);
+        const started = performance.now();
+        const settle = () => {
+            const shut = split.containerEl.style.display === "none";
+            // Opened again with ◧ meanwhile: it's a normal sidebar now
+            if (shut || !split.collapsed || performance.now() - started > 1000) {
+                document.body.removeClass(PEEK_CLASS[side]);
+                this.refreshFrame();
+            } else {
+                this.peekFrames[side] = window.requestAnimationFrame(settle);
+            }
+        };
+        this.peekFrames[side] = window.requestAnimationFrame(settle);
     }
 
     // ---- iPhone: a right sidebar button (Obsidian has none on phones) ----

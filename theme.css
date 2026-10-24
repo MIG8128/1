@@ -28,14 +28,20 @@ settings:
         default: false
     -
         id: g-ribbon-hotzone
-        title: Ribbon reveal zone
-        description: Width of the invisible strip on the left edge that reveals the ribbon.
+        title: Edge reveal zone
+        description: Width of the invisible strip at the window edges that brings out the ribbon, and closed sidebars when that option is on.
         type: variable-number-slider
         default: 12
         min: 4
         max: 40
         step: 1
         format: px
+    -
+        id: goguryeo-peek-sidebars
+        title: Bring out closed sidebars at the edges
+        description: Move the pointer to the left or right edge and a closed sidebar slides out over the note, the left one with the ribbon beside it. It hides again when the pointer leaves. Needs the Goguryeo Companion plugin.
+        type: class-toggle
+        default: false
     -
         id: goguryeo-no-cards
         title: Turn off floating panel layout
@@ -1219,13 +1225,16 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
 /* Narrow window: a sidebar that would leave the note too little room floats
    over the note instead of pushing it aside, and the note keeps the full
    width. The companion picks which ones (goguryeo-float-left / -right) and
-   closes them on a click in the note. */
-body:is(.goguryeo-float-left, .goguryeo-float-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace {
+   closes them on a click in the note.
+   The "Bring out closed sidebars" option floats the same way: the companion
+   opens a closed sidebar as goguryeo-peek-left / -right when the pointer
+   reaches its edge, and closes it when the pointer leaves. */
+body:is(.goguryeo-float-left, .goguryeo-float-right, .goguryeo-peek-left, .goguryeo-peek-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace {
     position: relative;
 }
 
-body.goguryeo-float-left:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split,
-body.goguryeo-float-right:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+body:is(.goguryeo-float-left, .goguryeo-peek-left):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split,
+body:is(.goguryeo-float-right, .goguryeo-peek-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -1233,11 +1242,22 @@ body.goguryeo-float-right:not(.is-mobile):not(.goguryeo-no-cards) .workspace-spl
     max-width: calc(100% - 48px);
 }
 
-body.goguryeo-float-left:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split {
+body:is(.goguryeo-float-left, .goguryeo-peek-left):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split {
     left: 0;
 }
 
-body.goguryeo-float-right:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+/* An always-shown ribbon sits in the row; float beside it, not over it */
+body.goguryeo-ribbon-static:is(.goguryeo-float-left, .goguryeo-peek-left):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split {
+    left: var(--ribbon-width);
+}
+
+/* The hidden ribbon comes out with a peeking left sidebar, so the sidebar
+   floats just right of it */
+body.goguryeo-peek-left:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-ribbon-static) .workspace-split.mod-left-split {
+    left: calc(var(--g-gap) + var(--ribbon-width));
+}
+
+body:is(.goguryeo-float-right, .goguryeo-peek-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
     right: 0;
 }
 
@@ -1537,7 +1557,8 @@ body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:
 }
 
 body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within),
-body.goguryeo-touch-active:not(.is-mobile) .workspace-ribbon.mod-primary {
+body.goguryeo-touch-active:not(.is-mobile) .workspace-ribbon.mod-primary,
+body.goguryeo-peek-left:not(.is-mobile):not(.goguryeo-no-cards) .workspace-ribbon.mod-primary {
     opacity: 1;
     transform: none;
     transition-delay: 0ms;
@@ -1554,7 +1575,7 @@ body.goguryeo-touch-active:not(.is-mobile) .workspace-ribbon.mod-primary {
     }
 
     body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within)::after,
-    body.goguryeo-touch-active .workspace-ribbon.mod-primary::after {
+    body:not(.is-mobile):not(.goguryeo-ribbon-static):is(.goguryeo-touch-active, .goguryeo-peek-left) .workspace-ribbon.mod-primary::after {
         background-image: none;
     }
 }
