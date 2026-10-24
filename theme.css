@@ -1069,15 +1069,17 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mo
 /* The shared toolbar: only the current pane's note header shows, pinned
    across the note area. Obsidian walls each pane in (contain: strict
    !important); keep size containment but drop layout/paint containment so
-   the header can sit outside its pane. */
+   the header can sit outside its pane. Plain "size": a value Safari
+   doesn't know would bring Obsidian's strict back. */
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf {
-    contain: size style !important;
+    contain: size !important;
 }
 
-/* The card can't clip with overflow: hidden (Obsidian's), as Safari clips
-   the pinned toolbar inside it too, so the iPad showed no toolbar. The
-   pieces round off themselves instead (16px card less its 1.5px border). */
-body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+/* Nothing around the toolbar may clip with overflow: hidden (Obsidian's):
+   Safari clips pinned children too, so the iPad showed no toolbar. Only
+   the note's own content clips, and the pieces round off themselves
+   (16px card less its 1.5px border). */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root :is(.workspace-tabs, .workspace-tab-container, .workspace-leaf, .workspace-leaf-content) {
     overflow: visible;
 }
 
