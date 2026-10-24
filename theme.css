@@ -341,15 +341,14 @@ body.theme-dark {
     --glass-highlight: transparent;
     --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
     --glass-blur: blur(var(--g-blur)) saturate(180%);
-    --glass-track: rgba(255, 255, 255, 0.065);
-    --glass-track-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10),
-        0 1px 3px rgba(0, 0, 0, 0.18);
-    --glass-thumb: linear-gradient(rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.09)),
-        color-mix(in srgb, var(--background-primary) 80%, transparent);
-    --glass-thumb-hover: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
-        color-mix(in srgb, color-mix(in srgb, var(--background-primary) 93%, var(--text-normal)) 85%, transparent);
-    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.08),
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+    --glass-track: rgba(0, 0, 0, 0.32);
+    --glass-track-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --glass-thumb: linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.22)),
+        color-mix(in srgb, var(--background-primary) 85%, transparent);
+    --glass-thumb-hover: linear-gradient(rgba(255, 255, 255, 0.27), rgba(255, 255, 255, 0.27)),
+        color-mix(in srgb, var(--background-primary) 85%, transparent);
+    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.32), 0 0 0 0.5px rgba(0, 0, 0, 0.2),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.24);
     --glass-sheen: none;
     --glass-well: rgba(0, 0, 0, 0.18);
     --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -363,15 +362,11 @@ body.theme-light {
     --glass-highlight: transparent;
     --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.08);
     --glass-blur: blur(var(--g-blur)) saturate(180%);
-    --glass-track: rgba(250, 250, 250, 0.61);
-    --glass-track-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07),
-        0 1px 3px rgba(0, 0, 0, 0.06);
-    --glass-thumb: linear-gradient(rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.09)),
-        color-mix(in srgb, var(--background-primary) 80%, transparent);
-    --glass-thumb-hover: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
-        color-mix(in srgb, color-mix(in srgb, var(--background-primary) 93%, var(--text-normal)) 85%, transparent);
-    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.10),
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.60);
+    --glass-track: rgba(118, 118, 128, 0.16);
+    --glass-track-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    --glass-thumb: color-mix(in srgb, var(--background-primary) 96%, transparent);
+    --glass-thumb-hover: var(--background-primary);
+    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
     --glass-sheen: none;
     --glass-well: rgba(0, 0, 0, 0.035);
     --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.07), 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -1131,6 +1126,11 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-leaf-resize-handle:hover
 body {
     --tab-radius: 8px;
     --tab-radius-active: 8px;
+    /* The tab under the glass reads bright in every pane; the rest stay faint */
+    --tab-text-color: var(--text-faint);
+    --tab-text-color-focused: var(--text-muted);
+    --tab-text-color-active: var(--text-normal);
+    --tab-text-color-focused-active: var(--text-normal);
 }
 
 .workspace-tab-header-container .workspace-tab-header::before,
