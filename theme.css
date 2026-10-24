@@ -263,25 +263,26 @@ body:not(.goguryeo-accent-links) :is(.internal-link, .external-link, .cm-hmd-int
    2. Glass tokens (shared with Day Planner Pro and other plugins)
    ------------------------------------------------------------------------- */
 
+/* The glass is flat: no brighter top edge or sheen. --glass-highlight and
+   --glass-sheen stay defined (as transparent / none) for plugins that use them. */
 body.theme-dark {
-    --glass-bg: color-mix(in srgb, var(--background-primary) var(--g-glass-tint), transparent);
+    --glass-bg:color-mix(in srgb, var(--background-primary) var(--g-glass-tint), transparent);
     --glass-bg-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
     --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) var(--g-glass-tint), transparent);
     --glass-border: rgba(255, 255, 255, 0.10);
-    --glass-highlight: rgba(255, 255, 255, 0.07);
+    --glass-highlight: transparent;
     --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
     --glass-blur: blur(var(--g-blur)) saturate(180%);
-    --glass-track: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
-    --glass-track-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    --glass-track: rgba(255, 255, 255, 0.065);
+    --glass-track-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10),
         0 1px 3px rgba(0, 0, 0, 0.18);
-    --glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+    --glass-thumb: linear-gradient(rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.09)),
         color-mix(in srgb, var(--background-primary) 80%, transparent);
-    --glass-thumb-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06)),
+    --glass-thumb-hover: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
         color-mix(in srgb, color-mix(in srgb, var(--background-primary) 93%, var(--text-normal)) 85%, transparent);
     --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.08),
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        inset 0 -1px 2px rgba(0, 0, 0, 0.10);
-    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 160px);
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+    --glass-sheen: none;
     --glass-well: rgba(0, 0, 0, 0.18);
     --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -291,20 +292,19 @@ body.theme-light {
     --glass-bg-strong: color-mix(in srgb, var(--background-primary) 84%, transparent);
     --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) calc(var(--g-glass-tint) + 6%), transparent);
     --glass-border: rgba(0, 0, 0, 0.08);
-    --glass-highlight: rgba(255, 255, 255, 0.7);
+    --glass-highlight: transparent;
     --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.08);
     --glass-blur: blur(var(--g-blur)) saturate(180%);
-    --glass-track: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.45)), rgba(0, 0, 0, 0.03);
-    --glass-track-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    --glass-track: rgba(250, 250, 250, 0.61);
+    --glass-track-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07),
         0 1px 3px rgba(0, 0, 0, 0.06);
-    --glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+    --glass-thumb: linear-gradient(rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.09)),
         color-mix(in srgb, var(--background-primary) 80%, transparent);
-    --glass-thumb-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06)),
+    --glass-thumb-hover: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
         color-mix(in srgb, color-mix(in srgb, var(--background-primary) 93%, var(--text-normal)) 85%, transparent);
     --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.10),
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.60), inset 0 1px 0 rgba(255, 255, 255, 0.70),
-        inset 0 -1px 2px rgba(0, 0, 0, 0.06);
-    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 160px);
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.60);
+    --glass-sheen: none;
     --glass-well: rgba(0, 0, 0, 0.035);
     --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.07), 0 1px 0 rgba(255, 255, 255, 0.8);
 }
@@ -335,12 +335,11 @@ body.theme-light {
 /* Ready-made pieces for plugins */
 .glass-panel {
     background-color: var(--glass-bg);
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
-    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--glass-shadow);
 }
 
 button.glass-btn {
@@ -512,7 +511,7 @@ body {
     --menu-backdrop-filter: var(--glass-blur);
     --menu-border-color: var(--glass-border);
     --menu-radius: 12px;
-    --menu-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    --menu-shadow: var(--glass-shadow);
 
     --prompt-background: var(--glass-bg-strong);
     --prompt-backdrop-filter: var(--glass-blur);
@@ -529,25 +528,23 @@ body {
 
 .prompt {
     border-radius: 16px;
-    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--glass-shadow);
 }
 
 .modal {
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--glass-shadow);
 }
 
 .suggestion-container,
 .popover.hover-popover,
 .notice {
     background-color: var(--glass-bg-strong);
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--glass-shadow);
 }
 
 .suggestion-container,
@@ -580,7 +577,6 @@ body {
 .status-bar {
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 /* Primary buttons in the accent */
@@ -628,10 +624,9 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs {
     border-radius: var(--g-radius-panel);
     border: 1px solid var(--glass-border);
     background-color: var(--glass-sidebar);
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: var(--g-panel-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--g-panel-shadow);
     overflow: hidden;
 }
 
@@ -864,7 +859,7 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
     background-color: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: inset 0 0 0 1px var(--glass-border), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
 }
 
 /* Windows: Obsidian makes its title bar no-drag and lets the tab bar drag
@@ -1023,7 +1018,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-sidedock-vault-profile {
     background-color: var(--glass-sidebar);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: var(--g-panel-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--g-panel-shadow);
 }
 
 /* Status bar: a floating glass chip in the bottom-right corner; the right
@@ -1037,7 +1032,7 @@ body:not(.is-mobile):not(.goguryeo-no-cards) {
 body:not(.is-mobile):not(.goguryeo-no-cards) .status-bar {
     bottom: var(--g-gap);
     right: var(--g-gap);
-    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--glass-shadow);
 }
 
 body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
@@ -1273,10 +1268,9 @@ body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary 
     border: 1px solid var(--glass-border);
     border-radius: var(--g-radius-panel);
     background-color: var(--glass-bg);
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    box-shadow: var(--glass-shadow);
     z-index: calc(var(--layer-status-bar) + 1);
     opacity: 0;
     transform: translateX(calc(-100% - var(--g-gap) - 4px));
@@ -1358,7 +1352,6 @@ body.is-mobile {
     z-index: -1;
     border-radius: inherit;
     background-color: var(--glass-sidebar);
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     box-shadow: inset 0 0 0 0.5px var(--glass-border);
@@ -1388,7 +1381,7 @@ body.is-mobile {
     background-color: var(--glass-bg-strong);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: inset 0 0 0 1px var(--glass-border), inset 0 1px 0 var(--glass-highlight), 0 6px 18px rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 0 1px var(--glass-border), 0 6px 18px rgba(0, 0, 0, 0.3);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease, scale 0.2s ease;
@@ -1437,7 +1430,7 @@ body.is-phone {
     --g-phone-btn: 44px;
     --g-nav-w: calc(100vw - var(--g-phone-side) * 2);
     --g-nav-lead: 96px;
-    --g-phone-glass-shadow: inset 0 0 0 1px var(--glass-border), inset 0 1px 0 var(--glass-highlight),
+    --g-phone-glass-shadow: inset 0 0 0 1px var(--glass-border),
         0 4px 14px rgba(0, 0, 0, 0.22);
 }
 
@@ -1457,7 +1450,6 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
     ),
 body.is-phone .goguryeo-right-toggle {
     background-color: var(--glass-bg);
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     box-shadow: var(--g-phone-glass-shadow);
@@ -1796,7 +1788,6 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
     box-sizing: border-box;
     border-radius: 999px;
     background-color: var(--glass-bg);
-    background-image: var(--glass-sheen);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     box-shadow: var(--g-phone-glass-shadow);
