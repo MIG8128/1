@@ -1652,6 +1652,7 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
     ),
 body.is-phone .goguryeo-right-toggle {
     background-color: var(--glass-bg);
+    background-image: none; /* Obsidian's raised gradient on ◧ */
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     box-shadow: var(--g-phone-glass-shadow);
@@ -1934,6 +1935,16 @@ body.is-phone .goguryeo-right-toggle {
 
 body.is-phone .goguryeo-right-toggle .svg-icon {
     --icon-size: var(--icon-l);
+    --icon-stroke: var(--icon-l-stroke-width);
+}
+
+/* The same icon as ◧, mirrored the way Obsidian mirrors its own ◨ */
+body.is-phone .goguryeo-right-toggle .sidebar-toggle-button-icon {
+    transform: scale(-1, 1);
+}
+
+body.is-phone .goguryeo-right-toggle .sidebar-toggle-icon-inner {
+    stroke: none;
 }
 
 body.is-phone.is-hidden-nav .goguryeo-right-toggle {

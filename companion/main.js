@@ -353,7 +353,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
             cls: "goguryeo-right-toggle clickable-icon",
             attr: { "aria-label": "Open right sidebar" },
         });
-        setIcon(button, "lucide-panel-right");
+        // Obsidian's own sidebar icon, as on the ◧ button (the theme mirrors it)
+        const icon = (this.app.workspace.rightSidebarToggleButtonEl ?? this.app.workspace.leftSidebarToggleButtonEl)
+            ?.querySelector("svg.sidebar-toggle-button-icon");
+        if (icon) button.appendChild(icon.cloneNode(true));
+        else setIcon(button, "lucide-panel-right");
         button.addEventListener("click", () => this.app.workspace.rightSplit.toggle());
         document.body.addClass(PHONE_RIGHT_CLASS);
         this.register(() => {
