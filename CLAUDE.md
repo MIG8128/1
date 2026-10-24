@@ -43,6 +43,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - **One fix at a time.** Make one change, test it in the sandbox, commit it, then report briefly, saying what was checked. The user then tests it on their own devices.
 - **Mock up visual changes in the design tool before building.** That's the Design canvas artifact "Goguryeo glass directions": https://claude.ai/artifact/GaRE4WK9qs73cGQMrUqxsP. It holds directions A–D, split-screen E/F, and the iPhone and iPad artboards.
 - **Edit in this repo, never in the vault.** After the sandbox test passes, run `powershell -ExecutionPolicy Bypass -File deploy.ps1`. The vault is `C:\Users\MIG\Documents\obsidian\mig8128\.obsidian\` (theme in `themes/Goguryeo`, plugin in `plugins/goguryeo-companion`). The user reloads Obsidian with Ctrl+R.
+- **Bump the version with every change** (the user asked, for file management): add 0.0.1 to the last number (0.1.0 → 0.1.1 → 0.1.2) in the manifest of what changed: `manifest.json` for `theme.css`, `companion/manifest.json` for `companion/main.js`, both when both changed. Do it in the same commit as the change, before deploying, and say the new version in the report. Keep three numbers (x.y.z): Obsidian compares versions as semver.
 - **Git:** one commit per verified step, on branch `main`, ending with the Co-Authored-By line. The git history describes every decision in detail.
 
 ## User's vault & testing (sandbox)
