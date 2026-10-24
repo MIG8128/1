@@ -405,12 +405,26 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (!callback) return;
             command.callback = (...args) => {
                 const from = this.pathCapsule();
+                const file = this.app.workspace.getActiveFile();
                 const result = callback.apply(command, args);
-                if (from) this.dockSwitcher(from);
+                if (from) {
+                    this.dockSwitcher(from);
+                    this.prefillSwitcher(file);
+                }
                 return result;
             };
             this.register(() => { command.callback = callback; });
         });
+    }
+
+    // Like a browser's address bar, the field opens holding the note's path,
+    // all selected: typing replaces it, an arrow key keeps it to edit
+    prefillSwitcher(file) {
+        const input = [...document.querySelectorAll(".modal-container .prompt-input")].pop();
+        if (!file || !input) return;
+        input.value = file.extension === "md" ? file.path.slice(0, -3) : file.path;
+        input.dispatchEvent(new Event("input"));
+        input.setSelectionRange(0, input.value.length);
     }
 
     // The current note's path capsule, while it's on screen
