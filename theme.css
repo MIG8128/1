@@ -954,7 +954,8 @@ body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscr
     margin-top: var(--g-row2-top);
 }
 
-/* Split screen (2+ panes; the companion plugin sets body.goguryeo-split):
+/* Split screen (2+ panes, or 1 over a background; the companion plugin sets
+   body.goguryeo-split, plus goguryeo-one-pane for the lone card):
      [◧] [‹ ›]      ( path of the current pane )      [actions] [+] [⌄] [◨]
      ╭─ ( tabs ) ─────╮  ╭─ ( tabs ) ─────╮
      │  pane          │  │  pane          │
@@ -1006,6 +1007,12 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mo
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane {
     border-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.62);
     box-shadow: 0 0 0 4px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.12), var(--g-panel-shadow);
+}
+
+/* A lone card (over a background) has nothing to stand out from */
+body.goguryeo-split.goguryeo-one-pane:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane {
+    border-color: var(--g-pane-border);
+    box-shadow: var(--g-panel-shadow);
 }
 
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {

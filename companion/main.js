@@ -31,6 +31,7 @@ const THUMB_CLASS = "goguryeo-glass-thumbs";
 const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
 const SPLIT_CLASS = "goguryeo-split";
+const ONE_PANE_CLASS = "goguryeo-one-pane";
 const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
 const EDGE_SWIPE_AT = 80; // px to pull before letting go navigates
@@ -275,8 +276,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // ---- Split screen: one shared toolbar over all panes ----
 
-    // With 2+ panes the theme shows only the current pane's note header, as
-    // a toolbar across the whole note area. It needs to know that the screen
+    // With 2+ panes (or 1 over a background) the theme shows only the
+    // current pane's note header, as a toolbar across the whole note area. It needs to know that the screen
     // is split, where the note area is, which pane is current (the one whose
     // path shows, even while a sidebar has focus) and which pane is the
     // top-right one (it holds + and the tab list).
@@ -290,13 +291,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
             else if (child.type === "split") collect(child);
         });
         collect(rootSplit);
-        if (!(Platform.isDesktopApp || Platform.isTablet) || panes.length < 2) {
+        const body = document.body;
+        // Over a background, a lone pane is a card too
+        const hasBackground = body.hasClass("goguryeo-bg-color") || body.hasClass("goguryeo-bg-image");
+        if (!(Platform.isDesktopApp || Platform.isTablet) || panes.length < (hasBackground ? 1 : 2)) {
             this.clearSplit();
             return;
         }
-        const body = document.body;
         const r = rootSplit.containerEl.getBoundingClientRect();
         body.addClass(SPLIT_CLASS);
+        body.toggleClass(ONE_PANE_CLASS, panes.length === 1);
         // iPad pads the note area's top for the status bar; start below it
         const padTop = parseFloat(getComputedStyle(rootSplit.containerEl).paddingTop) || 0;
         body.style.setProperty("--g-root-top", `${r.top + padTop}px`);
@@ -314,7 +318,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     clearSplit() {
         const body = document.body;
-        body.removeClass(SPLIT_CLASS);
+        body.removeClass(SPLIT_CLASS, ONE_PANE_CLASS);
         body.style.removeProperty("--g-root-top");
         body.style.removeProperty("--g-root-left");
         body.style.removeProperty("--g-root-right");
