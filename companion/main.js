@@ -187,6 +187,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
         if (Platform.isMobile) this.setupEdgeSwipe();
+        if (Platform.isMobile) this.setupHaptics();
 
         if (!Platform.isDesktopApp) return;
 
@@ -367,6 +368,36 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.setupNameCapsule();
     }
 
+    // ---- iPhone: haptics ----
+
+    // A light tap from the Taptic Engine. Obsidian's iOS app carries
+    // Capacitor's Haptics plugin; elsewhere (iPad without one, Android
+    // without it, the desktop preview) this quietly does nothing, or falls
+    // back to a short vibration where there is one.
+    haptic(style = "LIGHT") {
+        try {
+            const haptics = window.Capacitor?.Plugins?.Haptics;
+            if (haptics?.impact) haptics.impact({ style }).catch(() => {});
+            else navigator.vibrate?.(8);
+        } catch (e) {
+            // no haptics here
+        }
+    }
+
+    // Every tap on a control gives a tap back, like iOS: buttons and icons,
+    // the bars, the path, menus, the tab overview and the file list. Taps
+    // in the note itself don't.
+    setupHaptics() {
+        const controls = [
+            "button", ".clickable-icon", ".mobile-navbar-action", ".view-header-breadcrumb",
+            ".mobile-tab", ".menu-item", ".tree-item-self", ".workspace-drawer-tab-option-item",
+            ".suggestion-item", ".checkbox-container", ".dropdown",
+        ].join(", ");
+        this.registerDomEvent(document, "click", (e) => {
+            if (e.target.closest?.(controls)) this.haptic();
+        }, { capture: true });
+    }
+
     // ---- iPhone: the name capsule brings the bars back ----
 
     // Scrolling down folds the bottom bar into a small capsule with just the
@@ -380,6 +411,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             e.preventDefault();
             e.stopPropagation();
             this.app.mobileNavbar?.restoreNavigation();
+            this.haptic();
         };
         const opts = { passive: false, capture: true };
         this.registerDomEvent(document, "touchstart", onTap, opts);
@@ -481,7 +513,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
     }
 
     onEdgeStart(e) {
-        if (this.edgeSwipe?.settling) return;
+        // A second finger, or a touch while the page settles, leaves it be
+        if (this.edgeSwipe?.locked) return;
         this.edgeSwipe = null;
         if (e.touches.length !== 1 || !this.canEdgeSwipe()) return;
         const t = e.touches[0];
@@ -518,6 +551,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         s.x = t.clientX;
         s.t = e.timeStamp;
         this.setPageSwipe(s, Math.max(0, Math.min(s.width, dx)));
+        // A tick each time the swipe crosses the point where letting go goes
+        const armed = s.pulled >= s.width * EDGE_SWIPE_AT;
+        if (armed !== !!s.armed) this.haptic();
+        s.armed = armed;
     }
 
     onEdgeEnd(e, finished) {
