@@ -1954,6 +1954,17 @@ body.is-phone.is-hidden-nav .goguryeo-right-toggle {
     transform: translateY(calc((var(--view-header-height) + var(--view-header-top-offset)) * -1));
 }
 
+/* A sidebar open: ◧ and ◨ step aside (the drawer has its own way out) */
+body.is-phone .mod-root .view-header .mod-left-split-toggle {
+    transition: opacity 0.2s ease;
+}
+
+body.is-phone .workspace:is(.is-left-sidedock-open, .is-right-sidedock-open) .mod-root .view-header .mod-left-split-toggle,
+body.is-phone:has(.workspace:is(.is-left-sidedock-open, .is-right-sidedock-open)) .goguryeo-right-toggle {
+    opacity: 0;
+    pointer-events: none;
+}
+
 body:not(.is-phone) .goguryeo-right-toggle {
     display: none;
 }
