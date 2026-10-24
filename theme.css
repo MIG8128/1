@@ -1529,6 +1529,18 @@ body.is-mobile {
     pointer-events: none;
 }
 
+/* Obsidian paints the drawer's insides solid, over the glass; clear them
+   so the Sidebar opacity setting shows… */
+body.is-mobile :is(.workspace-drawer-inner, .workspace-drawer-active-tab-container) {
+    background-color: transparent;
+}
+
+/* …and fades its lists out into that solid color, which over glass is a
+   dark band */
+body.is-mobile .workspace-drawer :is(.nav-buttons-container, .workspace-leaf-content)::after {
+    display: none;
+}
+
 .mobile-tab-switcher-menubar {
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
