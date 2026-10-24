@@ -2296,8 +2296,24 @@ body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root {
     background-color: transparent;
 }
 
+/* ...as frosted glass, like the sidebars: Glass opacity tints it and Blur
+   strength frosts what's behind. The glass is a layer under the pane
+   (Obsidian isolates each pane), not the pane itself: a backdrop-filter
+   on the pane would trap the shared toolbar pinned outside it. */
 body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .workspace-leaf {
+    background-color: transparent;
+}
+
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .workspace-leaf::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
     background-color: var(--g-note-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    pointer-events: none;
 }
 
 /* Views paint their own --background-primary (Day Planner Pro, Dayloom and
