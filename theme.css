@@ -1623,12 +1623,13 @@ body.is-mobile .workspace-drawer :is(.nav-buttons-container, .workspace-leaf-con
 }
 
 /* Properties: on mobile Obsidian boxes them in a solid card
-   (--background-primary-alt); make it a glass card instead */
+   (--background-primary-alt), pulled 12px out to the left. Drop the card
+   so they sit on the note's glass like on desktop */
 body.is-mobile .metadata-content {
-    background-color: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: inset 0 0 0 0.5px var(--glass-border);
+    background-color: transparent;
+    transform: none;
+    width: auto;
+    padding: 0;
 }
 
 .mobile-tab-switcher-menubar {
