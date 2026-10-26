@@ -184,10 +184,27 @@ settings:
         step: 0.05
     -
         id: goguryeo-mobile
-        title: iPhone & iPad
+        title: Mobile
         type: heading
         level: 1
         collapsed: true
+    -
+        id: goguryeo-edge-swipe
+        title: Swipe in from the edge to go back / forward
+        description: Android's own back gesture uses the screen edges too, so there the two can clash. The setting syncs with the vault, so it can leave Android out. Needs the Goguryeo Companion plugin.
+        type: class-select
+        allowEmpty: false
+        default: goguryeo-edge-swipe-not-android
+        options:
+            -
+                label: "On"
+                value: goguryeo-edge-swipe-on
+            -
+                label: On, except Android
+                value: goguryeo-edge-swipe-not-android
+            -
+                label: "Off"
+                value: goguryeo-edge-swipe-off
     -
         id: goguryeo-no-safari-bar
         title: Turn off Safari-style bottom bar (iPhone)

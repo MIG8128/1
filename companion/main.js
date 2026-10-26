@@ -1047,8 +1047,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     canEdgeSwipe() {
         const { leftSplit, rightSplit } = this.app.workspace;
+        if (!this.edgeSwipeEnabled()) return false;
         if (!leftSplit?.collapsed || !rightSplit?.collapsed) return false;
         return !document.querySelector(".modal-container, .menu, .mobile-tab-switcher, .prompt");
+    }
+
+    // The theme's option. Android's own back gesture uses the edges too, so
+    // unless it's set to "On" the swipe leaves Android alone (also without
+    // Style Settings, which sets no class then)
+    edgeSwipeEnabled() {
+        const body = document.body;
+        if (body.hasClass("goguryeo-edge-swipe-off")) return false;
+        return !Platform.isAndroidApp || body.hasClass("goguryeo-edge-swipe-on");
     }
 
     onEdgeStart(e) {
