@@ -2,7 +2,8 @@
 
    All platforms: keeps the left sidebar button out of the hidden ribbon.
    Desktop: keeps it at the start of the main tab bar, mirroring the right one.
-   In a narrow window, sidebars that would squeeze the note float over it.
+   In a narrow window, sidebars that would squeeze the note hide, and come
+   out at the window edges.
 
    iPhone & iPad: swipe in from the left/right edge to go back/forward,
    Safari style: the page follows the finger with the other page showing
@@ -52,7 +53,8 @@ const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
 const FLOAT_LEFT_CLASS = "goguryeo-float-left";
 const FLOAT_RIGHT_CLASS = "goguryeo-float-right";
-const NOTE_MIN_WIDTH = 480; // px the note keeps beside docked sidebars; below it they float over it
+const NOTE_MIN_WIDTH = 480; // px the note keeps beside docked sidebars; below it they hide
+const AUTO_HIDDEN_KEY = "goguryeo-auto-hidden"; // which sidebars a narrow window hid (this device)
 const PEEK_OPTION_CLASS = "goguryeo-peek-sidebars"; // the theme's "Bring out closed sidebars" option
 const PEEK_CLASS = { left: "goguryeo-peek-left", right: "goguryeo-peek-right" };
 const FLOAT_CLASS = { left: FLOAT_LEFT_CLASS, right: FLOAT_RIGHT_CLASS };
@@ -405,13 +407,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
         window.requestAnimationFrame(() => this.app.workspace.updateFrameless?.());
     }
 
-    // ---- Narrow window: sidebars float over the note ----
+    // ---- Narrow window: sidebars hide, and float over the note when out ----
 
     // Docked sidebars take their width from the note. When the window can't
-    // give the note NOTE_MIN_WIDTH beside both, the right one floats over the
-    // note (the theme styles the body classes), and when even the left one
-    // alone is too much, both do. Only the window and sidebar widths decide,
-    // not which sidebars are open, so opening one never makes the other jump.
+    // give the note NOTE_MIN_WIDTH beside both, the right one has no room
+    // (the theme styles the body classes), and when even the left one alone
+    // is too much, neither has. A sidebar that loses its room hides, and
+    // comes back once the window is wide enough again. Meanwhile the window
+    // edge brings it out over the note, and so does its button. Only the
+    // window and sidebar widths decide, not which sidebars are open, so
+    // opening one never makes the other jump.
     setupFloatingSidebars() {
         if (!Platform.isDesktopApp) return;
         this.registerDomEvent(window, "resize", () => this.updateFloatingSidebars());
@@ -423,18 +428,26 @@ module.exports = class GoguryeoCompanion extends Plugin {
             document.body.removeClass(FLOAT_LEFT_CLASS, FLOAT_RIGHT_CLASS);
             this.refreshFrame();
         });
+        // Kept across restarts: a wider window next time brings them back.
+        // Start as if the window had no room for those, so a wide one does.
+        this.autoHidden = { left: false, right: false, ...this.app.loadLocalStorage(AUTO_HIDDEN_KEY) };
+        for (const side of ["left", "right"]) document.body.toggleClass(FLOAT_CLASS[side], this.autoHidden[side]);
         this.updateFloatingSidebars();
     }
 
     updateFloatingSidebars() {
         const { leftSplit, rightSplit } = this.app.workspace;
-        let left = false, right = false;
-        if (this.app.customCss?.theme === "Goguryeo" && !Platform.isMobile) {
-            const room = window.innerWidth - NOTE_MIN_WIDTH;
-            left = leftSplit.size > room;
-            right = leftSplit.size + rightSplit.size > room;
-        }
         const body = document.body;
+        // Decided again only when the window's width changes, so dragging a
+        // sidebar wider never hides it
+        let left = body.hasClass(FLOAT_LEFT_CLASS), right = body.hasClass(FLOAT_RIGHT_CLASS);
+        const width = this.app.customCss?.theme === "Goguryeo" && !Platform.isMobile ? window.innerWidth : 0;
+        if (width !== this.windowWidth) {
+            this.windowWidth = width;
+            const room = width - NOTE_MIN_WIDTH;
+            left = width > 0 && leftSplit.size > room;
+            right = width > 0 && leftSplit.size + rightSplit.size > room;
+        }
         // When both float, they work like the iPad's drawers: opening one
         // closes the other. A peeking sidebar floats too.
         const was = this.sidebarsOpen;
@@ -450,10 +463,35 @@ module.exports = class GoguryeoCompanion extends Plugin {
         for (const side of ["left", "right"]) {
             if (!open[side] && body.hasClass(PEEK_CLASS[side])) this.endPeek(side);
         }
-        if (body.hasClass(FLOAT_LEFT_CLASS) === left && body.hasClass(FLOAT_RIGHT_CLASS) === right) return;
+        const narrow = { left, right };
+        const changed = ["left", "right"].filter((side) => body.hasClass(FLOAT_CLASS[side]) !== narrow[side]);
+        if (!changed.length) return;
         body.toggleClass(FLOAT_LEFT_CLASS, left);
         body.toggleClass(FLOAT_RIGHT_CLASS, right);
+        for (const side of changed) this.autoHide(side, narrow[side]);
         this.refreshFrame(); // the note now reaches a top corner, or no longer does
+    }
+
+    // The window lost the room for this sidebar: hide it rather than cover
+    // the note with it. Room again: bring back the one it hid, docked.
+    autoHide(side, narrow) {
+        const split = this.split(side);
+        const peeking = document.body.hasClass(PEEK_CLASS[side]);
+        if (narrow) {
+            if (split.collapsed || peeking) return;
+            this.autoHidden[side] = true;
+            split.collapse();
+        } else {
+            if (!this.autoHidden[side]) return;
+            this.autoHidden[side] = false;
+            if (peeking) { // already out: it stays, docked now
+                this.stopWaitingPeek(side);
+                window.cancelAnimationFrame(this.peekFrames[side]);
+                document.body.removeClass(PEEK_CLASS[side]);
+            }
+            if (split.collapsed) split.expand();
+        }
+        this.app.saveLocalStorage(AUTO_HIDDEN_KEY, this.autoHidden);
     }
 
     isFloating(side) {
@@ -518,8 +556,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.peekZone = parseFloat(getComputedStyle(document.body).getPropertyValue("--g-ribbon-hotzone")) || 12;
     }
 
-    peekEnabled() {
-        return document.body.hasClass(PEEK_OPTION_CLASS) && !Platform.isMobile
+    // With the theme's option on, or for a sidebar the window has no room for
+    peekEnabled(side) {
+        const body = document.body;
+        return (body.hasClass(PEEK_OPTION_CLASS) || body.hasClass(FLOAT_CLASS[side])) && !Platform.isMobile
             && this.app.customCss?.theme === "Goguryeo";
     }
 
@@ -549,7 +589,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 // A menu opened from it (a file's right-click menu) keeps it out too
                 if ((!left && this.nearPeek(side, e)) || busy || this.holdsPeek(split)) this.stopWaitingPeek(side);
                 else this.waitPeek(side, "leave", PEEK_LEAVE_MS, () => this.endPeek(side));
-            } else if (!left && !busy && e.buttons === 0 && split.collapsed && this.peekEnabled() && this.atEdge(side, e)) {
+            } else if (!left && !busy && e.buttons === 0 && split.collapsed && this.peekEnabled(side) && this.atEdge(side, e)) {
                 this.waitPeek(side, "open", PEEK_DWELL_MS, () => this.startPeek(side));
             } else {
                 this.stopWaitingPeek(side);
@@ -579,7 +619,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     startPeek(side) {
         const split = this.split(side);
-        if (!split.collapsed || !this.peekEnabled()) return;
+        if (!split.collapsed || !this.peekEnabled(side)) return;
         window.cancelAnimationFrame(this.peekFrames[side]);
         document.body.addClass(PEEK_CLASS[side]);
         split.expand();

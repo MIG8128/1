@@ -29,7 +29,7 @@ settings:
     -
         id: g-ribbon-hotzone
         title: Edge reveal zone
-        description: Width of the invisible strip at the window edges that brings out the ribbon, and closed sidebars when that option is on.
+        description: Width of the invisible strip at the window edges that brings out the ribbon, and closed sidebars when that option is on or the window is narrow.
         type: variable-number-slider
         default: 12
         min: 4
@@ -39,7 +39,7 @@ settings:
     -
         id: goguryeo-peek-sidebars
         title: Bring out closed sidebars at the edges
-        description: Move the pointer to the left or right edge and a closed sidebar slides out over the note, the left one with the ribbon beside it. It hides again when the pointer leaves. Needs the Goguryeo Companion plugin.
+        description: Move the pointer to the left or right edge and a closed sidebar slides out over the note, the left one with the ribbon beside it. It hides again when the pointer leaves. In a window too narrow for the sidebars, they hide by themselves and come out this way even with this off. Needs the Goguryeo Companion plugin.
         type: class-toggle
         default: false
     -
@@ -1222,10 +1222,11 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
     padding-bottom: calc(var(--g-status-bar-height) + var(--g-gap));
 }
 
-/* Narrow window: a sidebar that would leave the note too little room floats
-   over the note instead of pushing it aside, and the note keeps the full
-   width. The companion picks which ones (goguryeo-float-left / -right) and
-   closes them on a click in the note.
+/* Narrow window: a sidebar that would leave the note too little room hides,
+   and the note keeps the full width. The companion picks which ones
+   (goguryeo-float-left / -right). Brought out at the window edge or with
+   its button, the sidebar floats over the note instead of pushing it
+   aside, and a click in the note closes it.
    The "Bring out closed sidebars" option floats the same way: the companion
    opens a closed sidebar as goguryeo-peek-left / -right when the pointer
    reaches its edge, and closes it when the pointer leaves. */
