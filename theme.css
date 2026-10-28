@@ -698,6 +698,68 @@ body .modal-container.goguryeo-omnibox .prompt-input {
     -webkit-backdrop-filter: var(--glass-blur);
 }
 
+/* Find in note (Ctrl+F): a glass capsule floating at the bottom of the
+   note, like Safari's Find on Page, instead of a row pushing the note
+   down. Obsidian puts it in the view; it's placed against the pane
+   (.workspace-leaf-content). Replace mode adds a second row. */
+body .workspace-leaf-content .document-search-container {
+    position: absolute;
+    z-index: var(--layer-popover);
+    left: 50%;
+    bottom: var(--g-find-bottom, 16px);
+    transform: translateX(-50%);
+    width: min(560px, calc(100% - 24px));
+    box-sizing: border-box;
+    margin: 0;
+    padding: 6px;
+    gap: 6px;
+    background-color: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    box-shadow: var(--glass-shadow);
+}
+
+/* A clip-path or mask around it stops its blur, so while it's open the
+   card's content rounds off with overflow instead (section 6), and on
+   iPhone Obsidian's top fade on the note goes */
+body.is-phone .mod-root .workspace-leaf-content[data-type] > .view-content:has(.document-search-container) {
+    mask-image: none;
+    -webkit-mask-image: none;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content:has(.document-search-container) {
+    clip-path: none;
+    border-radius: 14.5px;
+}
+
+body .document-search-container :is(.document-search, .document-replace) {
+    max-width: none;
+    padding: 0;
+    gap: 4px;
+}
+
+body .document-search-container :is(.document-search-input, .document-replace-input) {
+    border-radius: 999px;
+}
+
+body .document-search-container .document-search-buttons,
+body .document-search-container .document-replace-buttons {
+    flex-grow: 0;
+    gap: 2px;
+}
+
+/* iPhone: above the bottom bar; with the keyboard up the bar is gone and
+   the pane already ends at the keyboard */
+body.is-phone:has(.mobile-navbar) {
+    --g-find-bottom: calc(var(--navbar-bottom-offset) - var(--keyboard-height) + var(--navbar-height) + 12px);
+}
+
+body.is-phone:not(:has(.mobile-navbar)) {
+    --g-find-bottom: 8px;
+}
+
 /* Primary buttons in the accent */
 button.mod-cta {
     border-radius: 8px;
