@@ -69,6 +69,9 @@ const OMNI_MARGIN = 8; // px it keeps from the window edges
 const OMNI_MS = 320; // the list unrolling below the capsule
 const OMNI_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // a soft spring, settling past its spot and back
 const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the end, so its shadow shows
+const OVERVIEW_CLASS = "goguryeo-tab-overview"; // the tab overview sheet (desktop and iPad)
+const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⊞, which the theme shows in place of ⌄
+const OVERVIEW_MS = 240; // the sheet fading in and out
 const SNAP ="transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
 
@@ -258,6 +261,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
         if (Platform.isMobile) this.setupHaptics();
+        if (!Platform.isPhone) this.setupTabOverview(); // after the haptics, so ⊞ ticks once
 
         if (!Platform.isDesktopApp) return;
 
@@ -779,6 +783,154 @@ module.exports = class GoguryeoCompanion extends Plugin {
         );
         const dim = container.querySelector(".modal-bg");
         if (dim) dim.animate([{ opacity: 0 }, { opacity: getComputedStyle(dim).opacity }], { duration: OMNI_MS, easing: "ease-out" });
+    }
+
+    // ---- Desktop and iPad: the tab overview, Safari style ----
+
+    // ⌄ at the end of the toolbar becomes ⊞ (the theme swaps the icons):
+    // a click lays every open tab out as a card holding a still copy of its
+    // page, the current one ringed. A card goes to its tab, its × closes it
+    // and ＋ opens a new one; Done, Esc, the empty space or ⊞ again closes
+    // the sheet. A right click on ⊞ keeps Obsidian's menu (stack, close all).
+    setupTabOverview() {
+        this.overview = null;
+        const button = ".mod-root .workspace-tab-header-tab-list > .clickable-icon";
+        const addIcons = () => {
+            document.querySelectorAll(button).forEach((el) => {
+                if (!el.querySelector(`.${OVERVIEW_ICON_CLASS}`)) setIcon(el.createSpan(OVERVIEW_ICON_CLASS), "layout-grid");
+            });
+        };
+        this.app.workspace.onLayoutReady(addIcons);
+        this.registerEvent(this.app.workspace.on("layout-change", () => {
+            addIcons();
+            if (this.overview) this.renderOverview();
+        }));
+        this.register(() => {
+            this.closeOverview(true);
+            document.querySelectorAll(`.${OVERVIEW_ICON_CLASS}`).forEach((el) => el.remove());
+        });
+        this.registerDomEvent(document, "click", (e) => {
+            const icon = e.target.closest?.(button)?.querySelector(`.${OVERVIEW_ICON_CLASS}`);
+            if (!icon || getComputedStyle(icon).display === "none") return; // the theme kept ⌄ here
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (this.overview) this.closeOverview();
+            else this.openOverview();
+        }, { capture: true });
+        this.registerDomEvent(window, "keydown", (e) => {
+            if (!this.overview || e.key !== "Escape") return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            this.closeOverview();
+        }, { capture: true });
+        this.registerDomEvent(window, "resize", () => this.overview && this.renderOverview());
+    }
+
+    openOverview() {
+        const sheet = document.body.createDiv(OVERVIEW_CLASS);
+        const bar = sheet.createDiv("goguryeo-tab-overview-bar");
+        const add = bar.createDiv({ cls: "clickable-icon", attr: { "aria-label": "New tab" } });
+        setIcon(add, "lucide-plus");
+        add.addEventListener("click", () => {
+            const leaf = this.app.workspace.getLeaf("tab");
+            this.app.workspace.setActiveLeaf(leaf, { focus: true });
+            this.closeOverview();
+        });
+        bar.createEl("button", { cls: "goguryeo-tab-overview-done", text: "Done" })
+            .addEventListener("click", () => this.closeOverview());
+        const grid = sheet.createDiv("goguryeo-tab-overview-grid");
+        sheet.addEventListener("click", (e) => {
+            if (e.target === sheet || e.target === grid) this.closeOverview();
+        });
+        this.overview = { sheet, grid };
+        document.body.addClass(OVERVIEW_CLASS + "-open");
+        this.renderOverview();
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        sheet.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OVERVIEW_MS, easing: "ease-out" });
+        grid.animate([{ transform: "scale(1.04)" }, { transform: "none" }], { duration: OVERVIEW_MS * 1.5, easing: OMNI_EASE });
+    }
+
+    // The sheet covers the panes from the tab row down, so row 1 (and ⊞ in
+    // it) stays. Each page is drawn at the note's size, then shrunk onto its
+    // card, like Safari's previews.
+    renderOverview() {
+        const { sheet, grid } = this.overview;
+        const { workspace } = this.app;
+        const rootEl = workspace.rootSplit.containerEl;
+        let root = rootEl.getBoundingClientRect();
+        const panes = [...rootEl.querySelectorAll(".workspace-tabs")].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
+        if (panes.length) {
+            const left = Math.min(...panes.map((r) => r.left));
+            const right = Math.max(...panes.map((r) => r.right));
+            const bottom = Math.max(...panes.map((r) => r.bottom));
+            root = { left, right, bottom, top: root.top, width: right - left, height: bottom - root.top };
+        }
+        const top = rootEl.querySelector(".workspace-tabs > .workspace-tab-header-container")?.getBoundingClientRect().top ?? root.top;
+        sheet.style.left = `${root.left}px`;
+        sheet.style.top = `${top}px`;
+        sheet.style.width = `${root.width}px`;
+        sheet.style.height = `${root.bottom - top}px`;
+
+        const current = workspace.getMostRecentLeaf(workspace.rootSplit);
+        const size = current?.view?.containerEl.getBoundingClientRect();
+        const pageW = Math.max(320, Math.round(size?.width || root.width));
+        const pageH = Math.max(240, Math.round(size?.height || root.height));
+        const cardH = Math.min(Math.max(pageH, pageW * 0.55), pageW * 0.85);
+        sheet.style.setProperty("--g-page-w", `${pageW}px`);
+        sheet.style.setProperty("--g-page-h", `${pageH}px`);
+        sheet.style.setProperty("--g-card-ratio", `${pageW} / ${Math.round(cardH)}`);
+
+        const leaves = [];
+        workspace.iterateRootLeaves((leaf) => { leaves.push(leaf); }); // a truthy return would stop it
+        grid.empty();
+        const pages = [];
+        for (const leaf of leaves) {
+            const card = grid.createDiv("goguryeo-tab-card");
+            card.toggleClass("is-current", leaf === current);
+            const thumb = card.createDiv("goguryeo-tab-card-thumb");
+            let snapshot = null;
+            try {
+                snapshot = this.snapshotPage(leaf);
+            } catch (e) {
+                console.error("Goguryeo: tab preview failed", e);
+            }
+            const page = this.makeSwipePage(snapshot, { icon: leaf.getIcon?.(), title: leaf.getDisplayText() });
+            page.inert = true;
+            thumb.appendChild(page);
+            pages.push([page, snapshot]);
+
+            const label = card.createDiv("goguryeo-tab-card-label");
+            const close = label.createDiv({ cls: "clickable-icon goguryeo-tab-card-close", attr: { "aria-label": "Close tab" } });
+            setIcon(close, "lucide-x");
+            setIcon(label.createDiv("goguryeo-tab-card-icon"), leaf.getIcon?.() ?? "lucide-file");
+            label.createDiv({ cls: "goguryeo-tab-card-title", text: leaf.getDisplayText() });
+            close.addEventListener("click", (e) => {
+                e.stopPropagation();
+                leaf.detach(); // the layout change redraws the cards
+            });
+            card.addEventListener("click", () => {
+                this.haptic();
+                workspace.setActiveLeaf(leaf, { focus: true });
+                this.closeOverview();
+            });
+        }
+        const thumbW = grid.querySelector(".goguryeo-tab-card-thumb")?.clientWidth || 0;
+        sheet.style.setProperty("--g-card-scale", `${thumbW / pageW}`);
+        for (const [page, snapshot] of pages) this.restoreScrolls(page, snapshot);
+    }
+
+    closeOverview(now = false) {
+        const o = this.overview;
+        if (!o) return;
+        this.overview = null;
+        document.body.removeClass(OVERVIEW_CLASS + "-open");
+        if (now || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            o.sheet.remove();
+            return;
+        }
+        o.sheet.style.pointerEvents = "none";
+        o.sheet.animate([{ opacity: 1 }, { opacity: 0 }], { duration: OVERVIEW_MS, easing: "ease-in", fill: "forwards" })
+            .finished.finally(() => o.sheet.remove());
     }
 
     // ---- iPhone: haptics ----

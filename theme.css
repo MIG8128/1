@@ -1639,6 +1639,182 @@ body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-head
     opacity: 0.7;
 }
 
+/* Tab overview (companion plugin), desktop and iPad, Safari style: the ⌄
+   tab list becomes ⊞, which lays every tab out as a card with its page.
+   A right click on ⊞ still opens Obsidian's tab menu. */
+.goguryeo-overview-icon {
+    display: none;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-tab-list > .clickable-icon > .goguryeo-overview-icon {
+    display: flex;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-tab-list > .clickable-icon:has(> .goguryeo-overview-icon) > svg {
+    display: none;
+}
+
+body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clickable-icon {
+    color: var(--text-normal);
+    background-color: var(--glass-thumb);
+}
+
+.goguryeo-tab-overview {
+    position: fixed;
+    z-index: calc(var(--layer-sidedock) - 1);
+    display: flex;
+    flex-direction: column;
+    border-radius: 14.5px;
+    background-color: color-mix(in srgb, var(--g-split-canvas) 78%, transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+    -webkit-app-region: no-drag;
+}
+
+/* ( + ) ( Done ) at the top right */
+.goguryeo-tab-overview-bar {
+    flex: none;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px 0;
+}
+
+.goguryeo-tab-overview-bar > :is(.clickable-icon, .goguryeo-tab-overview-done) {
+    height: 30px;
+    border-radius: 999px;
+    background-color: var(--glass-bg);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+.goguryeo-tab-overview-bar > .clickable-icon {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
+}
+
+.goguryeo-tab-overview-done {
+    padding: 0 14px;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-semibold);
+}
+
+.goguryeo-tab-overview-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    align-content: start;
+    gap: 22px 18px;
+    padding: 12px 20px 24px;
+    overflow-y: auto;
+}
+
+.goguryeo-tab-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.goguryeo-tab-card-thumb {
+    position: relative;
+    aspect-ratio: var(--g-card-ratio, 4 / 3);
+    overflow: hidden;
+    border-radius: 12px;
+    background-color: var(--background-primary);
+    box-shadow: 0 0 0 1px var(--glass-border), 0 6px 18px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* The current tab, ringed like the iPhone's tab overview */
+.goguryeo-tab-card.is-current .goguryeo-tab-card-thumb {
+    box-shadow: 0 0 0 2px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7),
+        0 0 0 6px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14),
+        0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+@media (hover: hover) {
+    .goguryeo-tab-card:hover .goguryeo-tab-card-thumb {
+        transform: scale(1.02);
+    }
+}
+
+/* No scrollbars in the copies */
+.goguryeo-tab-card-thumb ::-webkit-scrollbar {
+    display: none;
+}
+
+/* The page at the note's own size, shrunk to the card */
+.goguryeo-tab-card-thumb > .goguryeo-swipe-page {
+    inset: auto;
+    top: 0;
+    left: 0;
+    width: var(--g-page-w);
+    height: var(--g-page-h);
+    transform: scale(var(--g-card-scale, 0.25));
+    transform-origin: 0 0;
+    will-change: auto;
+    pointer-events: none;
+}
+
+.goguryeo-tab-card-thumb > .goguryeo-swipe-page .goguryeo-swipe-blank-icon .svg-icon {
+    --icon-size: 64px;
+}
+
+.goguryeo-tab-card-thumb > .goguryeo-swipe-page .goguryeo-swipe-blank {
+    font-size: 2em;
+}
+
+/* × · icon · name under the card */
+.goguryeo-tab-card-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0 4px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.goguryeo-tab-card.is-current .goguryeo-tab-card-label {
+    color: var(--text-normal);
+}
+
+.goguryeo-tab-card-icon {
+    display: flex;
+    flex: none;
+    --icon-size: 14px;
+}
+
+.goguryeo-tab-card-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.goguryeo-tab-card-close {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    --icon-size: 12px;
+}
+
+@media (hover: hover) {
+    .goguryeo-tab-card:not(:hover) .goguryeo-tab-card-close {
+        opacity: 0;
+    }
+}
+
 
 /* -------------------------------------------------------------------------
    8. Desktop ribbon — hidden, slides out like a drawer at the left edge
