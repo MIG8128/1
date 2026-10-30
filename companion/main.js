@@ -55,6 +55,7 @@ const FLOAT_LEFT_CLASS = "goguryeo-float-left";
 const FLOAT_RIGHT_CLASS = "goguryeo-float-right";
 const NOTE_MIN_WIDTH = 480; // px the note keeps beside docked sidebars; below it they hide
 const AUTO_HIDDEN_KEY = "goguryeo-auto-hidden"; // which sidebars a narrow window hid (this device)
+const ANDROID_NAV_KEY = "goguryeo-android-nav"; // "gestures" or "buttons": how this Android device navigates
 const PEEK_OPTION_CLASS = "goguryeo-peek-sidebars"; // the theme's "Bring out closed sidebars" option
 const PEEK_CLASS = { left: "goguryeo-peek-left", right: "goguryeo-peek-right" };
 const FLOAT_CLASS = { left: FLOAT_LEFT_CLASS, right: FLOAT_RIGHT_CLASS };
@@ -195,7 +196,20 @@ class GoguryeoSettingTab extends PluginSettingTab {
                 manager.clearSetting("goguryeo", key);
                 this.display();
             }));
+            if (s.id === "goguryeo-edge-swipe" && Platform.isAndroidApp) this.androidNavPicker();
         }
+    }
+
+    // Per device, so it stays out of Style Settings (which syncs with the vault)
+    androidNavPicker() {
+        new Setting(this.containerEl)
+            .setName("Android navigation (this device)")
+            .setDesc("With gesture navigation, Android's back gesture uses the screen edges, so the swipe stays off here unless the option above is \"On\". With the navigation buttons, the edges are free and the swipe works like on iPhone and iPad.")
+            .addDropdown((d) => d
+                .addOption("gestures", "Gesture navigation")
+                .addOption("buttons", "Navigation buttons")
+                .setValue(this.plugin.androidNav)
+                .onChange((v) => this.plugin.setAndroidNav(v)));
     }
 
     imagePicker() {
@@ -240,6 +254,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
         this.app.workspace.onLayoutReady(() => this.setupSidebarPeek());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
+        this.androidNav = this.app.loadLocalStorage(ANDROID_NAV_KEY) === "buttons" ? "buttons" : "gestures";
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
         if (Platform.isMobile) this.setupHaptics();
@@ -1054,11 +1069,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // The theme's option. Android's own back gesture uses the edges too, so
     // unless it's set to "On" the swipe leaves Android alone (also without
-    // Style Settings, which sets no class then)
+    // Style Settings, which sets no class then), except on a device set to
+    // navigation buttons, whose edges are free
     edgeSwipeEnabled() {
         const body = document.body;
         if (body.hasClass("goguryeo-edge-swipe-off")) return false;
-        return !Platform.isAndroidApp || body.hasClass("goguryeo-edge-swipe-on");
+        if (!Platform.isAndroidApp || body.hasClass("goguryeo-edge-swipe-on")) return true;
+        return this.androidNav === "buttons";
+    }
+
+    setAndroidNav(value) {
+        this.androidNav = value;
+        this.app.saveLocalStorage(ANDROID_NAV_KEY, value);
     }
 
     onEdgeStart(e) {

@@ -191,7 +191,7 @@ settings:
     -
         id: goguryeo-edge-swipe
         title: Swipe in from the edge to go back / forward
-        description: Android's own back gesture uses the screen edges too, so there the two can clash. The setting syncs with the vault, so it can leave Android out. Needs the Goguryeo Companion plugin.
+        description: Android's own back gesture uses the screen edges too, so there the two can clash. The setting syncs with the vault, so it can leave Android out. An Android device that uses the navigation buttons can turn it back on for itself in Goguryeo Companion's settings (Android navigation). Needs the Goguryeo Companion plugin.
         type: class-select
         allowEmpty: false
         default: goguryeo-edge-swipe-not-android
@@ -200,7 +200,7 @@ settings:
                 label: "On"
                 value: goguryeo-edge-swipe-on
             -
-                label: On, except Android
+                label: On, except Android with gesture navigation
                 value: goguryeo-edge-swipe-not-android
             -
                 label: "Off"
