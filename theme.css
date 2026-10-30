@@ -1254,6 +1254,48 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mo
     display: none;
 }
 
+/* Only the top cards leave room for the toolbar; a card stacked under
+   another sits the usual gap below it. */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.mod-top) {
+    margin-top: 0;
+}
+
+/* Resize handles: Obsidian puts the bar on the card's own inner edge, so it
+   hugged one card. Fill the 10px gap between the cards instead and draw
+   the bar in its middle. A card's edge is its margin (5px, or 10px below)
+   plus its 1.5px border from the gap's far side; a nested split's edge is
+   the middle of the gap across, and the gap's bottom edge down. */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-resize-handle {
+    border-width: 0;
+    background-clip: content-box;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-vertical, .mod-root .workspace-split.mod-vertical) > * > .workspace-leaf-resize-handle {
+    width: 10px;
+    padding-inline: 3.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-vertical, .mod-root .workspace-split.mod-vertical) > .workspace-tabs > .workspace-leaf-resize-handle {
+    inset-inline-end: -11.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-vertical, .mod-root .workspace-split.mod-vertical) > .workspace-split > .workspace-leaf-resize-handle {
+    inset-inline-end: -5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-horizontal, .mod-root .workspace-split.mod-horizontal) > * > .workspace-leaf-resize-handle {
+    height: 10px;
+    padding-block: 3.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-horizontal, .mod-root .workspace-split.mod-horizontal) > .workspace-tabs > .workspace-leaf-resize-handle {
+    bottom: -11.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-horizontal, .mod-root .workspace-split.mod-horizontal) > .workspace-split > .workspace-leaf-resize-handle {
+    bottom: 0;
+}
+
 body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
     height: 100%;
     padding-top: var(--g-bar-offset);
@@ -1344,6 +1386,23 @@ body:is(.goguryeo-float-right, .goguryeo-peek-right):not(.is-mobile):not(.gogury
 /* Lighter, hairline dividers between stacked panes */
 body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-leaf-resize-handle:hover {
     background-color: var(--background-modifier-border-hover);
+}
+
+/* A sidebar's resize handle: the 10px beside its card, with the bar in the
+   middle, not on the card's own edge (see the split panes, section 6) */
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-sidedock > .workspace-leaf-resize-handle {
+    width: 10px;
+    padding-inline: 3.5px;
+    border-width: 0;
+    background-clip: content-box;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split > .workspace-leaf-resize-handle {
+    inset-inline-end: -10px;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split > .workspace-leaf-resize-handle {
+    inset-inline-start: -10px;
 }
 
 
