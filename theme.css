@@ -907,23 +907,24 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspa
 
 /* Only one tab, and only one pane: like Safari, no tab row; the note moves
    up under row 1. In split screen every pane keeps its row, as the tab's ×
-   is how a pane gets closed. The bar itself stays (it carries the lifted
+   is how a pane gets closed. With every tab closed, the empty new tab keeps
+   its row, so the tab bar never vanishes. The bar itself stays (it carries the lifted
    buttons), it just paints nothing and lets clicks through. */
-body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header)) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header, > .workspace-tab-container > .workspace-leaf > .workspace-leaf-content[data-type="empty"])) {
     --g-bar-offset: calc(var(--g-row2-top) + 2px);
 }
 
-body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header)) > .workspace-tab-header-container {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header, > .workspace-tab-container > .workspace-leaf > .workspace-leaf-content[data-type="empty"])) > .workspace-tab-header-container {
     background: none;
     box-shadow: none;
     pointer-events: none;
 }
 
-body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header)) > .workspace-tab-header-container::before {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header, > .workspace-tab-container > .workspace-leaf > .workspace-leaf-content[data-type="empty"])) > .workspace-tab-header-container::before {
     content: none;
 }
 
-body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header)) > .workspace-tab-header-container > :is(.workspace-tab-header-container-inner, .goguryeo-tab-thumb) {
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root:not(:has(> .workspace-tabs ~ .workspace-tabs, > .workspace-split)) .workspace-tabs:not(:has(> .workspace-tab-header-container .workspace-tab-header + .workspace-tab-header, > .workspace-tab-container > .workspace-leaf > .workspace-leaf-content[data-type="empty"])) > .workspace-tab-header-container > :is(.workspace-tab-header-container-inner, .goguryeo-tab-thumb) {
     visibility: hidden;
 }
 
