@@ -1383,6 +1383,27 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split > 
     inset-inline-start: -10px;
 }
 
+/* Cards stacked in a sidebar: the usual 10px apart, and the handle between
+   them fills that gap with the bar in its middle. The upper card clips to
+   its rounded edge, so it lets the gap below it show (overflow-clip-margin). */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock > .workspace-tabs ~ .workspace-tabs {
+    margin-top: 0;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock > .workspace-tabs:has(~ .workspace-tabs) {
+    overflow: clip;
+    overflow-clip-margin: var(--g-gap);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock > .workspace-tabs > .workspace-leaf-resize-handle {
+    height: var(--g-gap);
+    bottom: calc(-1 * var(--g-gap) - 1px);
+    padding-inline: var(--g-radius-panel);
+    padding-block: 3.5px;
+    border-width: 0;
+    background-clip: content-box;
+}
+
 
 /* -------------------------------------------------------------------------
    7. Tabs
