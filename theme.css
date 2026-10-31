@@ -2381,53 +2381,49 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
 
 
 /* -------------------------------------------------------------------------
-   10. iPhone
-       top:     (◧)  ( 여행 )  (📖 ⋯)  (◨)   only the note's folder
-       bottom:  ( ‹ › )  (   file name   )  (≡)
+   10. iPhone — one bar at the bottom (design G)
+       ( ‹ )  ( folder › file name )  ( ⋯ )
+       · no top row: the note runs up to the status bar
        · round glass buttons, like iOS
-       · › hides when there is nowhere to go forward
-       · tap the file name → tab overview (search + new file live there)
-       · drag the name up → tab overview; sideways → the tab beside it,
+       · ‹ goes back; forward is in ⋯ and the right-edge swipe
+       · ⋯ (Obsidian's ≡ button) opens the companion's menu: forward, the
+         note's own actions (reading view, plugin actions, more options),
+         both sidebars, all tabs, search, and Obsidian's own menu
+       · the capsule shows only the folder the note is in (for a folder
+         note, the folder around it); a long folder takes at most 40%,
+         and the folder and name shorten with "…"
+       · tap the capsule → tab overview; tap the folder → quick switcher
+         (or, with the Folder notes plugin, that folder's note)
+       · drag the capsule up → tab overview; sideways → the tab beside it,
          or past the last tab → a new tab
-       · scrolling down folds the bottom bar into a small name capsule; tap
-         it to bring the bars back
-       · ◨ and the back/forward edge swipes come from the companion plugin
+       · scrolling down folds the bar into a small folder › name capsule;
+         tap it to bring the bar back
+       · the back/forward edge swipes come from the companion plugin
    ------------------------------------------------------------------------- */
 
 body.is-phone {
     --navbar-height: 52px;
     --g-phone-side: 14px;
     --g-phone-gap: 8px;
-    --g-phone-btn: 44px;
     --g-nav-w: calc(100vw - var(--g-phone-side) * 2);
-    --g-nav-lead: 96px;
     --g-phone-glass-shadow: inset 0 0 0 1px var(--glass-border),
         0 4px 14px rgba(0, 0, 0, 0.22);
-}
-
-body.is-phone:has(.mobile-navbar-action-forward > button[aria-disabled="true"]) {
-    --g-nav-lead: var(--navbar-height);
 }
 
 /* The round glass every iPhone control wears */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
         .mobile-navbar-action-back,
-        .mobile-navbar-action-forward,
         .mobile-navbar-action-menu,
-        .mod-root .workspace-leaf .view-header-title,
-        .mod-root .view-header .mod-left-split-toggle,
-        .mod-root .view-header-title-parent,
-        .mod-root .view-header .view-actions
-    ),
-body.is-phone .goguryeo-right-toggle {
+        .mod-root .workspace-leaf .view-header-title-container
+    ) {
     background-color: var(--glass-bg);
-    background-image: none; /* Obsidian's raised gradient on ◧ */
+    background-image: none;
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     box-shadow: var(--g-phone-glass-shadow);
 }
 
-/* ---- Bottom bar ---- */
+/* ---- The bar ---- */
 
 /* The bar itself becomes a clear row; each group gets its own glass */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
@@ -2451,27 +2447,8 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action
     margin: 0;
 }
 
-/* ‹ and › share one pill; ‹ alone becomes a circle */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-back {
-    flex-basis: 50px;
-    width: 50px;
-    border-radius: 999px 0 0 999px;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-forward {
-    flex-basis: 46px;
-    width: 46px;
-    margin-inline-start: calc(var(--g-phone-gap) * -1);
-    border-radius: 0 999px 999px 0;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-forward:has(> button[aria-disabled="true"]) {
-    display: none;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar-action-forward > button[aria-disabled="true"]) .mobile-navbar-action-back {
-    flex-basis: var(--navbar-height);
-    width: var(--navbar-height);
+/* ( ‹ ) and ( ⋯ ): circles */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
     border-radius: 50%;
 }
 
@@ -2479,21 +2456,21 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action
     opacity: 0.35;
 }
 
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-menu {
-    border-radius: 50%;
-}
-
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-menu .navbar-action-flair {
     display: none;
 }
 
-/* Search + new file live in the tab overview instead */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-quick-switcher, .mobile-navbar-action-new-tab) {
+/* Forward lives in ⋯; search and new file in the tab overview */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
+        .mobile-navbar-action-forward,
+        .mobile-navbar-action-quick-switcher,
+        .mobile-navbar-action-new-tab
+    ) {
     display: none;
 }
 
 /* The tabs button stretches into the centre slot and becomes an invisible
-   tap target; the note's name is drawn underneath it (below) */
+   tap target; the capsule is drawn over it (below) */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-tabs {
     flex: 1 1 auto;
     width: auto;
@@ -2509,13 +2486,52 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root {
     -webkit-mask-image: none;
 }
 
-/* The note's name, in the centre pill of the bottom bar */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .mod-root .workspace-leaf .view-header-title {
+/* ---- No top row ----
+   Obsidian's header stays in the page (it holds the capsule, and its ◧,
+   📖 and ⋯ buttons are still clicked from the ⋯ menu) but shows nothing,
+   and the note no longer leaves room for it. */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf {
+    --view-header-height: 0px;
+    --view-top-spacing: calc(var(--safe-area-inset-top) + 8px);
+    --view-top-spacing-markdown: calc(var(--safe-area-inset-top) + 16px);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
+    height: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    pointer-events: none;
+    opacity: 1;
+    transform: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header > :not(.view-header-title-container) {
+    display: none;
+}
+
+/* The status bar area: a little glass so text doesn't run into the clock */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf-content::before {
+    content: "";
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: var(--safe-area-inset-top);
+    background-color: color-mix(in srgb, var(--background-primary) 55%, transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+}
+
+/* ---- The capsule: ( folder › file name ) in the middle of the bar ---- */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .mod-root .workspace-leaf .view-header-title-container {
     display: flex;
     position: fixed;
     z-index: 1;
-    left: calc(50% - var(--g-nav-w) / 2 + var(--g-nav-lead) + var(--g-phone-gap));
-    width: calc(var(--g-nav-w) - var(--g-nav-lead) - var(--navbar-height) - var(--g-phone-gap) * 2);
+    left: calc(50% - var(--g-nav-w) / 2 + var(--navbar-height) + var(--g-phone-gap));
+    width: calc(var(--g-nav-w) - var(--navbar-height) * 2 - var(--g-phone-gap) * 2);
     bottom: calc(var(--navbar-bottom-offset) - var(--keyboard-height) - 2px);
     height: var(--navbar-height);
     margin: 0;
@@ -2523,56 +2539,106 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .
     box-sizing: border-box;
     align-items: center;
     justify-content: center;
+    gap: 0;
     border-radius: 999px;
     font-size: var(--font-ui-small);
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+    transition-property: left, width, height, bottom, padding, font-size;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-container::before,
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-container::after {
+    display: none;
+}
+
+/* The note's name; with a long folder and name both shorten, the folder
+   never taking more than 40% */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    font-size: inherit;
     font-weight: var(--font-semibold);
+    color: var(--text-normal);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     pointer-events: none;
 }
 
-/* Scrolling down hides both bars. Obsidian slides the top row up with a
-   transform, and a transform drags fixed children along: the name pill (a
-   child of the top row) would jump up to the top for a moment. Slide the
-   row by its position instead, and let the pill slide down with the bar. */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
-    top: 0;
-    transition: opacity 0.2s ease-in-out, top 0.3s ease-in-out;
-}
-
-body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
-    top: calc(var(--hidden-nav-offset) * -1);
-    transform: none;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
-    transition-property: left, width, height, bottom, padding, font-size;
-    transition-duration: 0.3s;
-    transition-timing-function: ease-out;
-}
-
-/* …except the name: like Safari, the bottom bar folds into a small capsule
-   holding just the name. Tapping it brings the bars back (the companion
-   plugin; otherwise the tap would rename the note). The name lives in the
-   top row, which Obsidian fades out; that row slides off screen anyway, so
-   fade its other pieces instead. */
-body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
-    opacity: 1;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header > :not(.view-header-title-container),
+/* The folder, in gray. A tap on it opens the quick switcher (or the
+   folder's note), so it takes taps; the rest of the capsule lets them
+   through to the tabs button underneath. */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
-    transition: opacity 0.2s ease-in-out;
+    display: flex;
+    flex: 0 1 auto;
+    min-width: 3.5em;
+    max-width: 40%;
+    padding: 0;
+    align-items: center;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: auto;
 }
 
-body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header > :not(.view-header-title-container),
-body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
-    opacity: 0;
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent:empty {
+    display: none;
 }
 
-body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
-    --g-capsule-w: min(var(--g-nav-w) * 0.5, 220px);
+/* A whole path doesn't fit on a phone: like Safari showing just the site,
+   only the folder the note is in. Each crumb is followed by a separator,
+   so the last crumb is the 2nd from the end. A folder note's last crumb
+   is its own folder (the folder notes plugin marks the title), so take
+   the one before; a folder note at the top shows no folder at all. */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > * {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2),
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(4) {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2) {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent:not(:has(> :nth-last-child(4))) {
+    display: none;
+}
+
+/* The separator after the folder becomes › */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb-separator:last-child {
+    display: block;
+    flex-shrink: 0;
+    padding: 0 5px;
+    font-size: 0;
+    color: var(--text-faint);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb-separator:last-child::after {
+    content: "›";
+    font-size: calc(var(--font-ui-small) * 1.25);
+}
+
+/* Scrolling down: like Safari, the bar folds into a small capsule holding
+   folder › name. Tapping it brings the bar back (the companion plugin;
+   otherwise the tap would rename the note). */
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
+    --g-capsule-w: min(var(--g-nav-w) * 0.62, 260px);
     left: calc(50% - var(--g-capsule-w) / 2);
     width: var(--g-capsule-w);
     height: 34px;
@@ -2582,157 +2648,17 @@ body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-ro
     pointer-events: auto;
 }
 
-/* Keyboard open (bar gone): the name hides too */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):not(:has(.mobile-navbar)) .mod-root .workspace-leaf .view-header-title {
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb-separator:last-child::after {
+    font-size: calc(var(--font-ui-smaller) * 1.25);
+}
+
+/* Keyboard open (bar gone): the capsule hides too */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):not(:has(.mobile-navbar)) .mod-root .workspace-leaf .view-header-title-container {
     display: none;
 }
 
-/* ---- Top row ---- */
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
-    gap: var(--g-phone-gap);
-    padding-inline: var(--g-phone-side);
-    box-sizing: border-box;
-}
-
-/* Room for the plugin's ◨ at the right end */
-body.is-phone.goguryeo-phone-right.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
-    padding-inline-end: calc(var(--g-phone-side) + var(--g-phone-btn) + var(--g-phone-gap));
-}
-
-/* (◧) */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header .mod-left-split-toggle {
-    width: var(--g-phone-btn);
-    height: var(--g-phone-btn);
-    border-radius: 50%;
-}
-
-/* The note's name moves to the bottom bar and its folder path stays here:
-   let the two pieces lay out on their own */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf-content .view-header-title-container {
-    display: contents;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-container::before,
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-container::after {
-    display: none;
-}
-
-/* ( 일상 · 기록 / 여행 ) — the folder links, in the middle pill */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
-    display: flex;
-    flex: 1 1 auto;
-    min-width: 0;
-    height: var(--g-phone-btn);
-    padding: 0 16px;
-    box-sizing: border-box;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    border-radius: 999px;
-    font-size: var(--font-ui-small);
-    color: var(--text-normal);
-    white-space: nowrap;
-    overflow: hidden;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent:empty {
-    visibility: hidden;
-}
-
-/* A whole path doesn't fit on a phone: like Safari showing just the site,
-   only the folder the note is in. Each crumb is followed by a separator,
-   so the last crumb is the 2nd from the end. A folder note's last crumb
-   is its own folder (the folder notes plugin marks the title), so take
-   the one before, if there is one. */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > * {
-    display: none;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2),
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(4) {
-    display: block;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2):not(:first-child) {
-    display: none;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-breadcrumb-separator {
-    color: var(--text-faint);
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-breadcrumb-separator.is-last-separator {
-    display: none;
-}
-
-/* (📖 ⋯) — the note's actions, one round pill */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header .view-actions {
-    --raised: none;
-    flex-shrink: 0;
-    height: var(--g-phone-btn);
-    padding: 0 2px;
-    border-radius: 999px;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header .view-actions .view-action {
-    width: 40px;
-    height: var(--g-phone-btn);
-    background: transparent;
-}
-
-/* (◨) — added by the companion plugin; Obsidian has none on iPhone */
-body.is-phone .goguryeo-right-toggle {
-    position: fixed;
-    z-index: var(--layer-status-bar);
-    top: var(--view-header-top-offset);
-    right: var(--g-phone-side);
-    width: var(--g-phone-btn);
-    height: var(--g-phone-btn);
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-normal);
-    transition: opacity 0.2s ease-in-out, transform 0.3s ease-in-out;
-}
-
-body.is-phone .goguryeo-right-toggle .svg-icon {
-    --icon-size: var(--icon-l);
-    --icon-stroke: var(--icon-l-stroke-width);
-}
-
-/* The same icon as ◧, mirrored the way Obsidian mirrors its own ◨ */
-body.is-phone .goguryeo-right-toggle .sidebar-toggle-button-icon {
-    transform: scale(-1, 1);
-}
-
-body.is-phone .goguryeo-right-toggle .sidebar-toggle-icon-inner {
-    stroke: none;
-}
-
-body.is-phone.is-hidden-nav .goguryeo-right-toggle {
-    opacity: 0;
-    transform: translateY(calc((var(--view-header-height) + var(--view-header-top-offset)) * -1));
-}
-
-/* A sidebar open: ◧ and ◨ step aside (the drawer has its own way out) */
-body.is-phone .mod-root .view-header .mod-left-split-toggle {
-    transition: opacity 0.2s ease;
-}
-
-body.is-phone .workspace:is(.is-left-sidedock-open, .is-right-sidedock-open) .mod-root .view-header .mod-left-split-toggle,
-body.is-phone:has(.workspace:is(.is-left-sidedock-open, .is-right-sidedock-open)) .goguryeo-right-toggle {
-    opacity: 0;
-    pointer-events: none;
-}
-
-body:not(.is-phone) .goguryeo-right-toggle {
+/* The companion's ◨ of the old top row */
+.goguryeo-right-toggle {
     display: none;
 }
 

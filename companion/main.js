@@ -28,7 +28,7 @@
    two commands (from the vault, or from this device). */
 
 const {
-    Plugin, Platform, setIcon, normalizePath,
+    Plugin, Platform, Menu, setIcon, normalizePath,
     FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, WorkspaceLeaf,
 } = require("obsidian");
 
@@ -47,7 +47,6 @@ const SOLO_CLASS = "goguryeo-solo"; // body: a normal tab fills the screen, the 
 const SOLO_OFF_CLASS = "goguryeo-solo-off"; // a pane or split folded away for it
 const MEMBERS_KEY = "goguryeo-split-members"; // the split's page in each pane, by leaf id
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
-const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
 const EDGE_SWIPE_AT = 0.35; // share of the width to pull before letting go navigates
 const SWIPE_SETTLE_MS = 280; // the page gliding the rest of the way (or back)
@@ -266,7 +265,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.app.workspace.onLayoutReady(() => this.patchSelectTab());
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
         this.app.workspace.onLayoutReady(() => this.setupSidebarPeek());
-        this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
+        this.app.workspace.onLayoutReady(() => this.setupPhoneBar());
         this.androidNav = this.app.loadLocalStorage(ANDROID_NAV_KEY) === "buttons" ? "buttons" : "gestures";
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
@@ -677,36 +676,91 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // ---- iPhone: a right sidebar button (Obsidian has none on phones) ----
 
-    setupPhoneRightToggle() {
+    // ---- iPhone: one bar at the bottom ----
+
+    // ( ‹ ) ( folder › name ) ( ⋯ ): the theme hides the top row and draws
+    // the capsule over Obsidian's tabs button; the plugin gives the capsule
+    // its gestures and turns Obsidian's ≡ into ⋯, one menu holding what the
+    // top row had.
+    setupPhoneBar() {
         if (!Platform.isPhone) return;
-        const button = document.body.createEl("button", {
-            cls: "goguryeo-right-toggle clickable-icon",
-            attr: { "aria-label": "Open right sidebar" },
-        });
-        // Obsidian's own sidebar icon, as on the ◧ button (the theme mirrors it)
-        const icon = (this.app.workspace.rightSidebarToggleButtonEl ?? this.app.workspace.leftSidebarToggleButtonEl)
-            ?.querySelector("svg.sidebar-toggle-button-icon");
-        if (icon) button.appendChild(icon.cloneNode(true));
-        else setIcon(button, "lucide-panel-right");
-        button.addEventListener("click", () => this.app.workspace.rightSplit.toggle());
-        document.body.addClass(PHONE_RIGHT_CLASS);
-        this.register(() => {
-            button.remove();
-            document.body.removeClass(PHONE_RIGHT_CLASS);
-        });
         this.setupNameCapsule();
         this.setupNameGestures();
+        this.setupPhoneMenu();
+    }
+
+    setupPhoneMenu() {
+        const iconEl = () => document.querySelector(".mobile-navbar-action-menu > .clickable-icon");
+        const paint = () => {
+            const el = iconEl();
+            if (el && !el.querySelector(".lucide-more-horizontal")) setIcon(el, "more-horizontal");
+        };
+        paint();
+        this.registerEvent(this.app.workspace.on("layout-change", paint));
+        this.registerEvent(this.app.workspace.on("active-leaf-change", paint));
+        this.register(() => {
+            const el = iconEl();
+            if (el) setIcon(el, "menu");
+        });
+        // A long press still opens Obsidian's own menu (its contextmenu)
+        this.registerDomEvent(document, "click", (e) => {
+            const action = e.target.closest?.(".mobile-navbar-action-menu");
+            if (!action) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            this.openPhoneMenu(action);
+        }, { capture: true });
+    }
+
+    // Forward, the note's own actions (reading view, plugin actions, more
+    // options: the buttons of the hidden top row, clicked for real), the
+    // sidebars, all tabs, search, and Obsidian's own ≡ menu last
+    openPhoneMenu(anchor) {
+        const ws = this.app.workspace;
+        const leaf = ws.getMostRecentLeaf(ws.rootSplit);
+        const view = leaf?.view;
+        const menu = new Menu();
+        // Obsidian opens the next menu only once this one has closed
+        const later = (fn) => () => window.setTimeout(fn, 0);
+        if (leaf?.history?.forwardHistory?.length > 0) {
+            menu.addItem((i) => i.setTitle("Forward").setIcon("arrow-right").onClick(() => leaf.history.go(1)));
+        }
+        const actions = view?.containerEl.querySelectorAll(":scope > .view-header .view-actions > .view-action") ?? [];
+        for (const button of actions) {
+            let title = (button.getAttribute("aria-label") ?? "").split("\n")[0];
+            if (button === view.modeButtonEl) title = view.getMode?.() === "preview" ? "Edit" : "Reading view";
+            else if (button === view.moreOptionsButtonEl) title = "Note options";
+            const icon = [...(button.querySelector("svg")?.classList ?? [])].find((c) => c.startsWith("lucide-"));
+            menu.addItem((i) => {
+                i.setTitle(title).onClick(later(() => button.click()));
+                if (icon) i.setIcon(icon);
+            });
+        }
+        menu.addSeparator();
+        menu.addItem((i) => i.setTitle("Left sidebar").setIcon("panel-left").onClick(() => ws.leftSplit.toggle()));
+        menu.addItem((i) => i.setTitle("Right sidebar").setIcon("panel-right").onClick(() => ws.rightSplit.toggle()));
+        menu.addItem((i) => i.setTitle("All tabs").setIcon("copy").onClick(later(() => this.app.mobileTabSwitcher?.show())));
+        menu.addItem((i) => i.setTitle("Search files").setIcon("search")
+            .onClick(later(() => this.app.commands.executeCommandById("switcher:open"))));
+        menu.addSeparator();
+        // Obsidian's ribbon menu (what ≡ opens; it wants an event to place it)
+        const r = anchor.getBoundingClientRect();
+        menu.addItem((i) => i.setTitle("Obsidian menu").setIcon("menu").onClick(later(() => {
+            this.app.mobileNavbar?.showRibbonMenu?.(new MouseEvent("click", { clientX: r.right, clientY: r.top }));
+        })));
+        menu.showAtPosition({ x: r.right, y: r.top });
     }
 
     // ---- The path capsule opens the quick switcher ----
 
     // Like a browser's address bar: tapping the path (row 1 on desktop and
-    // iPad, the folder pill on top on iPhone) opens Ctrl+O instead of
+    // iPad, the folder in the bottom capsule on iPhone) opens Ctrl+O instead of
     // renaming the note or revealing a folder; only a folder that has a
     // folder note opens that note. On iPhone the note's name sits
-    // in the bottom bar and keeps opening the tab overview. However it opens
-    // (the tap, Ctrl+O, the command palette), the search field opens in the
-    // capsule and the list drops down right below it.
+    // in the capsule too and keeps opening the tab overview. However it opens
+    // (the tap, Ctrl+O, the command palette), on desktop and iPad the search
+    // field opens in the capsule and the list drops down right below it; on
+    // iPhone it stays Obsidian's own sheet, its field already at the bottom.
     setupPathSwitcher() {
         const path = Platform.isPhone
             ? ".mod-root .view-header-title-parent"
@@ -723,6 +777,20 @@ module.exports = class GoguryeoCompanion extends Plugin {
             e.stopImmediatePropagation();
             this.haptic();
             this.app.commands.executeCommandById("switcher:open");
+        }, { capture: true });
+
+        // iPhone: the folder sits in the bottom capsule, which Obsidian draws
+        // under its tabs button (the bar is a layer above the note), so a tap
+        // over the folder is passed on to it. Before the haptics, so it ticks
+        // once; a drag on the pill still swallows its click.
+        if (Platform.isPhone) this.registerDomEvent(document, "click", (e) => {
+            if (Date.now() <= (this.suppressClickUntil ?? 0)) return;
+            if (!e.target.closest?.(".mobile-navbar-action-tabs")) return;
+            const folder = this.capsuleFolderAt(e.clientX, e.clientY);
+            if (!folder) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            folder.click();
         }, { capture: true });
 
         this.app.workspace.onLayoutReady(() => {
@@ -743,6 +811,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
     }
 
+    // iPhone: the folder shown in the capsule, if (x, y) is over it
+    capsuleFolderAt(x, y) {
+        const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
+        const header = leaf?.view?.containerEl.querySelector(":scope > .view-header");
+        const capsule = header?.querySelector(".view-header-title-container")?.getBoundingClientRect();
+        if (!capsule || y < capsule.top || y > capsule.bottom) return null;
+        const crumb = [...header.querySelectorAll(".view-header-title-parent > .view-header-breadcrumb")]
+            .find((c) => c.offsetWidth > 0);
+        const r = crumb?.getBoundingClientRect();
+        return r && x >= r.left - 4 && x <= r.right + 4 ? crumb : null;
+    }
+
     // Like a browser's address bar, the field opens holding the note's path,
     // all selected: typing replaces it, an arrow key keeps it to edit
     prefillSwitcher(file) {
@@ -755,8 +835,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // The current note's path capsule, while it's on screen
     pathCapsule() {
+        if (Platform.isPhone) return null;
         const header = this.app.workspace.getMostRecentLeaf()?.view?.containerEl.querySelector(":scope > .view-header");
-        const el = header?.querySelector(Platform.isPhone ? ".view-header-title-parent" : ".view-header-title-container");
+        const el = header?.querySelector(".view-header-title-container");
         const rect = el?.getBoundingClientRect();
         if (!rect || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0) return null;
         // A pill's 999px would make the dropped-down list an oval
@@ -1243,7 +1324,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (e.touches.length !== 1 || document.body.hasClass("is-hidden-nav")) return;
         if (!e.target.closest?.(".mobile-navbar-action-tabs")) return;
         const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
-        const pill = leaf?.view?.containerEl.querySelector(".view-header-title");
+        const pill = leaf?.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container");
         if (!pill) return;
         const tabs = leaf.parent?.children ?? [];
         const i = tabs.indexOf(leaf);
@@ -1343,7 +1424,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.app.workspace.setActiveLeaf(target, { focus: true });
             const easing = "cubic-bezier(0.25, 0.8, 0.25, 1)";
             const from = -toward;
-            target.view?.containerEl.querySelector(".view-header-title")?.animate(
+            target.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container")?.animate(
                 [{ translate: `${from * 40}px 0`, opacity: 0 }, { translate: "0 0", opacity: 1 }],
                 { duration: 260, easing },
             );
@@ -1363,7 +1444,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     setupNameCapsule() {
         const onTap = (e) => {
             if (!document.body.hasClass("is-hidden-nav")) return;
-            if (!e.target.closest?.(".mod-root .view-header-title")) return;
+            if (!e.target.closest?.(".mod-root .view-header-title-container")) return;
             e.preventDefault();
             e.stopPropagation();
             this.app.mobileNavbar?.restoreNavigation();
