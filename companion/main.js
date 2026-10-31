@@ -28,7 +28,7 @@
    two commands (from the vault, or from this device). */
 
 const {
-    Plugin, Platform, Menu, setIcon, normalizePath,
+    Plugin, Platform, setIcon, normalizePath,
     FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, WorkspaceLeaf,
 } = require("obsidian");
 
@@ -696,59 +696,136 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (el && !el.querySelector(".lucide-more-horizontal")) setIcon(el, "more-horizontal");
         };
         paint();
+        this.phoneMenu = null;
         this.registerEvent(this.app.workspace.on("layout-change", paint));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", paint));
+        this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
+            paint();
+            this.closePhoneMenu();
+        }));
         this.register(() => {
             const el = iconEl();
             if (el) setIcon(el, "menu");
+            this.closePhoneMenu(true);
         });
         // A long press still opens Obsidian's own menu (its contextmenu)
         this.registerDomEvent(document, "click", (e) => {
             const action = e.target.closest?.(".mobile-navbar-action-menu");
             if (!action) return;
+            // stopPropagation, not stopImmediatePropagation: Obsidian's own
+            // handler (on the button) never runs, the haptics one (also on
+            // document) still does, whichever was registered first
             e.preventDefault();
-            e.stopImmediatePropagation();
-            this.openPhoneMenu(action);
+            e.stopPropagation();
+            if (this.phoneMenu) this.closePhoneMenu();
+            else this.openPhoneMenu();
+        }, { capture: true });
+        this.registerDomEvent(document, "keydown", (e) => {
+            if (e.key === "Escape" && this.phoneMenu) this.closePhoneMenu();
         }, { capture: true });
     }
 
-    // Forward, the note's own actions (reading view, plugin actions, more
-    // options: the buttons of the hidden top row, clicked for real), the
-    // sidebars, all tabs, search, and Obsidian's own ≡ menu last
-    openPhoneMenu(anchor) {
+    // Design G's ⋯ panel: a small glass panel above ⋯ (the page dims a
+    // little behind it). On top a row of three tiles, ‹ › 📖 (back, forward,
+    // reading view / edit); then the sidebars, all tabs and search; then the
+    // note's own actions from the hidden top row (plugin actions, note
+    // options, clicked for real) and Obsidian's own ≡ menu. Every control is
+    // a <button>, so each tap ticks (setupHaptics).
+    openPhoneMenu() {
         const ws = this.app.workspace;
         const leaf = ws.getMostRecentLeaf(ws.rootSplit);
         const view = leaf?.view;
-        const menu = new Menu();
-        // Obsidian opens the next menu only once this one has closed
-        const later = (fn) => () => window.setTimeout(fn, 0);
-        if (leaf?.history?.forwardHistory?.length > 0) {
-            menu.addItem((i) => i.setTitle("Forward").setIcon("arrow-right").onClick(() => leaf.history.go(1)));
+        const history = leaf?.history;
+        const bg = document.body.createDiv("goguryeo-phone-menu-bg");
+        const panel = document.body.createDiv({ cls: "goguryeo-phone-menu", attr: { role: "menu", "aria-label": "More" } });
+        this.phoneMenu = { bg, panel };
+        document.body.addClass("goguryeo-phone-menu-open");
+        bg.addEventListener("click", () => this.closePhoneMenu());
+        // Close first; the action runs once the panel is gone (another menu
+        // or sheet may open from it). The tap already ticked, so a hidden
+        // top-row button clicked for it doesn't tick again.
+        const run = (fn) => () => {
+            this.closePhoneMenu();
+            window.setTimeout(() => {
+                const before = this.suppressClickUntil;
+                this.suppressClickUntil = Date.now() + 1000;
+                try {
+                    fn();
+                } finally {
+                    this.suppressClickUntil = before;
+                }
+            }, 0);
+        };
+
+        const row = panel.createDiv("goguryeo-phone-menu-row");
+        const tile = (icon, label, fn) => {
+            const b = row.createEl("button", { cls: "goguryeo-phone-menu-tile", attr: { "aria-label": label } });
+            setIcon(b, icon);
+            if (fn) b.addEventListener("click", run(fn));
+            else b.disabled = true;
+        };
+        tile("chevron-left", "Back", history?.backHistory?.length ? () => history.go(-1) : null);
+        tile("chevron-right", "Forward", history?.forwardHistory?.length ? () => history.go(1) : null);
+        const mode = view?.modeButtonEl;
+        if (mode) {
+            const reading = view.getMode?.() === "preview";
+            tile(reading ? "pencil" : "book-open", reading ? "Edit" : "Reading view", () => mode.click());
         }
+
+        const group = () => panel.createDiv("goguryeo-phone-menu-group");
+        const item = (g, icon, label, fn) => {
+            const b = g.createEl("button", { cls: "goguryeo-phone-menu-item", attr: { role: "menuitem" } });
+            const i = b.createSpan("goguryeo-phone-menu-icon");
+            if (icon) setIcon(i, icon);
+            b.createSpan({ cls: "goguryeo-phone-menu-label", text: label });
+            b.addEventListener("click", run(fn));
+        };
+        const sides = group();
+        item(sides, "panel-left", "Left sidebar", () => ws.leftSplit.toggle());
+        item(sides, "panel-right", "Right sidebar", () => ws.rightSplit.toggle());
+        const go = group();
+        item(go, "copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
+        item(go, "search", "Search files", () => this.app.commands.executeCommandById("switcher:open"));
+        const note = group();
         const actions = view?.containerEl.querySelectorAll(":scope > .view-header .view-actions > .view-action") ?? [];
         for (const button of actions) {
-            let title = (button.getAttribute("aria-label") ?? "").split("\n")[0];
-            if (button === view.modeButtonEl) title = view.getMode?.() === "preview" ? "Edit" : "Reading view";
-            else if (button === view.moreOptionsButtonEl) title = "Note options";
+            if (button === mode || button === view.moreOptionsButtonEl) continue;
+            const label = (button.getAttribute("aria-label") ?? "").split("\n")[0];
             const icon = [...(button.querySelector("svg")?.classList ?? [])].find((c) => c.startsWith("lucide-"));
-            menu.addItem((i) => {
-                i.setTitle(title).onClick(later(() => button.click()));
-                if (icon) i.setIcon(icon);
-            });
+            item(note, icon, label, () => button.click());
         }
-        menu.addSeparator();
-        menu.addItem((i) => i.setTitle("Left sidebar").setIcon("panel-left").onClick(() => ws.leftSplit.toggle()));
-        menu.addItem((i) => i.setTitle("Right sidebar").setIcon("panel-right").onClick(() => ws.rightSplit.toggle()));
-        menu.addItem((i) => i.setTitle("All tabs").setIcon("copy").onClick(later(() => this.app.mobileTabSwitcher?.show())));
-        menu.addItem((i) => i.setTitle("Search files").setIcon("search")
-            .onClick(later(() => this.app.commands.executeCommandById("switcher:open"))));
-        menu.addSeparator();
-        // Obsidian's ribbon menu (what ≡ opens; it wants an event to place it)
-        const r = anchor.getBoundingClientRect();
-        menu.addItem((i) => i.setTitle("Obsidian menu").setIcon("menu").onClick(later(() => {
-            this.app.mobileNavbar?.showRibbonMenu?.(new MouseEvent("click", { clientX: r.right, clientY: r.top }));
-        })));
-        menu.showAtPosition({ x: r.right, y: r.top });
+        if (view?.moreOptionsButtonEl) item(note, "more-horizontal", "Note options…", () => view.moreOptionsButtonEl.click());
+        const anchor = document.querySelector(".mobile-navbar-action-menu")?.getBoundingClientRect();
+        item(note, "menu", "Obsidian menu…", () => this.app.mobileNavbar?.showRibbonMenu?.(
+            new MouseEvent("click", { clientX: anchor?.right ?? 0, clientY: anchor?.top ?? 0 }),
+        ));
+
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        panel.animate(
+            [{ opacity: 0, transform: "scale(0.86)" }, { opacity: 1, transform: "none" }],
+            { duration: 260, easing: "cubic-bezier(0.3, 1.3, 0.4, 1)" },
+        );
+        bg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });
+    }
+
+    closePhoneMenu(now = false) {
+        const menu = this.phoneMenu;
+        if (!menu) return;
+        this.phoneMenu = null;
+        document.body.removeClass("goguryeo-phone-menu-open");
+        const remove = () => {
+            menu.bg.remove();
+            menu.panel.remove();
+        };
+        if (now || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            remove();
+            return;
+        }
+        menu.bg.style.pointerEvents = menu.panel.style.pointerEvents = "none";
+        menu.bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "ease-in", fill: "forwards" });
+        menu.panel.animate(
+            [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.92)" }],
+            { duration: 150, easing: "ease-in", fill: "forwards" },
+        ).finished.then(remove, remove);
     }
 
     // ---- The path capsule opens the quick switcher ----
