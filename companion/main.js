@@ -905,8 +905,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // Like a browser's address bar: tapping the path (row 1 on desktop and
     // iPad, the folder in the bottom capsule on iPhone) opens Ctrl+O instead of
     // renaming the note or revealing a folder; only a folder that has a
-    // folder note opens that note. On iPhone the note's name sits
-    // in the capsule too and keeps opening the tab overview. However it opens
+    // folder note opens that note. On a phone a tap on the note's name
+    // in the capsule opens it too, with the path filled in. However it opens
     // (the tap, Ctrl+O, the command palette), on desktop and iPad the search
     // field opens in the capsule and the list drops down right below it; on
     // iPhone it stays Obsidian's own sheet, its field already at the bottom.
@@ -928,18 +928,24 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.app.commands.executeCommandById("switcher:open");
         }, { capture: true });
 
-        // iPhone: the folder sits in the bottom capsule, which Obsidian draws
-        // under its tabs button (the bar is a layer above the note), so a tap
-        // over the folder is passed on to it. Before the haptics, so it ticks
-        // once; a drag on the pill still swallows its click.
+        // Phone: the capsule sits over Obsidian's tabs button (the bar is a
+        // layer above the note), so a tap on it would open all tabs. Like on
+        // desktop, it opens the quick switcher holding the note's path, all
+        // selected; a folder with a folder note still opens that note. A drag
+        // on the pill still swallows its click (and drag up = all tabs).
         if (Platform.isPhone) this.registerDomEvent(document, "click", (e) => {
             if (Date.now() <= (this.suppressClickUntil ?? 0)) return;
             if (!e.target.closest?.(".mobile-navbar-action-tabs")) return;
-            const folder = this.capsuleFolderAt(e.clientX, e.clientY);
-            if (!folder) return;
+            if (!this.capsuleAt(e.clientX, e.clientY)) return;
             e.preventDefault();
             e.stopImmediatePropagation();
-            folder.click();
+            const folder = this.capsuleFolderAt(e.clientX, e.clientY);
+            if (folder?.matches(".has-folder-note")) {
+                folder.click(); // ticks in the handler above
+                return;
+            }
+            this.haptic();
+            this.app.commands.executeCommandById("switcher:open");
         }, { capture: true });
 
         this.app.workspace.onLayoutReady(() => {
@@ -950,14 +956,20 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 const from = this.pathCapsule();
                 const file = this.app.workspace.getActiveFile();
                 const result = callback.apply(command, args);
-                if (from) {
-                    this.dockSwitcher(from);
-                    this.prefillSwitcher(file);
-                }
+                if (from) this.dockSwitcher(from);
+                if (from || Platform.isPhone) this.prefillSwitcher(file);
                 return result;
             };
             this.register(() => { command.callback = callback; });
         });
+    }
+
+    // Phone: the bottom capsule, if (x, y) is over it
+    capsuleAt(x, y) {
+        const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
+        const el = leaf?.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container");
+        const r = el?.getBoundingClientRect();
+        return r && r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom ? el : null;
     }
 
     // iPhone: the folder shown in the capsule, if (x, y) is over it
@@ -1450,7 +1462,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // sideways to go to the tab beside it (to the left → the next tab, to
     // the right → the previous one; to the left on the last tab → a new tab). The pill follows the finger and ticks
     // once it's far enough that letting go acts; a flick acts too. A plain
-    // tap still opens the tab overview (Obsidian's button under the pill).
+    // tap opens the quick switcher (setupPathSwitcher).
     setupNameGestures() {
         this.pillDrag = null;
         this.suppressClickUntil = 0;
@@ -1602,6 +1614,31 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const opts = { passive: false, capture: true };
         this.registerDomEvent(document, "touchstart", onTap, opts);
         this.registerDomEvent(document, "mousedown", onTap, opts);
+
+        // Folded, the capsule holds only the name and is as wide as it: the
+        // theme reads --g-capsule-name-w, the name's width in the folded
+        // font, measured ahead so the fold can animate to it
+        const ctx = document.createElement("canvas").getContext("2d");
+        const measure = () => {
+            this.app.workspace.iterateRootLeaves((leaf) => {
+                const capsule = leaf.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container");
+                const title = capsule?.querySelector(".view-header-title");
+                if (!title) return;
+                const cs = getComputedStyle(title);
+                const size = getComputedStyle(document.body).getPropertyValue("--font-ui-smaller").trim() || "12px";
+                ctx.font = `${cs.fontWeight} ${size} ${cs.fontFamily}`;
+                capsule.style.setProperty("--g-capsule-name-w", `${Math.ceil(ctx.measureText(title.textContent).width)}px`);
+            });
+        };
+        const later = () => window.setTimeout(measure, 0);
+        this.app.workspace.onLayoutReady(later);
+        this.registerEvent(this.app.workspace.on("layout-change", later));
+        this.registerEvent(this.app.workspace.on("active-leaf-change", later));
+        this.registerEvent(this.app.workspace.on("file-open", later));
+        this.registerEvent(this.app.workspace.on("css-change", later));
+        this.registerEvent(this.app.vault.on("rename", later));
+        this.register(() => document.querySelectorAll(".view-header-title-container")
+            .forEach((el) => el.style.removeProperty("--g-capsule-name-w")));
     }
 
     // ---- iPhone & iPad: swipe in from an edge to go back / forward ----

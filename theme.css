@@ -2635,10 +2635,11 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-heade
 }
 
 /* Scrolling down: like Safari, the bar folds into a small capsule holding
-   folder › name. Tapping it brings the bar back (the companion plugin;
-   otherwise the tap would rename the note). */
+   just the name, as wide as the name (--g-capsule-name-w, measured by the
+   companion; without it, 62% of the bar). Tapping it brings the bar back
+   (the companion; otherwise the tap would rename the note). */
 body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
-    --g-capsule-w: min(var(--g-nav-w) * 0.62, 260px);
+    --g-capsule-w: max(80px, min(var(--g-nav-w) * 0.62, 260px, var(--g-capsule-name-w, 999px) + 30px));
     left: calc(50% - var(--g-capsule-w) / 2);
     width: var(--g-capsule-w);
     height: 34px;
@@ -2648,8 +2649,8 @@ body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-ro
     pointer-events: auto;
 }
 
-body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb-separator:last-child::after {
-    font-size: calc(var(--font-ui-smaller) * 1.25);
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
+    display: none;
 }
 
 /* Keyboard open (bar gone): the capsule hides too */
