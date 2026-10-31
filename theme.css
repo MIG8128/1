@@ -1638,8 +1638,8 @@ body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-head
 }
 
 /* Tab overview (companion plugin), desktop and iPad, Safari style: the ⌄
-   tab list becomes ⊞, which lays every tab out as a card with its page.
-   A right click on ⊞ still opens Obsidian's tab menu. */
+   tab list becomes ⧉, which lays every tab out as a card with its page.
+   A right click on ⧉ still opens Obsidian's tab menu. */
 .goguryeo-overview-icon {
     display: none;
 }

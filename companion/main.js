@@ -70,7 +70,7 @@ const OMNI_MS = 320; // the list unrolling below the capsule
 const OMNI_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // a soft spring, settling past its spot and back
 const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the end, so its shadow shows
 const OVERVIEW_CLASS = "goguryeo-tab-overview"; // the tab overview sheet (desktop and iPad)
-const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⊞, which the theme shows in place of ⌄
+const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⧉, which the theme shows in place of ⌄
 const OVERVIEW_MS = 240; // the sheet fading in and out
 const SNAP ="transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
@@ -261,7 +261,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
         if (Platform.isMobile) this.setupHaptics();
-        if (!Platform.isPhone) this.setupTabOverview(); // after the haptics, so ⊞ ticks once
+        if (!Platform.isPhone) this.setupTabOverview(); // after the haptics, so ⧉ ticks once
 
         if (!Platform.isDesktopApp) return;
 
@@ -787,17 +787,17 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // ---- Desktop and iPad: the tab overview, Safari style ----
 
-    // ⌄ at the end of the toolbar becomes ⊞ (the theme swaps the icons):
+    // ⌄ at the end of the toolbar becomes ⧉ (the theme swaps the icons):
     // a click lays every open tab out as a card holding a still copy of its
     // page, the current one ringed. A card goes to its tab, its × closes it
-    // and ＋ opens a new one; Done, Esc, the empty space or ⊞ again closes
-    // the sheet. A right click on ⊞ keeps Obsidian's menu (stack, close all).
+    // and ＋ opens a new one; Done, Esc, the empty space or ⧉ again closes
+    // the sheet. A right click on ⧉ keeps Obsidian's menu (stack, close all).
     setupTabOverview() {
         this.overview = null;
         const button = ".mod-root .workspace-tab-header-tab-list > .clickable-icon";
         const addIcons = () => {
             document.querySelectorAll(button).forEach((el) => {
-                if (!el.querySelector(`.${OVERVIEW_ICON_CLASS}`)) setIcon(el.createSpan(OVERVIEW_ICON_CLASS), "layout-grid");
+                if (!el.querySelector(`.${OVERVIEW_ICON_CLASS}`)) setIcon(el.createSpan(OVERVIEW_ICON_CLASS), "copy");
             });
         };
         this.app.workspace.onLayoutReady(addIcons);
@@ -850,7 +850,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         grid.animate([{ transform: "scale(1.04)" }, { transform: "none" }], { duration: OVERVIEW_MS * 1.5, easing: OMNI_EASE });
     }
 
-    // The sheet covers the panes from the tab row down, so row 1 (and ⊞ in
+    // The sheet covers the panes from the tab row down, so row 1 (and ⧉ in
     // it) stays. Each page is drawn at the note's size, then shrunk onto its
     // card, like Safari's previews.
     renderOverview() {
