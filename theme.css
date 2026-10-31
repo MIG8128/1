@@ -2869,6 +2869,17 @@ body.is-mobile.goguryeo-bg-color .app-container {
     isolation: isolate;
 }
 
+/* The isolation above also traps Obsidian's bottom bar (z-index above the
+   modal layer) inside the app, so on iPhone the tab overview, a body child,
+   covered the "Search files" pill. While the overview is up the app gives
+   up its isolation and its own background: the picture (or color) then sits
+   just above body's background (body has `contain: strict`, so it is a
+   stacking context), looking the same while the overview fades in. */
+body.is-mobile:is(.goguryeo-bg-color, .goguryeo-bg-image):has(.mobile-tab-switcher) .app-container {
+    isolation: auto;
+    background-color: transparent;
+}
+
 body.is-mobile.goguryeo-bg-color .app-container::before {
     content: "";
     position: absolute;
