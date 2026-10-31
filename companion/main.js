@@ -726,7 +726,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // Design G's ⋯ panel (canvas: "G · ⋯ open" / "scrolled down"): a glass
     // panel the width of the bar, above it (the page dims a little behind).
-    // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, search, reading
+    // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, find in note, reading
     // view / edit, right sidebar). Below, in two columns and scrolling:
     // Obsidian's own ≡ menu unfolded (the ribbon's items), then the note's
     // options unfolded (the hidden top row's plugin actions, then the menu
@@ -766,7 +766,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         };
         tile("panel-left", "Left sidebar", () => ws.leftSplit.toggle());
         tile("copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
-        tile("search", "Search files", () => this.app.commands.executeCommandById("switcher:open"));
+        // Find in this note (the capsule already opens the quick switcher)
+        tile("text-search", "Find", () => this.app.commands.executeCommandById("editor:open-search"));
         const mode = view?.modeButtonEl;
         if (mode) {
             const reading = view.getMode?.() === "preview";

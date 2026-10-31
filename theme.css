@@ -2808,37 +2808,10 @@ body.is-phone.is-floating-nav.goguryeo-phone-menu-open:not(.goguryeo-no-safari-b
     box-shadow: inset 0 0 0 1.5px var(--interactive-accent), var(--g-phone-glass-shadow);
 }
 
-/* ---- Tab overview: the bar turns into a "Search files" pill above
-   Obsidian's own [+] [N tabs] [Done] row ---- */
+/* ---- Tab overview: only Obsidian's own [+] [N tabs] [Done] row; the bar
+   (and its Search files button) stays out of it ---- */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar {
-    z-index: calc(var(--layer-modal) + 1);
-    margin-bottom: calc(var(--navbar-bottom-offset) + var(--navbar-height) + 12px);
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action {
     display: none;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action-quick-switcher {
-    display: flex;
-    flex: 1 1 auto;
-    width: auto;
-    border-radius: 999px;
-    background-color: var(--glass-bg-strong);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: var(--g-phone-glass-shadow);
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action-quick-switcher .clickable-icon {
-    --icon-size: 18px;
-    gap: 8px;
-}
-
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar-action-quick-switcher .clickable-icon::after {
-    content: "Search files";
-    font-size: var(--font-ui-small);
-    color: var(--text-muted);
 }
 
 /* The overview itself: tab cards on the darker canvas, the current one
@@ -2851,9 +2824,9 @@ body.is-phone {
         0 0 0 6px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
 }
 
-/* Room at the bottom so the search pill and the buttons never cover a card */
+/* Room at the bottom so the buttons never cover a card */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-scroll {
-    padding-bottom: calc(var(--navbar-bottom-offset) + var(--navbar-height) * 2 + 36px);
+    padding-bottom: calc(var(--navbar-bottom-offset) + var(--navbar-height) + 24px);
 }
 
 body.is-phone .mobile-tab .close-button {
@@ -3015,16 +2988,6 @@ body.is-mobile.goguryeo-bg-color .app-container {
     isolation: isolate;
 }
 
-/* The isolation above also traps Obsidian's bottom bar (z-index above the
-   modal layer) inside the app, so on iPhone the tab overview, a body child,
-   covered the "Search files" pill. While the overview is up the app gives
-   up its isolation and its own background: the picture (or color) then sits
-   just above body's background (body has `contain: strict`, so it is a
-   stacking context), looking the same while the overview fades in. */
-body.is-mobile:is(.goguryeo-bg-color, .goguryeo-bg-image):has(.mobile-tab-switcher) .app-container {
-    isolation: auto;
-    background-color: transparent;
-}
 
 body.is-mobile.goguryeo-bg-color .app-container::before {
     content: "";
