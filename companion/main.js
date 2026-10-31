@@ -1807,7 +1807,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         const inner = tab.querySelector(".goguryeo-stab-inner");
         tab.toggleClass("is-active", !solo);
-        tab.style.flexGrow = `${pages.size}`;
         const parts = new Set();
         for (const pane of groups) {
             const leaf = pages.get(pane);

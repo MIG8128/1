@@ -1290,8 +1290,8 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     pointer-events: none;
 }
 
-/* Every page shares the width equally: a normal tab is one share, the
-   joined tab one per page (the companion sets its flex-grow) */
+/* Every tab shares the width equally; the joined split tab counts as one
+   (the user's choice: {A · B} {C} {D} each get a third) */
 .goguryeo-stab {
     position: relative;
     z-index: 1;
@@ -1391,9 +1391,10 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     pointer-events: none;
 }
 
-/* The joined split tab: its pages side by side inside one tab, a split
-   icon-like line between them, Chrome style. Each page has its own × (on
-   hover) and click. */
+/* The joined split tab: its pages' names side by side inside one tab, a
+   dot between them. Each name takes what it needs and shrinks (with …)
+   when the tab is narrow; each has its own click, and on hover a × in
+   front of it. */
 .goguryeo-stab-split > .goguryeo-stab-inner {
     padding: 0 4px;
     gap: 0;
@@ -1401,13 +1402,13 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
 
 .goguryeo-stab-part {
     position: relative;
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-width: 0;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 20px;
+    padding: 0 9px;
     border-radius: 6px;
 }
 
@@ -1445,18 +1446,20 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
 }
 
 .goguryeo-stab-part > .goguryeo-stab-close {
-    left: 2px;
+    position: static;
+    flex: none;
     width: 18px;
     height: 18px;
+    margin: 0 3px 0 -6px;
+    transform: none;
 }
 
 .goguryeo-stab-part > .goguryeo-stab-icon {
-    margin-right: 4px;
+    display: none !important;
 }
 
 .goguryeo-stab-part:not(:hover) > .goguryeo-stab-close {
-    opacity: 0;
-    pointer-events: none;
+    display: none;
 }
 
 .goguryeo-stab-split.is-active .goguryeo-stab-part:not(.is-focused) {
