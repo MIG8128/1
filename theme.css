@@ -2046,22 +2046,20 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     font-size: 2em;
 }
 
-/* Split screen (Chrome style): the split is one wide card, its pages side
-   by side at the same zoom as the other cards; the companion sets the
-   height and each page's width. The focused page's name is green. */
+/* Split screen (Chrome style): the split is one wide card, a small map of
+   the panes as they are laid out; the companion places each page (left,
+   top, width, height in %), sizes the card to the panes' area and draws
+   each page at its pane's real size. The focused page is ringed. */
 .goguryeo-tab-card.is-split .goguryeo-tab-card-thumb {
-    display: flex;
     aspect-ratio: auto;
-    gap: 2px;
     background-color: var(--glass-border);
 }
 
 .goguryeo-tab-card-part {
-    position: relative;
-    flex: 1 1 0;
-    min-width: 0;
+    position: absolute;
     overflow: hidden;
     background-color: var(--background-primary);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
 }
 
 .goguryeo-tab-card-part > .goguryeo-swipe-page {

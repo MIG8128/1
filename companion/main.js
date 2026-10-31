@@ -263,6 +263,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.setupBackgroundPickers();
 
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
+        this.app.workspace.onLayoutReady(() => this.patchSelectTab());
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
         this.app.workspace.onLayoutReady(() => this.setupSidebarPeek());
         this.app.workspace.onLayoutReady(() => this.setupPhoneRightToggle());
@@ -904,7 +905,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         workspace.iterateRootLeaves((leaf) => { leaves.push(leaf); }); // a truthy return would stop it
         // Chrome-style split screen: the split's pages make one card, where
         // the first of them stands, as in the tab row
-        const splitPages = this.sharedBar?.isConnected && this.splitPages ? [...this.splitPages.values()].filter((leaf) => leaves.includes(leaf)) : [];
+        const pageSet = this.sharedBar?.isConnected && this.splitPages ? new Set(this.splitPages.values()) : new Set();
+        const splitPages = leaves.filter((leaf) => pageSet.has(leaf)); // in layout order
         const solo = document.body.hasClass(SOLO_CLASS);
         const entries = [];
         for (const leaf of leaves) {
@@ -919,10 +921,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const pages = [];
         const addPage = (thumb, leaf) => {
             let snapshot = null;
-            // A folded split page: the copy taken as it folded
-            const folded = leaf.parent?.containerEl.closest(`.${SOLO_OFF_CLASS}`);
+            // A split page off screen (its pane folded, or hidden behind the
+            // lone tab in its own pane): the copy taken as the split folded,
+            // since a hidden page can't tell its scroll position
+            const folded = leaf.parent?.containerEl.closest(`.${SOLO_OFF_CLASS}`) || leaf.parent?.children[leaf.parent.currentTab] !== leaf;
             try {
-                snapshot = (folded && this.splitShots?.get(leaf)) || this.snapshotPage(leaf);
+                snapshot = (folded && this.splitShots?.get(leaf)) || this.snapshotPage(leaf, true);
             } catch (e) {
                 console.error("Goguryeo: tab preview failed", e);
             }
@@ -941,13 +945,21 @@ module.exports = class GoguryeoCompanion extends Plugin {
         let splitCard = null;
         for (const entry of entries) {
             if (Array.isArray(entry)) {
-                // The split: its pages side by side in one wide card; a page
-                // goes to that page, the name row to the focused (or first) one
+                // The split: one wide card, a small map of the panes as they
+                // are laid out, each page in its pane's place; a page goes
+                // to that page, the name row to the focused (or first) one
                 const card = splitCard = grid.createDiv("goguryeo-tab-card is-split");
                 card.toggleClass("is-current", !solo);
                 const thumb = card.createDiv("goguryeo-tab-card-thumb");
+                const places = this.splitPlaces();
                 for (const leaf of entry) {
                     const part = thumb.createDiv("goguryeo-tab-card-part");
+                    const [x, y, w, h] = places.get(leaf) ?? [entry.indexOf(leaf) / entry.length, 0, 1 / entry.length, 1];
+                    part.gPlace = [x, y, w, h];
+                    part.style.left = `${x * 100}%`;
+                    part.style.top = `${y * 100}%`;
+                    part.style.width = `${w * 100}%`;
+                    part.style.height = `${h * 100}%`;
                     part.toggleClass("is-focused", !solo && leaf === current);
                     addPage(part, leaf);
                     part.addEventListener("click", (e) => {
@@ -980,9 +992,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
             card.addEventListener("pointerdown", (e) => this.onCardDown(e, card, leaf));
             card.addEventListener("click", () => go(leaf));
         }
-        // Card size from the grid's column; the split's card spans two
-        // columns at the same height, each page drawn at the same zoom but
-        // only its share of the width, like a narrower pane
+        // Card size from the grid's column. The split's card spans two
+        // columns and has the panes' area's shape; each page is drawn at its
+        // pane's real size and shrunk by the card's own zoom.
         const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean);
         const colW = parseFloat(columns[0]) || 0;
         const scale = colW / pageW;
@@ -990,10 +1002,21 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (splitCard) {
             splitCard.style.gridColumn = `span ${Math.min(2, columns.length)}`;
             const thumb = splitCard.querySelector(".goguryeo-tab-card-thumb");
-            thumb.style.height = `${colW * cardH / pageW}px`;
-            const parts = thumb.querySelectorAll(".goguryeo-tab-card-part");
-            const partW = thumb.clientWidth / Math.max(1, parts.length);
-            parts.forEach((part) => part.style.setProperty("--g-page-w", `${Math.round(partW / (scale || 1))}px`));
+            // The panes' area: the root, from the top of the cards down
+            const shownPane = current?.parent?.containerEl.getBoundingClientRect();
+            const rootR = rootEl.getBoundingClientRect();
+            const areaW = Math.max(320, rootR.width);
+            const areaTop = shownPane && shownPane.height > 0 ? shownPane.top : rootR.top;
+            const areaH = Math.max(240, rootR.bottom - areaTop);
+            const mapW = thumb.clientWidth;
+            const mapScale = mapW / areaW;
+            thumb.style.height = `${Math.round(areaH * mapScale)}px`;
+            splitCard.style.setProperty("--g-card-scale", `${mapScale}`);
+            thumb.querySelectorAll(".goguryeo-tab-card-part").forEach((part) => {
+                const [, , w, h] = part.gPlace;
+                part.style.setProperty("--g-page-w", `${Math.round(w * areaW)}px`);
+                part.style.setProperty("--g-page-h", `${Math.round(h * areaH)}px`);
+            });
         }
         for (const [page, snapshot] of pages) this.restoreScrolls(page, snapshot);
     }
@@ -1397,9 +1420,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // A still copy of a leaf's page: its content inside a bare copy of the
     // content's frame (so the theme's rules for it still apply), plus where
     // each scrolled part was scrolled to.
-    snapshotPage(leaf) {
+    // anyView: also views that aren't pages you navigate (calendars,
+    // plugin views), for the tab overview; the edge swipe wants notes only
+    snapshotPage(leaf, anyView = false) {
         const content = leaf.view?.contentEl;
-        if (!content || !leaf.view.navigation || !content.isConnected) return null;
+        if (!content || (!anyView && !leaf.view.navigation) || !content.isConnected) return null;
         const scrolls = [];
         const walk = (el, path) => {
             if (el.scrollTop || el.scrollLeft) scrolls.push([path, el.scrollTop, el.scrollLeft]);
@@ -1726,6 +1751,72 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return focused;
     }
 
+    // Where each split page's pane sits in the panes' area, as fractions
+    // [x, y, w, h], from Obsidian's layout (each split's direction and its
+    // children's sizes), so it holds while the split is folded away too
+    splitPlaces() {
+        const places = new Map();
+        const pages = this.splitPages;
+        if (!pages) return places;
+        const walk = (node, x, y, w, h) => {
+            if (node.type === "tabs") {
+                const leaf = pages.get(node);
+                if (leaf) places.set(leaf, [x, y, w, h]);
+                return;
+            }
+            const kids = node.children ?? [];
+            const sizes = kids.map((k) => (k.dimension > 0 ? k.dimension : parseFloat(k.containerEl?.style.flexGrow) || 1));
+            const total = sizes.reduce((a, b) => a + b, 0) || 1;
+            let at = 0;
+            kids.forEach((k, i) => {
+                const f = sizes[i] / total;
+                if (node.direction === "vertical") walk(k, x + w * at, y, w * f, h); // side by side
+                else walk(k, x, y + h * at, w, h * f); // stacked
+                at += f;
+            });
+        };
+        walk(this.app.workspace.rootSplit, 0, 0, 1, 1);
+        return places;
+    }
+
+    // A pane about to leave its split page for another tab (the lone tab
+    // opening in the same pane): keep a copy of the page first, while it is
+    // still on screen, for the tab overview. Obsidian switches tabs through
+    // WorkspaceTabs.selectTabIndex, so that is wrapped.
+    patchSelectTab() {
+        let tabs = null;
+        const find = (node) => node?.children?.forEach((child) => {
+            if (!tabs && child.type === "tabs") tabs = child;
+            else if (!tabs) find(child);
+        });
+        find(this.app.workspace.rootSplit);
+        const proto = tabs && Object.getPrototypeOf(tabs);
+        if (!proto || typeof proto.selectTabIndex !== "function") return;
+        const plugin = this;
+        const own = Object.prototype.hasOwnProperty.call(proto, "selectTabIndex");
+        const original = proto.selectTabIndex;
+        const patched = function (index, ...rest) {
+            try {
+                plugin.keepSplitPage(this, this.children?.[index]);
+            } catch (e) { /* never block a tab switch */ }
+            return original.call(this, index, ...rest);
+        };
+        proto.selectTabIndex = patched;
+        this.register(() => {
+            if (proto.selectTabIndex !== patched) return;
+            if (own) proto.selectTabIndex = original;
+            else delete proto.selectTabIndex;
+        });
+    }
+
+    keepSplitPage(pane, next) {
+        const page = this.splitPages?.get(pane);
+        if (!page || !next || next === page || document.body.hasClass(SOLO_CLASS)) return;
+        if (pane.children[pane.currentTab] !== page) return;
+        const shot = this.snapshotPage(page, true);
+        if (shot) (this.splitShots ??= new WeakMap()).set(page, shot);
+    }
+
     // Fold away every pane but the lone tab's: at each level of the layout,
     // the siblings of the branch that holds it. They keep their place in
     // Obsidian's layout, so the split comes back as it was.
@@ -1736,8 +1827,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (solo && !body.hasClass(SOLO_CLASS) && this.splitPages) {
             this.splitShots ??= new WeakMap();
             for (const leaf of this.splitPages.values()) {
+                // a page already hidden behind the lone tab was kept as it left
+                if (!leaf || leaf.parent?.children[leaf.parent.currentTab] !== leaf) continue;
                 try {
-                    const shot = leaf && this.snapshotPage(leaf);
+                    const shot = this.snapshotPage(leaf, true);
                     if (shot) this.splitShots.set(leaf, shot);
                 } catch (e) { /* keep the old copy */ }
             }
