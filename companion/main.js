@@ -848,23 +848,26 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
         bar.createEl("button", { cls: "goguryeo-tab-overview-done", text: "Done" })
             .addEventListener("click", () => this.closeOverview());
-        const grid = sheet.createDiv("goguryeo-tab-overview-grid");
+        const box = sheet.createDiv("goguryeo-tab-overview-panes");
         sheet.addEventListener("click", (e) => {
-            if (e.target === sheet || e.target === grid) this.closeOverview();
+            if (e.target === sheet || e.target === box || e.target.classList?.contains("goguryeo-tab-overview-grid")) this.closeOverview();
         });
-        this.overview = { sheet, grid };
+        this.overview = { sheet, box };
         document.body.addClass(OVERVIEW_CLASS + "-open");
         this.renderOverview();
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
         sheet.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OVERVIEW_MS, easing: "ease-out" });
-        grid.animate([{ transform: "scale(1.04)" }, { transform: "none" }], { duration: OVERVIEW_MS * 1.5, easing: OMNI_EASE });
+        box.animate([{ transform: "scale(1.04)" }, { transform: "none" }], { duration: OVERVIEW_MS * 1.5, easing: OMNI_EASE });
     }
 
     // The sheet covers the panes from the tab row down, so row 1 (and ⧉ in
-    // it) stays. Each page is drawn at the note's size, then shrunk onto its
-    // card, like Safari's previews.
+    // it) stays. Each pane gets its own group of cards in its own place, like
+    // Safari windows side by side, the current pane's group ringed. Each page
+    // is drawn at its pane's note size, then shrunk onto its card, like
+    // Safari's previews.
     renderOverview() {
-        const { sheet, grid } = this.overview;
+        const o = this.overview;
+        const { sheet, box } = o;
         const { workspace } = this.app;
         const rootEl = workspace.rootSplit.containerEl;
         let root = rootEl.getBoundingClientRect();
@@ -882,81 +885,121 @@ module.exports = class GoguryeoCompanion extends Plugin {
         sheet.style.height = `${root.bottom - top}px`;
 
         const current = workspace.getMostRecentLeaf(workspace.rootSplit);
-        const size = current?.view?.containerEl.getBoundingClientRect();
-        const pageW = Math.max(320, Math.round(size?.width || root.width));
-        const pageH = Math.max(240, Math.round(size?.height || root.height));
-        const cardH = Math.min(Math.max(pageH, pageW * 0.55), pageW * 0.85);
-        sheet.style.setProperty("--g-page-w", `${pageW}px`);
-        sheet.style.setProperty("--g-page-h", `${pageH}px`);
-        sheet.style.setProperty("--g-card-ratio", `${pageW} / ${Math.round(cardH)}`);
-
-        const leaves = [];
-        workspace.iterateRootLeaves((leaf) => { leaves.push(leaf); }); // a truthy return would stop it
-        grid.empty();
+        const groups = new Map(); // pane → its leaves, in tab order
+        workspace.iterateRootLeaves((leaf) => { // a truthy return would stop it
+            if (!groups.has(leaf.parent)) groups.set(leaf.parent, []);
+            groups.get(leaf.parent).push(leaf);
+        });
         this.endCardDrag();
-        const leafOf = this.overview.leafOf = new WeakMap();
+        box.empty();
+        sheet.toggleClass("is-split", groups.size > 1);
+        o.paneOf = new WeakMap(); // grid → pane
+        o.shotOf = new WeakMap(); // card → its page copy
+        const area = box.getBoundingClientRect();
         const pages = [];
-        for (const leaf of leaves) {
-            const card = grid.createDiv("goguryeo-tab-card");
-            leafOf.set(card, leaf);
-            card.toggleClass("is-current", leaf === current);
-            const thumb = card.createDiv("goguryeo-tab-card-thumb");
-            let snapshot = null;
-            try {
-                snapshot = this.snapshotPage(leaf);
-            } catch (e) {
-                console.error("Goguryeo: tab preview failed", e);
+        for (const [pane, leaves] of groups) {
+            const grid = box.createDiv("goguryeo-tab-overview-grid");
+            o.paneOf.set(grid, pane);
+            grid.toggleClass("is-current", pane === current?.parent);
+            const r = pane.containerEl.getBoundingClientRect();
+            if (groups.size > 1 && r.width > 0) {
+                const gTop = Math.max(r.top, area.top);
+                grid.style.left = `${r.left - area.left}px`;
+                grid.style.top = `${gTop - area.top}px`;
+                grid.style.width = `${r.width}px`;
+                grid.style.height = `${Math.max(0, r.bottom - gTop)}px`;
             }
-            const page = this.makeSwipePage(snapshot, { icon: leaf.getIcon?.(), title: leaf.getDisplayText() });
-            page.inert = true;
-            thumb.appendChild(page);
-            pages.push([page, snapshot]);
+            const shown = pane.children[pane.currentTab] ?? leaves[0];
+            const size = shown?.view?.containerEl.getBoundingClientRect();
+            const pageW = Math.max(320, Math.round(size?.width || r.width || root.width));
+            const pageH = Math.max(240, Math.round(size?.height || r.height || root.height));
+            const cardH = Math.min(Math.max(pageH, pageW * 0.55), pageW * 0.85);
+            grid.style.setProperty("--g-page-w", `${pageW}px`);
+            grid.style.setProperty("--g-page-h", `${pageH}px`);
+            grid.style.setProperty("--g-card-ratio", `${pageW} / ${Math.round(cardH)}`);
+            for (const leaf of leaves) {
+                const card = grid.createDiv("goguryeo-tab-card");
+                card.toggleClass("is-current", leaf === current);
+                const thumb = card.createDiv("goguryeo-tab-card-thumb");
+                let snapshot = null;
+                try {
+                    snapshot = this.snapshotPage(leaf);
+                } catch (e) {
+                    console.error("Goguryeo: tab preview failed", e);
+                }
+                const page = this.makeSwipePage(snapshot, { icon: leaf.getIcon?.(), title: leaf.getDisplayText() });
+                page.inert = true;
+                thumb.appendChild(page);
+                pages.push([page, snapshot]);
+                o.shotOf.set(card, snapshot);
 
-            const label = card.createDiv("goguryeo-tab-card-label");
-            const close = label.createDiv({ cls: "clickable-icon goguryeo-tab-card-close", attr: { "aria-label": "Close tab" } });
-            setIcon(close, "lucide-x");
-            setIcon(label.createDiv("goguryeo-tab-card-icon"), leaf.getIcon?.() ?? "lucide-file");
-            label.createDiv({ cls: "goguryeo-tab-card-title", text: leaf.getDisplayText() });
-            close.addEventListener("click", (e) => {
-                e.stopPropagation();
-                leaf.detach(); // the layout change redraws the cards
-            });
-            card.addEventListener("pointerdown", (e) => this.onCardDown(e, card, leaf));
-            card.addEventListener("click", () => {
-                if (this.overview?.dropped) return; // the click that ends a drag
-                this.haptic();
-                workspace.setActiveLeaf(leaf, { focus: true });
-                this.closeOverview();
-            });
+                const label = card.createDiv("goguryeo-tab-card-label");
+                const close = label.createDiv({ cls: "clickable-icon goguryeo-tab-card-close", attr: { "aria-label": "Close tab" } });
+                setIcon(close, "lucide-x");
+                setIcon(label.createDiv("goguryeo-tab-card-icon"), leaf.getIcon?.() ?? "lucide-file");
+                label.createDiv({ cls: "goguryeo-tab-card-title", text: leaf.getDisplayText() });
+                close.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    leaf.detach(); // the layout change redraws the cards
+                });
+                card.addEventListener("pointerdown", (e) => this.onCardDown(e, card, leaf));
+                card.addEventListener("click", () => {
+                    if (this.overview?.dropped) return; // the click that ends a drag
+                    this.haptic();
+                    workspace.setActiveLeaf(leaf, { focus: true });
+                    this.closeOverview();
+                });
+            }
         }
-        const thumbW = grid.querySelector(".goguryeo-tab-card-thumb")?.clientWidth || 0;
-        sheet.style.setProperty("--g-card-scale", `${thumbW / pageW}`);
+        for (const grid of box.children) {
+            const thumbW = grid.querySelector(".goguryeo-tab-card-thumb")?.clientWidth || 0;
+            grid.style.setProperty("--g-card-scale", `${thumbW / parseFloat(grid.style.getPropertyValue("--g-page-w"))}`);
+        }
         for (const [page, snapshot] of pages) this.restoreScrolls(page, snapshot);
     }
 
-    // Drag a card to move its tab, within its own pane. A mouse drags as soon
-    // as it moves; a finger holds the card first (CARD_HOLD_MS), so a quick
-    // swipe still scrolls the grid. The other cards slide out of the way as
-    // the card passes them, and the tab moves when it's dropped.
+    // Drag a card to move its tab, within its pane or into another pane's
+    // group. A mouse drags as soon as it moves; a finger holds the card
+    // first (CARD_HOLD_MS), so a quick swipe still scrolls the group. A
+    // copy of the card follows the pointer over the whole sheet, while the
+    // card itself stays behind as an empty slot that moves to where it would
+    // land; the other cards slide out of its way. The tab moves on the drop.
     onCardDown(e, card, leaf) {
         const o = this.overview;
         if (!o || o.drag || e.button !== 0 || e.target.closest(".goguryeo-tab-card-close")) return;
-        const drag = { card, leaf, id: e.pointerId, x: e.clientX, y: e.clientY, live: false, timer: 0 };
+        const drag = { card, leaf, id: e.pointerId, x: e.clientX, y: e.clientY, live: false, timer: 0, ghost: null };
         o.drag = drag;
         if (e.pointerType === "touch") drag.timer = window.setTimeout(() => this.liftCard(drag), CARD_HOLD_MS);
     }
 
     liftCard(drag) {
-        if (this.overview?.drag !== drag) return;
+        const o = this.overview;
+        if (o?.drag !== drag) return;
         const r = drag.card.getBoundingClientRect();
+        const s = o.sheet.getBoundingClientRect();
+        const ghost = drag.card.cloneNode(true);
+        ghost.addClass("goguryeo-tab-card-ghost");
+        for (const name of ["--g-page-w", "--g-page-h", "--g-card-ratio", "--g-card-scale"]) {
+            ghost.style.setProperty(name, drag.card.parentElement.style.getPropertyValue(name));
+        }
+        ghost.style.width = `${r.width}px`;
+        o.sheet.appendChild(ghost);
+        const page = ghost.querySelector(".goguryeo-swipe-page");
+        if (page) this.restoreScrolls(page, o.shotOf.get(drag.card));
         drag.live = true;
-        drag.grabX = drag.x - r.left;
-        drag.grabY = drag.y - r.top;
-        drag.left = r.left;
-        drag.top = r.top;
+        drag.ghost = ghost;
+        drag.grabX = drag.x - r.left + s.left;
+        drag.grabY = drag.y - r.top + s.top;
+        this.placeGhost(drag);
+        requestAnimationFrame(() => ghost.addClass("is-lifted"));
+        drag.card.addClass("is-placeholder");
         this.measureSlots(drag);
-        drag.card.addClass("is-lifted");
         this.haptic();
+    }
+
+    placeGhost(drag) {
+        drag.ghost.style.left = `${drag.x - drag.grabX}px`;
+        drag.ghost.style.top = `${drag.y - drag.grabY}px`;
     }
 
     onCardMove(e) {
@@ -970,43 +1013,52 @@ module.exports = class GoguryeoCompanion extends Plugin {
         e.preventDefault();
         drag.x = e.clientX;
         drag.y = e.clientY;
-        const y = e.clientY + this.overview.grid.scrollTop - drag.scroll;
-        const target = [...drag.slots].find(([el, r]) => {
-            if (this.overview.leafOf.get(el)?.parent !== drag.leaf.parent) return false;
-            return e.clientX >= r.left && e.clientX <= r.right && y >= r.top && y <= r.bottom;
-        })?.[0];
-        if (target) this.moveCardPast(drag, target);
-        drag.card.style.translate = `${drag.x - drag.grabX - drag.left}px ${drag.y - drag.grabY - drag.top}px`;
+        this.placeGhost(drag);
+        const x = e.clientX;
+        const hit = [...drag.slots].find(([, { r, grid, scroll }]) => {
+            const y = e.clientY + grid.scrollTop - scroll;
+            return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+        });
+        const home = drag.card.parentElement;
+        if (hit) {
+            const [target, { r, grid }] = hit;
+            // In its own group the card swaps past the one it meets; in
+            // another group it goes before or after it by the pointer's side
+            const after = grid === home
+                ? drag.card.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING
+                : x > r.left + r.width / 2;
+            this.moveCard(drag, grid, after ? target.nextSibling : target);
+            return;
+        }
+        // Over the empty part of another pane's group: the card goes last
+        const grid = drag.grids.find(([, r]) => x >= r.left && x <= r.right && e.clientY >= r.top && e.clientY <= r.bottom)?.[0];
+        if (grid && grid !== home) this.moveCard(drag, grid, null);
     }
 
-    // Put the dragged card on the other side of `target`, and slide every
+    // Put the dragged card's slot before `before` in `grid`, and slide every
     // card that moved from its old spot to its new one (FLIP)
-    moveCardPast(drag, target) {
-        const { grid } = this.overview;
-        const cards = [...grid.children].filter((el) => el !== drag.card);
-        const before = new Map(cards.map((el) => [el, el.getBoundingClientRect()]));
+    moveCard(drag, grid, before) {
+        if (drag.card.parentElement === grid && (drag.card === before || drag.card.nextSibling === before)) return;
+        const cards = [...this.overview.box.querySelectorAll(".goguryeo-tab-card")].filter((el) => el !== drag.card);
+        const old = new Map(cards.map((el) => [el, el.getBoundingClientRect()]));
         cards.forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
-        const after = drag.card.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING;
-        grid.insertBefore(drag.card, after ? target.nextSibling : target);
+        grid.insertBefore(drag.card, before);
         this.measureSlots(drag);
-        const r = drag.card.getBoundingClientRect();
-        const [tx, ty] = (drag.card.style.translate || "0px 0px").split(" ").map(parseFloat);
-        drag.left = r.left - (tx || 0);
-        drag.top = r.top - (ty || 0);
-        for (const [el, old] of before) {
-            const now = el.getBoundingClientRect();
-            const dx = old.left - now.left;
-            const dy = old.top - now.top;
+        for (const [el, was] of old) {
+            const now = drag.slots.get(el).r;
+            const dx = was.left - now.left;
+            const dy = was.top - now.top;
             if (dx || dy) el.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 260, easing: CARD_EASE });
         }
     }
 
     // Where the other cards sit once they've landed: hit tests use these, not
-    // the cards' sliding positions
+    // the cards' sliding positions. Each remembers its group's scroll then.
     measureSlots(drag) {
-        const { grid } = this.overview;
-        drag.scroll = grid.scrollTop;
-        drag.slots = new Map([...grid.children].filter((el) => el !== drag.card).map((el) => [el, el.getBoundingClientRect()]));
+        const { box } = this.overview;
+        drag.slots = new Map([...box.querySelectorAll(".goguryeo-tab-card")].filter((el) => el !== drag.card)
+            .map((el) => [el, { r: el.getBoundingClientRect(), grid: el.parentElement, scroll: el.parentElement.scrollTop }]));
+        drag.grids = [...box.children].map((g) => [g, g.getBoundingClientRect()]);
     }
 
     onCardUp(e, cancelled = false) {
@@ -1016,27 +1068,36 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const o = this.overview;
         o.dropped = true; // swallow the click that follows
         window.setTimeout(() => { if (this.overview === o) o.dropped = false; });
-        const { card, leaf } = drag;
-        const [tx, ty] = (card.style.translate || "0px 0px").split(" ").map(parseFloat);
-        card.style.translate = "";
-        card.removeClass("is-lifted");
+        const { card, leaf, ghost } = drag;
+        drag.ghost = null; // it's ours now, to land
+        drag.card = null;
         this.endCardDrag();
-        const settle = card.animate([{ translate: `${tx || 0}px ${ty || 0}px` }, { translate: "0 0" }], { duration: 260, easing: CARD_EASE });
-        if (cancelled) return;
-        const parent = leaf.parent;
-        const order = this.cardOrder(parent);
-        const index = order.indexOf(leaf);
-        if (index < 0 || index === parent.children.indexOf(leaf)) return;
-        // Move the tab once the card has landed; the layout change then
-        // redraws the cards in their new order
-        settle.finished.finally(() => {
-            if (!leaf.parent) return; // closed meanwhile
+        const pane = o.paneOf.get(card.parentElement);
+        const index = [...card.parentElement.children].indexOf(card);
+        // The copy flies into the slot, then the card takes its place
+        const from = ghost.getBoundingClientRect();
+        const to = card.getBoundingClientRect();
+        ghost.removeClass("is-lifted");
+        const land = ghost.animate([
+            { translate: "0 0", scale: "1" },
+            { translate: `${to.left - from.left}px ${to.top - from.top}px`, scale: `${to.width / (from.width || 1)}` },
+        ], { duration: 260, easing: CARD_EASE, fill: "forwards" });
+        land.finished.catch(() => {}).finally(() => {
+            ghost.remove();
+            card.removeClass("is-placeholder");
+            if (cancelled || !pane || !leaf.parent || this.overview !== o) return; // closed meanwhile
+            const home = leaf.parent;
+            if (pane === home && index === home.children.indexOf(leaf)) return;
+            // The layout change then redraws the cards in their new order
             const { workspace } = this.app;
             const active = workspace.activeLeaf;
-            const shown = parent.children[parent.currentTab];
-            parent.removeChild(leaf);
-            parent.insertChild(index, leaf);
-            if (shown) parent.selectTab(shown);
+            const shown = pane === home ? home.children[home.currentTab] : pane.children[pane.currentTab];
+            home.removeChild(leaf); // a pane left empty closes itself
+            pane.insertChild(index, leaf);
+            // The current tab stays shown wherever it lands; any other keeps
+            // its new pane showing what it showed
+            const show = leaf === active ? leaf : shown;
+            if (show) pane.selectTab(show);
             if (active) workspace.setActiveLeaf(active, { focus: false });
             workspace.requestSaveLayout?.();
         });
@@ -1046,13 +1107,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const o = this.overview;
         if (!o?.drag) return;
         window.clearTimeout(o.drag.timer);
+        o.drag.ghost?.remove();
+        o.drag.card?.removeClass("is-placeholder");
         o.drag = null;
-    }
-
-    // The leaves of one pane in the order their cards now stand
-    cardOrder(parent) {
-        const { grid, leafOf } = this.overview;
-        return [...grid.children].map((el) => leafOf.get(el)).filter((leaf) => leaf?.parent === parent);
     }
 
     closeOverview(now = false) {

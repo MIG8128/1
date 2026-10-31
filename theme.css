@@ -1700,15 +1700,39 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     font-weight: var(--font-semibold);
 }
 
-.goguryeo-tab-overview-grid {
+/* One group of cards per pane. With one pane it fills the sheet; in split
+   screen the companion puts each group where its pane is (left, top, width,
+   height), and each scrolls on its own. */
+.goguryeo-tab-overview-panes {
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
+}
+
+.goguryeo-tab-overview-grid {
+    position: absolute;
+    inset: 0;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     align-content: start;
     gap: 22px 18px;
     padding: 12px 20px 24px;
     overflow-y: auto;
+}
+
+.goguryeo-tab-overview.is-split .goguryeo-tab-overview-grid {
+    inset: auto;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 18px 14px;
+    padding: 12px 14px 20px;
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+/* The current pane's group, with the same green edge as the pane itself */
+.goguryeo-tab-overview.is-split .goguryeo-tab-overview-grid.is-current {
+    box-shadow: inset 0 0 0 1px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.62),
+        inset 0 0 0 4px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.12);
 }
 
 .goguryeo-tab-card {
@@ -1813,8 +1837,10 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     }
 }
 
-/* A card being dragged to a new spot (companion): it lifts above the others
-   and follows the pointer; the others slide out of its way */
+/* A card being dragged to a new spot (companion): a copy of it (the ghost)
+   lifts and follows the pointer over the whole sheet, into any pane's
+   group; the card stays behind as an empty slot where it would land, and
+   the others slide out of its way */
 .goguryeo-tab-card {
     touch-action: pan-y;
     -webkit-user-select: none;
@@ -1822,10 +1848,15 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     -webkit-touch-callout: none;
 }
 
-.goguryeo-tab-card.is-lifted {
-    position: relative;
-    z-index: 1;
-    cursor: grabbing;
+.goguryeo-tab-card-ghost {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    transform-origin: 0 0;
+}
+
+.goguryeo-tab-card.is-placeholder {
+    visibility: hidden;
 }
 
 .goguryeo-tab-card.is-lifted .goguryeo-tab-card-thumb {
