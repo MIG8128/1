@@ -1232,6 +1232,203 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mo
     display: none;
 }
 
+/* 2+ panes: one shared tab row (companion, body.goguryeo-shared-tabs) under
+   the toolbar, across all the cards:
+     [◧] [‹ ›]      ( path of the current pane )      [actions] [+] [⧉] [◨]
+     ( A  D │ B │ C )            every tab, in pane order
+     ╭─ pane ─╮  ╭─ pane ─╮
+   Each pane's glass pill sits on the tab it shows; the focused tab's name is
+   green. The cards lose their own tab rows (their ◧ + ⧉ ◨ stay in row 1). */
+.goguryeo-shared-tabs-bar {
+    display: none;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
+    --g-shared-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px);
+    --g-split-top: calc(var(--g-shared-top) + var(--g-row2-h) + 8px);
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar {
+    position: fixed;
+    z-index: calc(var(--layer-sidedock) - 2);
+    top: calc(var(--g-root-top, 0px) + var(--g-shared-top));
+    left: calc(var(--g-root-left, 0px) + 10px);
+    right: calc(var(--g-root-right, 0px) + 10px);
+    height: var(--g-row2-h);
+    display: flex;
+    align-items: stretch;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 11px;
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+    isolation: isolate;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-app-region: no-drag;
+}
+
+.goguryeo-shared-tabs-bar::-webkit-scrollbar {
+    display: none;
+}
+
+/* The glass on a pseudo-element, as on the cards' tab rows, so each pill's
+   own blur sees the page */
+.goguryeo-shared-tabs-bar::before {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    top: calc(var(--g-root-top, 0px) + var(--g-shared-top));
+    left: calc(var(--g-root-left, 0px) + 10px);
+    right: calc(var(--g-root-right, 0px) + 10px);
+    height: var(--g-row2-h);
+    border-radius: inherit;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+}
+
+/* One group per pane; tabs share the width equally across the whole row */
+.goguryeo-stab-group {
+    position: relative;
+    flex: var(--g-tabs, 1) 1 0;
+    min-width: 0;
+    display: flex;
+    gap: 3px;
+}
+
+/* Between panes: a taller divider than between tabs */
+.goguryeo-stab-group + .goguryeo-stab-group {
+    margin-left: 9px;
+}
+
+.goguryeo-stab-group + .goguryeo-stab-group::before {
+    content: "";
+    position: absolute;
+    top: 12%;
+    left: -7px;
+    width: 2px;
+    height: 76%;
+    border-radius: 1px;
+    background-color: var(--text-faint);
+}
+
+.goguryeo-stab {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 0;
+    min-width: 44px;
+    display: flex;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.goguryeo-stab-inner {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 28px;
+}
+
+/* The icon only on a tab on screen, as on Obsidian's own tabs */
+.goguryeo-stab-icon {
+    display: none;
+    flex: none;
+    margin-right: 6px;
+    --icon-size: 14px;
+}
+
+.goguryeo-stab.is-shown .goguryeo-stab-icon:not(:empty) {
+    display: flex;
+}
+
+.goguryeo-stab-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* On screen in its pane (under the pill) */
+.goguryeo-stab.is-shown {
+    color: var(--text-normal);
+}
+
+/* The focused tab: its name in the accent */
+.goguryeo-stab.is-focused {
+    color: var(--text-accent);
+    font-weight: var(--font-semibold);
+}
+
+@media (hover: hover) {
+    .goguryeo-stab:not(.is-shown):hover {
+        background-color: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
+}
+
+/* Short dividers between tabs, gone beside a pill or a hovered tab */
+.goguryeo-stab-inner::after {
+    content: "";
+    position: absolute;
+    top: 25%;
+    right: -2.5px;
+    width: 2px;
+    height: 50%;
+    border-radius: 1px;
+    background-color: var(--g-tab-divider);
+    transition: opacity 0.15s ease;
+}
+
+.goguryeo-stab:is(.is-shown, :has(+ .is-shown), :last-of-type) > .goguryeo-stab-inner::after {
+    opacity: 0;
+}
+
+@media (hover: hover) {
+    .goguryeo-stab:is(:hover, :has(+ :hover)) > .goguryeo-stab-inner::after {
+        opacity: 0;
+    }
+}
+
+.goguryeo-stab-close {
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    justify-content: center;
+    transform: translateY(-50%);
+    --icon-size: 12px;
+}
+
+.goguryeo-stab:not(.is-shown):not(:hover) .goguryeo-stab-close {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* The cards' own tab rows go; the note starts near the card's top */
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    --g-bar-offset: 4px;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    height: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container::before,
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container > .workspace-tab-header-container-inner {
+    display: none;
+}
+
 /* Only the top cards leave room for the toolbar; a card stacked under
    another sits the usual gap below it. */
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.mod-top) {
@@ -2572,7 +2769,8 @@ body.is-tablet:not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .
 body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list),
 body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
 body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner,
-body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb {
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb,
+body.is-tablet:not(.goguryeo-no-cards) :is(.goguryeo-shared-tabs-bar, .goguryeo-stab, .goguryeo-shared-tabs-bar .goguryeo-tab-thumb) {
     border-radius: 999px;
 }
 

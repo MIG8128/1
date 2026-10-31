@@ -41,6 +41,9 @@ const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
 const SPLIT_CLASS = "goguryeo-split";
 const ONE_PANE_CLASS = "goguryeo-one-pane";
+const SHARED_TABS_CLASS = "goguryeo-shared-tabs"; // body: 2+ panes share one tab row
+const SHARED_ACTIVE = ":scope > .goguryeo-stab.is-shown"; // the tab a pane shows, in the shared row
+const SHARED_INNER = ":scope > .goguryeo-stab-inner";
 const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
 const EDGE_SWIPE_AT = 0.35; // share of the width to pull before letting go navigates
@@ -1605,12 +1608,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const { rootSplit } = this.app.workspace;
         // Count panes from Obsidian's layout, not the page: a split animation
         // briefly leaves an extra copy of a pane in the page
-        const panes = [];
+        const groups = [];
         const collect = (node) => node?.children?.forEach((child) => {
-            if (child.type === "tabs") panes.push(child.containerEl);
+            if (child.type === "tabs") groups.push(child);
             else if (child.type === "split") collect(child);
         });
         collect(rootSplit);
+        const panes = groups.map((g) => g.containerEl);
         const body = document.body;
         // Over a background, a lone pane is a card too
         const hasBackground = body.hasClass("goguryeo-bg-color") || body.hasClass("goguryeo-bg-image");
@@ -1634,11 +1638,115 @@ module.exports = class GoguryeoCompanion extends Plugin {
             el.toggleClass(CURRENT_PANE_CLASS, el === currentEl);
             el.toggleClass(LAST_PANE_CLASS, el === lastTop);
         }
+        if (groups.length > 1) this.renderSharedTabs(groups);
+        else this.removeSharedTabs();
+    }
+
+    // ---- Split screen: one tab row for every pane ----
+
+    // With 2+ panes, every tab of every pane sits in one row above the
+    // cards, in pane order, a short divider between panes. Each pane's glass
+    // pill rests on the tab it shows, and slides when that changes; the
+    // focused tab's name is green. The theme hides the panes' own tab rows.
+    // The tabs and pane groups are kept from one update to the next, so the
+    // pills can slide. A tab does what Obsidian's does: click shows it, ×
+    // or a middle click closes it, right click opens its menu, and it drags
+    // like one (to split, or into another pane).
+    renderSharedTabs(groups) {
+        const { workspace } = this.app;
+        document.body.addClass(SHARED_TABS_CLASS);
+        let bar = this.sharedBar;
+        if (!bar?.isConnected) {
+            bar = this.sharedBar = document.body.createDiv("goguryeo-shared-tabs-bar");
+            this.sharedGroups = new Map(); // pane → its group in the row
+            this.sharedTabs = new WeakMap(); // leaf → its tab in the row
+        }
+        const current = workspace.getMostRecentLeaf(workspace.rootSplit);
+        const keep = new Set();
+        for (const pane of groups) {
+            let group = this.sharedGroups.get(pane);
+            if (!group) {
+                group = createDiv("goguryeo-stab-group");
+                this.sharedGroups.set(pane, group);
+            }
+            keep.add(pane);
+            bar.appendChild(group); // in pane order
+            group.toggleClass("is-current", pane === current?.parent);
+            group.style.setProperty("--g-tabs", `${Math.max(1, pane.children.length)}`);
+            const shown = pane.children[pane.currentTab];
+            const tabs = new Set();
+            for (const leaf of pane.children) {
+                let tab = this.sharedTabs.get(leaf);
+                if (!tab) tab = this.makeSharedTab(leaf);
+                tabs.add(tab);
+                group.appendChild(tab);
+                tab.toggleClass("is-shown", leaf === shown);
+                tab.toggleClass("is-focused", leaf === current);
+                const title = leaf.getDisplayText();
+                const titleEl = tab.querySelector(".goguryeo-stab-title");
+                const icon = leaf.getIcon?.() ?? "";
+                if (tab.gIcon !== icon) {
+                    tab.gIcon = icon;
+                    const iconEl = tab.querySelector(".goguryeo-stab-icon");
+                    iconEl.empty();
+                    if (icon) setIcon(iconEl, icon);
+                }
+                if (titleEl.textContent !== title) {
+                    titleEl.setText(title);
+                    tab.setAttr("aria-label", title);
+                }
+            }
+            for (const el of [...group.children]) {
+                if (el.hasClass("goguryeo-stab") && !tabs.has(el)) el.remove();
+            }
+            this.placeThumb(group, group, SHARED_ACTIVE, SHARED_INNER);
+        }
+        for (const [pane, group] of this.sharedGroups) {
+            if (keep.has(pane)) continue;
+            group.remove();
+            this.sharedGroups.delete(pane);
+        }
+    }
+
+    makeSharedTab(leaf) {
+        const { workspace } = this.app;
+        const tab = createDiv({ cls: "goguryeo-stab", attr: { draggable: "true" } });
+        const inner = tab.createDiv("goguryeo-stab-inner");
+        const close = inner.createDiv({ cls: "clickable-icon goguryeo-stab-close", attr: { "aria-label": "Close" } });
+        setIcon(close, "lucide-x");
+        inner.createDiv("goguryeo-stab-icon");
+        inner.createDiv("goguryeo-stab-title");
+        close.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.haptic();
+            leaf.detach();
+        });
+        tab.addEventListener("click", () => {
+            this.haptic();
+            workspace.setActiveLeaf(leaf, { focus: true });
+        });
+        tab.addEventListener("mousedown", (e) => {
+            if (e.button === 1) e.preventDefault(); // no autoscroll
+        });
+        tab.addEventListener("auxclick", (e) => {
+            if (e.button === 1) leaf.detach();
+        });
+        tab.addEventListener("contextmenu", (e) => leaf.onOpenTabHeaderMenu?.(e, tab));
+        tab.addEventListener("dragstart", (e) => workspace.onDragLeaf?.(e, leaf));
+        this.sharedTabs.set(leaf, tab);
+        return tab;
+    }
+
+    removeSharedTabs() {
+        document.body.removeClass(SHARED_TABS_CLASS);
+        this.sharedBar?.remove();
+        this.sharedBar = null;
     }
 
     clearSplit() {
         const body = document.body;
         body.removeClass(SPLIT_CLASS, ONE_PANE_CLASS);
+        this.removeSharedTabs();
         body.style.removeProperty("--g-root-top");
         body.style.removeProperty("--g-root-left");
         body.style.removeProperty("--g-root-right");
@@ -1674,10 +1782,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
     }
 
-    placeThumb(bar, strip) {
+    placeThumb(bar, strip, active = ":scope > .workspace-tab-header.is-active", innerSel = ":scope > .workspace-tab-header-inner") {
         let thumb = this.thumbs.get(bar);
-        const tab = strip.querySelector(":scope > .workspace-tab-header.is-active");
-        const inner = tab?.querySelector(":scope > .workspace-tab-header-inner");
+        const tab = strip.querySelector(active);
+        const inner = tab?.querySelector(innerSel);
         if (!inner || bar.offsetWidth === 0) {
             thumb?.hide();
             return;
