@@ -72,6 +72,9 @@ const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the e
 const OVERVIEW_CLASS = "goguryeo-tab-overview"; // the tab overview sheet (desktop and iPad)
 const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⧉, which the theme shows in place of ⌄
 const OVERVIEW_MS = 240; // the sheet fading in and out
+const CARD_HOLD_MS = 300; // a finger rests on a card this long before it lifts (a mouse drags at once)
+const CARD_SLOP = 6; // px a pointer may wander before it counts as a drag (or, for a finger, a scroll)
+const CARD_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // the other cards making room, and the drop
 const SNAP ="transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
 
@@ -824,6 +827,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.closeOverview();
         }, { capture: true });
         this.registerDomEvent(window, "resize", () => this.overview && this.renderOverview());
+        this.registerDomEvent(window, "pointermove", (e) => this.onCardMove(e));
+        this.registerDomEvent(window, "pointerup", (e) => this.onCardUp(e));
+        this.registerDomEvent(window, "pointercancel", (e) => this.onCardUp(e, true));
+        // A lifted card keeps the finger: the grid must not scroll under it
+        this.registerDomEvent(window, "touchmove", (e) => {
+            if (this.overview?.drag?.live) e.preventDefault();
+        }, { passive: false });
     }
 
     openOverview() {
@@ -883,9 +893,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const leaves = [];
         workspace.iterateRootLeaves((leaf) => { leaves.push(leaf); }); // a truthy return would stop it
         grid.empty();
+        this.endCardDrag();
+        const leafOf = this.overview.leafOf = new WeakMap();
         const pages = [];
         for (const leaf of leaves) {
             const card = grid.createDiv("goguryeo-tab-card");
+            leafOf.set(card, leaf);
             card.toggleClass("is-current", leaf === current);
             const thumb = card.createDiv("goguryeo-tab-card-thumb");
             let snapshot = null;
@@ -908,7 +921,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 e.stopPropagation();
                 leaf.detach(); // the layout change redraws the cards
             });
+            card.addEventListener("pointerdown", (e) => this.onCardDown(e, card, leaf));
             card.addEventListener("click", () => {
+                if (this.overview?.dropped) return; // the click that ends a drag
                 this.haptic();
                 workspace.setActiveLeaf(leaf, { focus: true });
                 this.closeOverview();
@@ -917,6 +932,127 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const thumbW = grid.querySelector(".goguryeo-tab-card-thumb")?.clientWidth || 0;
         sheet.style.setProperty("--g-card-scale", `${thumbW / pageW}`);
         for (const [page, snapshot] of pages) this.restoreScrolls(page, snapshot);
+    }
+
+    // Drag a card to move its tab, within its own pane. A mouse drags as soon
+    // as it moves; a finger holds the card first (CARD_HOLD_MS), so a quick
+    // swipe still scrolls the grid. The other cards slide out of the way as
+    // the card passes them, and the tab moves when it's dropped.
+    onCardDown(e, card, leaf) {
+        const o = this.overview;
+        if (!o || o.drag || e.button !== 0 || e.target.closest(".goguryeo-tab-card-close")) return;
+        const drag = { card, leaf, id: e.pointerId, x: e.clientX, y: e.clientY, live: false, timer: 0 };
+        o.drag = drag;
+        if (e.pointerType === "touch") drag.timer = window.setTimeout(() => this.liftCard(drag), CARD_HOLD_MS);
+    }
+
+    liftCard(drag) {
+        if (this.overview?.drag !== drag) return;
+        const r = drag.card.getBoundingClientRect();
+        drag.live = true;
+        drag.grabX = drag.x - r.left;
+        drag.grabY = drag.y - r.top;
+        drag.left = r.left;
+        drag.top = r.top;
+        this.measureSlots(drag);
+        drag.card.addClass("is-lifted");
+        this.haptic();
+    }
+
+    onCardMove(e) {
+        const drag = this.overview?.drag;
+        if (!drag || e.pointerId !== drag.id) return;
+        if (!drag.live) {
+            if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < CARD_SLOP) return;
+            if (e.pointerType === "touch") return this.endCardDrag(); // moved before the hold: a scroll
+            this.liftCard(drag);
+        }
+        e.preventDefault();
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+        const y = e.clientY + this.overview.grid.scrollTop - drag.scroll;
+        const target = [...drag.slots].find(([el, r]) => {
+            if (this.overview.leafOf.get(el)?.parent !== drag.leaf.parent) return false;
+            return e.clientX >= r.left && e.clientX <= r.right && y >= r.top && y <= r.bottom;
+        })?.[0];
+        if (target) this.moveCardPast(drag, target);
+        drag.card.style.translate = `${drag.x - drag.grabX - drag.left}px ${drag.y - drag.grabY - drag.top}px`;
+    }
+
+    // Put the dragged card on the other side of `target`, and slide every
+    // card that moved from its old spot to its new one (FLIP)
+    moveCardPast(drag, target) {
+        const { grid } = this.overview;
+        const cards = [...grid.children].filter((el) => el !== drag.card);
+        const before = new Map(cards.map((el) => [el, el.getBoundingClientRect()]));
+        cards.forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
+        const after = drag.card.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING;
+        grid.insertBefore(drag.card, after ? target.nextSibling : target);
+        this.measureSlots(drag);
+        const r = drag.card.getBoundingClientRect();
+        const [tx, ty] = (drag.card.style.translate || "0px 0px").split(" ").map(parseFloat);
+        drag.left = r.left - (tx || 0);
+        drag.top = r.top - (ty || 0);
+        for (const [el, old] of before) {
+            const now = el.getBoundingClientRect();
+            const dx = old.left - now.left;
+            const dy = old.top - now.top;
+            if (dx || dy) el.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 260, easing: CARD_EASE });
+        }
+    }
+
+    // Where the other cards sit once they've landed: hit tests use these, not
+    // the cards' sliding positions
+    measureSlots(drag) {
+        const { grid } = this.overview;
+        drag.scroll = grid.scrollTop;
+        drag.slots = new Map([...grid.children].filter((el) => el !== drag.card).map((el) => [el, el.getBoundingClientRect()]));
+    }
+
+    onCardUp(e, cancelled = false) {
+        const drag = this.overview?.drag;
+        if (!drag || e.pointerId !== drag.id) return;
+        if (!drag.live) return this.endCardDrag();
+        const o = this.overview;
+        o.dropped = true; // swallow the click that follows
+        window.setTimeout(() => { if (this.overview === o) o.dropped = false; });
+        const { card, leaf } = drag;
+        const [tx, ty] = (card.style.translate || "0px 0px").split(" ").map(parseFloat);
+        card.style.translate = "";
+        card.removeClass("is-lifted");
+        this.endCardDrag();
+        const settle = card.animate([{ translate: `${tx || 0}px ${ty || 0}px` }, { translate: "0 0" }], { duration: 260, easing: CARD_EASE });
+        if (cancelled) return;
+        const parent = leaf.parent;
+        const order = this.cardOrder(parent);
+        const index = order.indexOf(leaf);
+        if (index < 0 || index === parent.children.indexOf(leaf)) return;
+        // Move the tab once the card has landed; the layout change then
+        // redraws the cards in their new order
+        settle.finished.finally(() => {
+            if (!leaf.parent) return; // closed meanwhile
+            const { workspace } = this.app;
+            const active = workspace.activeLeaf;
+            const shown = parent.children[parent.currentTab];
+            parent.removeChild(leaf);
+            parent.insertChild(index, leaf);
+            if (shown) parent.selectTab(shown);
+            if (active) workspace.setActiveLeaf(active, { focus: false });
+            workspace.requestSaveLayout?.();
+        });
+    }
+
+    endCardDrag() {
+        const o = this.overview;
+        if (!o?.drag) return;
+        window.clearTimeout(o.drag.timer);
+        o.drag = null;
+    }
+
+    // The leaves of one pane in the order their cards now stand
+    cardOrder(parent) {
+        const { grid, leafOf } = this.overview;
+        return [...grid.children].map((el) => leafOf.get(el)).filter((leaf) => leaf?.parent === parent);
     }
 
     closeOverview(now = false) {

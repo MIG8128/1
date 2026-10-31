@@ -1813,6 +1813,26 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     }
 }
 
+/* A card being dragged to a new spot (companion): it lifts above the others
+   and follows the pointer; the others slide out of its way */
+.goguryeo-tab-card {
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.goguryeo-tab-card.is-lifted {
+    position: relative;
+    z-index: 1;
+    cursor: grabbing;
+}
+
+.goguryeo-tab-card.is-lifted .goguryeo-tab-card-thumb {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 1px var(--glass-border), 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
 
 /* -------------------------------------------------------------------------
    8. Desktop ribbon — hidden, slides out like a drawer at the left edge
