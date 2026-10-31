@@ -1823,6 +1823,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const focused = workspace.getMostRecentLeaf(workspace.rootSplit);
         if (!focused || !groups.includes(focused.parent)) return null;
         if ([...pages.values()].includes(focused)) {
+            this.lastSplitPage = focused; // where a click on the joined tab returns
             // The split on screen: each pane back on its page
             for (const [pane, page] of pages) {
                 if (page && pane.children[pane.currentTab] !== page) pane.selectTab(page);
@@ -1978,6 +1979,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (!tab) {
             tab = this.splitTab = createDiv({ cls: "goguryeo-stab goguryeo-stab-split" });
             tab.createDiv("goguryeo-stab-inner");
+            // The names fill only the middle of the joined tab; a click
+            // anywhere else on it brings the split back too, on the page
+            // that was focused last (a click on a name goes to that page)
+            tab.addEventListener("click", () => {
+                const pages = [...(this.splitPages?.values() ?? [])].filter(Boolean);
+                const leaf = pages.includes(this.lastSplitPage) ? this.lastSplitPage : pages[0];
+                if (!leaf) return;
+                this.haptic();
+                this.app.workspace.setActiveLeaf(leaf, { focus: true });
+            });
         }
         const inner = tab.querySelector(".goguryeo-stab-inner");
         tab.toggleClass("is-active", !solo);
