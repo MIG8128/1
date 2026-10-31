@@ -42,7 +42,10 @@ const SWELL_MS = 320; // how long the glass stays swollen while it travels
 const SPLIT_CLASS = "goguryeo-split";
 const ONE_PANE_CLASS = "goguryeo-one-pane";
 const SHARED_TABS_CLASS = "goguryeo-shared-tabs"; // body: 2+ panes share one tab row
-const SHARED_ACTIVE = ":scope > .goguryeo-stab.is-shown"; // the tab a pane shows, in the shared row
+const SHARED_ACTIVE = ":scope > .goguryeo-stab.is-active"; // the split tab or the lone tab on screen, in the shared row
+const SOLO_CLASS = "goguryeo-solo"; // body: a normal tab fills the screen, the split's panes fold away
+const SOLO_OFF_CLASS = "goguryeo-solo-off"; // a pane or split folded away for it
+const MEMBERS_KEY = "goguryeo-split-members"; // the split's page in each pane, by leaf id
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
 const PHONE_RIGHT_CLASS = "goguryeo-phone-right";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
@@ -1602,9 +1605,14 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.clearSplit();
             return;
         }
+        // 2+ panes: Chrome's split view. A normal tab in focus fills the
+        // screen alone; a page of the split brings every pane back
+        const solo = groups.length > 1 && !body.hasClass("goguryeo-no-cards") ? this.syncSplitPages(groups) : null;
+        this.applySolo(solo);
+        if (groups.length < 2) this.splitPages = null;
         const r = rootSplit.containerEl.getBoundingClientRect();
         body.addClass(SPLIT_CLASS);
-        body.toggleClass(ONE_PANE_CLASS, panes.length === 1);
+        body.toggleClass(ONE_PANE_CLASS, panes.length === 1 || !!solo);
         // iPad pads the note area's top for the status bar; start below it
         const padTop = parseFloat(getComputedStyle(rootSplit.containerEl).paddingTop) || 0;
         body.style.setProperty("--g-root-top", `${r.top + padTop}px`);
@@ -1618,80 +1626,172 @@ module.exports = class GoguryeoCompanion extends Plugin {
             el.toggleClass(CURRENT_PANE_CLASS, el === currentEl);
             el.toggleClass(LAST_PANE_CLASS, el === lastTop);
         }
-        if (groups.length > 1) this.renderSharedTabs(groups);
+        if (groups.length > 1) this.renderSharedTabs(groups, solo);
         else this.removeSharedTabs();
     }
 
-    // ---- Split screen: one tab row for every pane ----
+    // ---- Split screen, Chrome style: one tab row, the split as one tab ----
 
-    // With 2+ panes, every tab of every pane sits in one row above the
-    // cards, in pane order, a short divider between panes. Each pane's glass
-    // pill rests on the tab it shows, and slides when that changes; the
-    // focused tab's name is green. The theme hides the panes' own tab rows.
-    // The tabs and pane groups are kept from one update to the next, so the
-    // pills can slide. A tab does what Obsidian's does: click shows it, ×
-    // or a middle click closes it, right click opens its menu, and it drags
-    // like one (to split, or into another pane).
-    renderSharedTabs(groups) {
+    // Like Chrome's split view. Each pane has one page that belongs to the
+    // split (`splitPages`: pane → leaf); every other tab is a normal tab.
+    // What shows follows the focused leaf: a page of the split → every pane
+    // is on screen, each showing its page; a normal tab → that tab fills the
+    // screen alone (its pane stays, the others fold away: applySolo). A new
+    // pane's page is the tab it shows when it appears. The pages are
+    // remembered across restarts by leaf id. Returns the lone tab, or null
+    // while the split is on screen.
+    syncSplitPages(groups) {
+        const { workspace } = this.app;
+        if (!this.splitPages) {
+            this.splitPages = new Map();
+            let saved = [];
+            try {
+                saved = JSON.parse(this.app.loadLocalStorage(MEMBERS_KEY) || "[]");
+            } catch (e) { /* none yet */ }
+            this.savedPages = new Set(Array.isArray(saved) ? saved : []);
+        }
+        const pages = this.splitPages;
+        for (const pane of [...pages.keys()]) {
+            if (!groups.includes(pane)) pages.delete(pane);
+        }
+        for (const pane of groups) {
+            const page = pages.get(pane);
+            if (page && page.parent === pane) continue;
+            const restored = this.savedPages?.size ? pane.children.find((leaf) => this.savedPages.has(leaf.id)) : null;
+            pages.set(pane, restored ?? pane.children[pane.currentTab] ?? pane.children[0]);
+        }
+        this.savedPages = null;
+        const ids = JSON.stringify([...pages.values()].map((leaf) => leaf?.id).filter(Boolean));
+        if (ids !== this.savedIds) {
+            this.savedIds = ids;
+            this.app.saveLocalStorage(MEMBERS_KEY, ids);
+        }
+        const focused = workspace.getMostRecentLeaf(workspace.rootSplit);
+        if (!focused || !groups.includes(focused.parent)) return null;
+        if ([...pages.values()].includes(focused)) {
+            // The split on screen: each pane back on its page
+            for (const [pane, page] of pages) {
+                if (page && pane.children[pane.currentTab] !== page) pane.selectTab(page);
+            }
+            return null;
+        }
+        return focused;
+    }
+
+    // Fold away every pane but the lone tab's: at each level of the layout,
+    // the siblings of the branch that holds it. They keep their place in
+    // Obsidian's layout, so the split comes back as it was.
+    applySolo(solo) {
+        const body = document.body;
+        const off = new Set();
+        let node = solo?.parent;
+        while (node && node !== this.app.workspace.rootSplit && node.parent) {
+            for (const sibling of node.parent.children) {
+                if (sibling !== node) off.add(sibling.containerEl);
+            }
+            node = node.parent;
+        }
+        document.querySelectorAll(`.${SOLO_OFF_CLASS}`).forEach((el) => {
+            if (!off.has(el)) el.removeClass(SOLO_OFF_CLASS);
+        });
+        off.forEach((el) => el.addClass(SOLO_OFF_CLASS));
+        body.toggleClass(SOLO_CLASS, !!solo);
+    }
+
+    // The row, in pane order: the split as one joined tab ("A │ B │ C",
+    // standing where its first page is), the normal tabs around it. One
+    // glass pill sits on what's on screen (the joined tab or the lone tab)
+    // and slides between them; the focused page's name is green. Tabs are
+    // kept from one update to the next so the pill can slide.
+    renderSharedTabs(groups, solo) {
         const { workspace } = this.app;
         document.body.addClass(SHARED_TABS_CLASS);
         let bar = this.sharedBar;
         if (!bar?.isConnected) {
             bar = this.sharedBar = document.body.createDiv("goguryeo-shared-tabs-bar");
-            this.sharedGroups = new Map(); // pane → its group in the row
-            this.sharedTabs = new WeakMap(); // leaf → its tab in the row
+            this.sharedTabs = new WeakMap(); // leaf → its tab (or its part of the joined tab)
+            this.splitTab = null;
         }
-        const current = workspace.getMostRecentLeaf(workspace.rootSplit);
+        const focused = workspace.getMostRecentLeaf(workspace.rootSplit);
+        const pages = this.splitPages ?? new Map();
+        const isPage = new Set(pages.values());
         const keep = new Set();
         for (const pane of groups) {
-            let group = this.sharedGroups.get(pane);
-            if (!group) {
-                group = createDiv("goguryeo-stab-group");
-                this.sharedGroups.set(pane, group);
-            }
-            keep.add(pane);
-            bar.appendChild(group); // in pane order
-            group.toggleClass("is-current", pane === current?.parent);
-            group.style.setProperty("--g-tabs", `${Math.max(1, pane.children.length)}`);
-            const shown = pane.children[pane.currentTab];
-            const tabs = new Set();
             for (const leaf of pane.children) {
+                if (isPage.has(leaf)) {
+                    if (keep.has(this.splitTab)) continue;
+                    const tab = this.renderSplitTab(groups, pages, solo, focused);
+                    keep.add(tab);
+                    bar.appendChild(tab);
+                    continue;
+                }
                 let tab = this.sharedTabs.get(leaf);
-                if (!tab) tab = this.makeSharedTab(leaf);
-                tabs.add(tab);
-                group.appendChild(tab);
-                tab.toggleClass("is-shown", leaf === shown);
-                tab.toggleClass("is-focused", leaf === current);
-                const title = leaf.getDisplayText();
-                const titleEl = tab.querySelector(".goguryeo-stab-title");
-                const icon = leaf.getIcon?.() ?? "";
-                if (tab.gIcon !== icon) {
-                    tab.gIcon = icon;
-                    const iconEl = tab.querySelector(".goguryeo-stab-icon");
-                    iconEl.empty();
-                    if (icon) setIcon(iconEl, icon);
-                }
-                if (titleEl.textContent !== title) {
-                    titleEl.setText(title);
-                    tab.setAttr("aria-label", title);
-                }
+                if (!tab || tab.hasClass("goguryeo-stab-part")) tab = this.makeSharedTab(leaf);
+                keep.add(tab);
+                bar.appendChild(tab);
+                tab.toggleClass("is-active", leaf === solo);
+                tab.toggleClass("is-focused", leaf === solo);
+                this.fillTab(tab, leaf);
             }
-            for (const el of [...group.children]) {
-                if (el.hasClass("goguryeo-stab") && !tabs.has(el)) el.remove();
-            }
-            this.placeThumb(group, group, SHARED_ACTIVE, SHARED_INNER);
         }
-        for (const [pane, group] of this.sharedGroups) {
-            if (keep.has(pane)) continue;
-            group.remove();
-            this.sharedGroups.delete(pane);
+        for (const el of [...bar.children]) {
+            if (el.hasClass("goguryeo-stab") && !keep.has(el)) el.remove();
+        }
+        this.placeThumb(bar, bar, SHARED_ACTIVE, SHARED_INNER);
+    }
+
+    renderSplitTab(groups, pages, solo, focused) {
+        let tab = this.splitTab;
+        if (!tab) {
+            tab = this.splitTab = createDiv({ cls: "goguryeo-stab goguryeo-stab-split" });
+            tab.createDiv("goguryeo-stab-inner");
+        }
+        const inner = tab.querySelector(".goguryeo-stab-inner");
+        tab.toggleClass("is-active", !solo);
+        tab.style.flexGrow = `${pages.size}`;
+        const parts = new Set();
+        for (const pane of groups) {
+            const leaf = pages.get(pane);
+            if (!leaf) continue;
+            let part = this.sharedTabs.get(leaf);
+            if (!part || !part.hasClass("goguryeo-stab-part")) part = this.makeSharedTab(leaf, true);
+            parts.add(part);
+            inner.appendChild(part);
+            part.toggleClass("is-focused", !solo && leaf === focused);
+            this.fillTab(part, leaf);
+        }
+        for (const el of [...inner.children]) {
+            if (!parts.has(el)) el.remove();
+        }
+        return tab;
+    }
+
+    // Icon and name; the icon shows while the tab is on screen, as on
+    // Obsidian's own tabs
+    fillTab(tab, leaf) {
+        const title = leaf.getDisplayText();
+        const icon = leaf.getIcon?.() ?? "";
+        if (tab.gIcon !== icon) {
+            tab.gIcon = icon;
+            const iconEl = tab.querySelector(".goguryeo-stab-icon");
+            iconEl.empty();
+            if (icon) setIcon(iconEl, icon);
+        }
+        const titleEl = tab.querySelector(".goguryeo-stab-title");
+        if (titleEl.textContent !== title) {
+            titleEl.setText(title);
+            tab.setAttr("aria-label", title);
         }
     }
 
-    makeSharedTab(leaf) {
+    // A normal tab, or (part) one page of the joined split tab. Either acts
+    // like Obsidian's tab: click focuses it, × or a middle click closes it,
+    // right click opens its menu; a normal tab also drags like one (to
+    // split, or into another pane).
+    makeSharedTab(leaf, part = false) {
         const { workspace } = this.app;
-        const tab = createDiv({ cls: "goguryeo-stab", attr: { draggable: "true" } });
-        const inner = tab.createDiv("goguryeo-stab-inner");
+        const tab = createDiv({ cls: part ? "goguryeo-stab-part" : "goguryeo-stab", attr: part ? {} : { draggable: "true" } });
+        const inner = part ? tab : tab.createDiv("goguryeo-stab-inner");
         const close = inner.createDiv({ cls: "clickable-icon goguryeo-stab-close", attr: { "aria-label": "Close" } });
         setIcon(close, "lucide-x");
         inner.createDiv("goguryeo-stab-icon");
@@ -1701,7 +1801,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.haptic();
             leaf.detach();
         });
-        tab.addEventListener("click", () => {
+        tab.addEventListener("click", (e) => {
+            e.stopPropagation(); // a part's click is not the joined tab's
             this.haptic();
             workspace.setActiveLeaf(leaf, { focus: true });
         });
@@ -1711,8 +1812,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
         tab.addEventListener("auxclick", (e) => {
             if (e.button === 1) leaf.detach();
         });
-        tab.addEventListener("contextmenu", (e) => leaf.onOpenTabHeaderMenu?.(e, tab));
-        tab.addEventListener("dragstart", (e) => workspace.onDragLeaf?.(e, leaf));
+        tab.addEventListener("contextmenu", (e) => {
+            e.stopPropagation();
+            leaf.onOpenTabHeaderMenu?.(e, tab);
+        });
+        if (!part) tab.addEventListener("dragstart", (e) => workspace.onDragLeaf?.(e, leaf));
         this.sharedTabs.set(leaf, tab);
         return tab;
     }
@@ -1721,6 +1825,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         document.body.removeClass(SHARED_TABS_CLASS);
         this.sharedBar?.remove();
         this.sharedBar = null;
+        this.splitTab = null;
+        this.applySolo(null);
     }
 
     clearSplit() {

@@ -1232,12 +1232,14 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mo
     display: none;
 }
 
-/* 2+ panes: one shared tab row (companion, body.goguryeo-shared-tabs) under
-   the toolbar, across all the cards:
-     [◧] [‹ ›]      ( path of the current pane )      [actions] [+] [⧉] [◨]
-     ( A  D │ B │ C )            every tab, in pane order
-     ╭─ pane ─╮  ╭─ pane ─╮
-   Each pane's glass pill sits on the tab it shows; the focused tab's name is
+/* 2+ panes, Chrome's split view (companion, body.goguryeo-shared-tabs): one
+   tab row under the toolbar, the split as one joined tab among the normal
+   tabs:
+     [◧] [‹ ›]      ( path of the focused page )      [actions] [+] [⧉] [◨]
+     ( [ A │ B │ C ]   D    E )
+     ╭─ A ─╮ ╭─ B ─╮ ╭─ C ─╮     joined tab on screen: every pane
+   A normal tab in focus fills the screen alone (body.goguryeo-solo); the
+   glass pill sits on what's on screen, and the focused page's name is
    green. The cards lose their own tab rows (their ◧ + ⧉ ◨ stay in row 1). */
 .goguryeo-shared-tabs-bar {
     display: none;
@@ -1271,7 +1273,7 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     display: none;
 }
 
-/* The glass on a pseudo-element, as on the cards' tab rows, so each pill's
+/* The glass on a pseudo-element, as on the cards' tab rows, so the pill's
    own blur sees the page */
 .goguryeo-shared-tabs-bar::before {
     content: "";
@@ -1288,31 +1290,8 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     pointer-events: none;
 }
 
-/* One group per pane; tabs share the width equally across the whole row */
-.goguryeo-stab-group {
-    position: relative;
-    flex: var(--g-tabs, 1) 1 0;
-    min-width: 0;
-    display: flex;
-    gap: 3px;
-}
-
-/* Between panes: a taller divider than between tabs */
-.goguryeo-stab-group + .goguryeo-stab-group {
-    margin-left: 9px;
-}
-
-.goguryeo-stab-group + .goguryeo-stab-group::before {
-    content: "";
-    position: absolute;
-    top: 12%;
-    left: -7px;
-    width: 2px;
-    height: 76%;
-    border-radius: 1px;
-    background-color: var(--text-faint);
-}
-
+/* Every page shares the width equally: a normal tab is one share, the
+   joined tab one per page (the companion sets its flex-grow) */
 .goguryeo-stab {
     position: relative;
     z-index: 1;
@@ -1336,7 +1315,7 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     padding: 0 28px;
 }
 
-/* The icon only on a tab on screen, as on Obsidian's own tabs */
+/* The icon only on what's on screen, as on Obsidian's own tabs */
 .goguryeo-stab-icon {
     display: none;
     flex: none;
@@ -1344,7 +1323,7 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     --icon-size: 14px;
 }
 
-.goguryeo-stab.is-shown .goguryeo-stab-icon:not(:empty) {
+.goguryeo-stab.is-active .goguryeo-stab-icon:not(:empty) {
     display: flex;
 }
 
@@ -1355,25 +1334,24 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     white-space: nowrap;
 }
 
-/* On screen in its pane (under the pill) */
-.goguryeo-stab.is-shown {
+.goguryeo-stab.is-active {
     color: var(--text-normal);
 }
 
-/* The focused tab: its name in the accent */
-.goguryeo-stab.is-focused {
+/* The focused page: its name in the accent */
+:is(.goguryeo-stab, .goguryeo-stab-part).is-focused {
     color: var(--text-accent);
     font-weight: var(--font-semibold);
 }
 
 @media (hover: hover) {
-    .goguryeo-stab:not(.is-shown):hover {
+    .goguryeo-stab:not(.is-active):hover {
         background-color: var(--background-modifier-hover);
         color: var(--text-normal);
     }
 }
 
-/* Short dividers between tabs, gone beside a pill or a hovered tab */
+/* Short dividers between tabs, gone beside the pill or a hovered tab */
 .goguryeo-stab-inner::after {
     content: "";
     position: absolute;
@@ -1386,7 +1364,7 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     transition: opacity 0.15s ease;
 }
 
-.goguryeo-stab:is(.is-shown, :has(+ .is-shown), :last-of-type) > .goguryeo-stab-inner::after {
+.goguryeo-stab:is(.is-active, :has(+ .is-active), :last-of-type) > .goguryeo-stab-inner::after {
     opacity: 0;
 }
 
@@ -1408,9 +1386,95 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     --icon-size: 12px;
 }
 
-.goguryeo-stab:not(.is-shown):not(:hover) .goguryeo-stab-close {
+.goguryeo-stab:not(.is-active):not(:hover) > .goguryeo-stab-inner > .goguryeo-stab-close {
     opacity: 0;
     pointer-events: none;
+}
+
+/* The joined split tab: its pages side by side inside one tab, a split
+   icon-like line between them, Chrome style. Each page has its own × (on
+   hover) and click. */
+.goguryeo-stab-split > .goguryeo-stab-inner {
+    padding: 0 4px;
+    gap: 0;
+}
+
+.goguryeo-stab-part {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 26px;
+    border-radius: 6px;
+}
+
+.goguryeo-stab-part + .goguryeo-stab-part::before {
+    content: "";
+    position: absolute;
+    top: 18%;
+    left: -1px;
+    width: 2px;
+    height: 64%;
+    border-radius: 1px;
+    background-color: currentColor;
+    opacity: 0.45;
+}
+
+/* Off screen, the joined tab keeps a faint outline so it reads as one tab */
+.goguryeo-stab-split:not(.is-active) {
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+.goguryeo-stab-split > .goguryeo-stab-inner::after,
+.goguryeo-stab:has(+ .goguryeo-stab-split) > .goguryeo-stab-inner::after {
+    opacity: 0;
+}
+
+.goguryeo-stab-split:not(.is-active) .goguryeo-stab-part + .goguryeo-stab-part::before {
+    opacity: 0.3;
+}
+
+@media (hover: hover) {
+    .goguryeo-stab-split.is-active .goguryeo-stab-part:not(.is-focused):hover {
+        background-color: var(--background-modifier-hover);
+    }
+}
+
+.goguryeo-stab-part > .goguryeo-stab-close {
+    left: 4px;
+}
+
+.goguryeo-stab-part:not(:hover) > .goguryeo-stab-close {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.goguryeo-stab-split.is-active .goguryeo-stab-part:not(.is-focused) {
+    color: var(--text-normal);
+}
+
+/* A normal tab in focus fills the screen alone: the split's other panes
+   (and splits) fold to nothing but keep their place in Obsidian's layout.
+   Their ◧ + ⧉ ◨ still show (fixed in row 1). */
+body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off {
+    flex: 0 0 0px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    visibility: hidden;
+}
+
+body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    visibility: visible;
+}
+
+body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-resize-handle {
+    display: none;
 }
 
 /* The cards' own tab rows go; the note starts near the card's top */
@@ -2776,7 +2840,7 @@ body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container
 body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
 body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner,
 body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb,
-body.is-tablet:not(.goguryeo-no-cards) :is(.goguryeo-shared-tabs-bar, .goguryeo-stab, .goguryeo-shared-tabs-bar .goguryeo-tab-thumb) {
+body.is-tablet:not(.goguryeo-no-cards) :is(.goguryeo-shared-tabs-bar, .goguryeo-stab, .goguryeo-stab-part, .goguryeo-shared-tabs-bar .goguryeo-tab-thumb) {
     border-radius: 999px;
 }
 
