@@ -1,7 +1,7 @@
 {
   "id": "goguryeo-companion",
   "name": "Goguryeo Companion",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "minAppVersion": "1.9.0",
   "description": "Helpers for the Goguryeo theme: sliding tab glass, split-screen and phone layout helpers, edge swipes, and a picker for the background image.",
   "author": "MIG&Claude (opus5.5)",
