@@ -1407,20 +1407,21 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 26px;
+    padding: 0 20px;
     border-radius: 6px;
 }
 
+/* A small dot between the split's pages (the user's choice) */
 .goguryeo-stab-part + .goguryeo-stab-part::before {
     content: "";
     position: absolute;
-    top: 18%;
-    left: -1px;
-    width: 2px;
-    height: 64%;
-    border-radius: 1px;
-    background-color: currentColor;
-    opacity: 0.45;
+    top: calc(50% - 2px);
+    left: -2px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: var(--text-muted);
+    opacity: 0.8;
 }
 
 /* Off screen, the joined tab keeps a faint outline so it reads as one tab */
@@ -1434,7 +1435,7 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
 }
 
 .goguryeo-stab-split:not(.is-active) .goguryeo-stab-part + .goguryeo-stab-part::before {
-    opacity: 0.3;
+    opacity: 0.5;
 }
 
 @media (hover: hover) {
@@ -1444,7 +1445,13 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
 }
 
 .goguryeo-stab-part > .goguryeo-stab-close {
-    left: 4px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+}
+
+.goguryeo-stab-part > .goguryeo-stab-icon {
+    margin-right: 4px;
 }
 
 .goguryeo-stab-part:not(:hover) > .goguryeo-stab-close {
@@ -2036,27 +2043,51 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     font-size: 2em;
 }
 
-/* Split screen: a dot on the cards on screen in their pane (green on the
-   focused one), like the glass pills in the shared tab row */
-.goguryeo-tab-card-dot {
-    display: none;
+/* Split screen (Chrome style): the split is one wide card, its pages side
+   by side at the same zoom as the other cards; the companion sets the
+   height and each page's width. The focused page's name is green. */
+.goguryeo-tab-card.is-split .goguryeo-tab-card-thumb {
+    display: flex;
+    aspect-ratio: auto;
+    gap: 2px;
+    background-color: var(--glass-border);
+}
+
+.goguryeo-tab-card-part {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    background-color: var(--background-primary);
+}
+
+.goguryeo-tab-card-part > .goguryeo-swipe-page {
+    inset: auto;
+    top: 0;
+    left: 0;
+    width: var(--g-page-w);
+    height: var(--g-page-h);
+    transform: scale(var(--g-card-scale, 0.25));
+    transform-origin: 0 0;
+    will-change: auto;
+    pointer-events: none;
+}
+
+.goguryeo-tab-card-part > .goguryeo-swipe-page .goguryeo-swipe-blank-icon .svg-icon {
+    --icon-size: 64px;
+}
+
+.goguryeo-tab-card-part > .goguryeo-swipe-page .goguryeo-swipe-blank {
+    font-size: 2em;
+}
+
+/* The focused page of the split, ringed inside the card */
+.goguryeo-tab-card-part.is-focused::after {
+    content: "";
     position: absolute;
-    z-index: 1;
-    top: 8px;
-    right: 8px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: var(--text-normal);
-    box-shadow: 0 0 0 2px var(--background-primary);
-}
-
-.goguryeo-tab-card.is-shown .goguryeo-tab-card-dot {
-    display: block;
-}
-
-.goguryeo-tab-card.is-current .goguryeo-tab-card-dot {
-    background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+    inset: 0;
+    box-shadow: inset 0 0 0 2px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7);
+    pointer-events: none;
 }
 
 /* × · icon · name under the card */

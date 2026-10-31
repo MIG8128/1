@@ -867,9 +867,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
     }
 
     // The sheet covers the panes from the tab row down, so row 1 (and ⧉ in
-    // it) stays. One grid holds every tab in the tab row's order (pane by
-    // pane); in split screen the cards on screen in their pane carry a dot,
-    // and the focused one is ringed. Each page is drawn at the note's size,
+    // it) stays. One grid holds the tab row's entries in its order: in split
+    // screen the split is one wide card with its pages side by side, and
+    // what's on screen is ringed. Each page is drawn at the note's size,
     // then shrunk onto its card, like Safari's previews.
     renderOverview() {
         const o = this.overview;
@@ -902,31 +902,71 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
         const leaves = [];
         workspace.iterateRootLeaves((leaf) => { leaves.push(leaf); }); // a truthy return would stop it
-        const split = new Set(leaves.map((leaf) => leaf.parent)).size > 1;
+        // Chrome-style split screen: the split's pages make one card, where
+        // the first of them stands, as in the tab row
+        const splitPages = this.sharedBar?.isConnected && this.splitPages ? [...this.splitPages.values()].filter((leaf) => leaves.includes(leaf)) : [];
+        const solo = document.body.hasClass(SOLO_CLASS);
+        const entries = [];
+        for (const leaf of leaves) {
+            if (!splitPages.includes(leaf)) entries.push(leaf);
+            else if (!entries.includes(splitPages)) entries.push(splitPages);
+        }
         this.endCardDrag();
         box.empty();
         const grid = o.grid = box.createDiv("goguryeo-tab-overview-grid");
-        o.leafOf = new WeakMap(); // card → its leaf
+        o.leafOf = new WeakMap(); // card → its leaf (none for the split's card)
         o.shotOf = new WeakMap(); // card → its page copy
         const pages = [];
-        for (const leaf of leaves) {
-            const card = grid.createDiv("goguryeo-tab-card");
-            o.leafOf.set(card, leaf);
-            card.toggleClass("is-current", leaf === current);
-            card.toggleClass("is-shown", split && leaf.parent?.children[leaf.parent.currentTab] === leaf);
-            const thumb = card.createDiv("goguryeo-tab-card-thumb");
+        const addPage = (thumb, leaf) => {
             let snapshot = null;
+            // A folded split page: the copy taken as it folded
+            const folded = leaf.parent?.containerEl.closest(`.${SOLO_OFF_CLASS}`);
             try {
-                snapshot = this.snapshotPage(leaf);
+                snapshot = (folded && this.splitShots?.get(leaf)) || this.snapshotPage(leaf);
             } catch (e) {
                 console.error("Goguryeo: tab preview failed", e);
             }
             const page = this.makeSwipePage(snapshot, { icon: leaf.getIcon?.(), title: leaf.getDisplayText() });
             page.inert = true;
             thumb.appendChild(page);
-            thumb.createDiv({ cls: "goguryeo-tab-card-dot", attr: { "aria-label": "On screen" } });
             pages.push([page, snapshot]);
-            o.shotOf.set(card, snapshot);
+            return snapshot;
+        };
+        const go = (leaf) => {
+            if (this.overview?.dropped) return; // the click that ends a drag
+            this.haptic();
+            workspace.setActiveLeaf(leaf, { focus: true });
+            this.closeOverview();
+        };
+        let splitCard = null;
+        for (const entry of entries) {
+            if (Array.isArray(entry)) {
+                // The split: its pages side by side in one wide card; a page
+                // goes to that page, the name row to the focused (or first) one
+                const card = splitCard = grid.createDiv("goguryeo-tab-card is-split");
+                card.toggleClass("is-current", !solo);
+                const thumb = card.createDiv("goguryeo-tab-card-thumb");
+                for (const leaf of entry) {
+                    const part = thumb.createDiv("goguryeo-tab-card-part");
+                    part.toggleClass("is-focused", !solo && leaf === current);
+                    addPage(part, leaf);
+                    part.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        go(leaf);
+                    });
+                }
+                const label = card.createDiv("goguryeo-tab-card-label");
+                setIcon(label.createDiv("goguryeo-tab-card-icon"), "lucide-columns-2");
+                label.createDiv({ cls: "goguryeo-tab-card-title", text: entry.map((leaf) => leaf.getDisplayText()).join("  ·  ") });
+                card.addEventListener("click", () => go(entry.includes(current) ? current : entry[0]));
+                continue;
+            }
+            const leaf = entry;
+            const card = grid.createDiv("goguryeo-tab-card");
+            o.leafOf.set(card, leaf);
+            card.toggleClass("is-current", leaf === current);
+            const thumb = card.createDiv("goguryeo-tab-card-thumb");
+            o.shotOf.set(card, addPage(thumb, leaf));
 
             const label = card.createDiv("goguryeo-tab-card-label");
             const close = label.createDiv({ cls: "clickable-icon goguryeo-tab-card-close", attr: { "aria-label": "Close tab" } });
@@ -938,15 +978,23 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 leaf.detach(); // the layout change redraws the cards
             });
             card.addEventListener("pointerdown", (e) => this.onCardDown(e, card, leaf));
-            card.addEventListener("click", () => {
-                if (this.overview?.dropped) return; // the click that ends a drag
-                this.haptic();
-                workspace.setActiveLeaf(leaf, { focus: true });
-                this.closeOverview();
-            });
+            card.addEventListener("click", () => go(leaf));
         }
-        const thumbW = grid.querySelector(".goguryeo-tab-card-thumb")?.clientWidth || 0;
-        sheet.style.setProperty("--g-card-scale", `${thumbW / pageW}`);
+        // Card size from the grid's column; the split's card spans two
+        // columns at the same height, each page drawn at the same zoom but
+        // only its share of the width, like a narrower pane
+        const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean);
+        const colW = parseFloat(columns[0]) || 0;
+        const scale = colW / pageW;
+        sheet.style.setProperty("--g-card-scale", `${scale}`);
+        if (splitCard) {
+            splitCard.style.gridColumn = `span ${Math.min(2, columns.length)}`;
+            const thumb = splitCard.querySelector(".goguryeo-tab-card-thumb");
+            thumb.style.height = `${colW * cardH / pageW}px`;
+            const parts = thumb.querySelectorAll(".goguryeo-tab-card-part");
+            const partW = thumb.clientWidth / Math.max(1, parts.length);
+            parts.forEach((part) => part.style.setProperty("--g-page-w", `${Math.round(partW / (scale || 1))}px`));
+        }
         for (const [page, snapshot] of pages) this.restoreScrolls(page, snapshot);
     }
 
@@ -1683,6 +1731,17 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // Obsidian's layout, so the split comes back as it was.
     applySolo(solo) {
         const body = document.body;
+        // About to fold the split away: keep a copy of each page for the
+        // tab overview, which can't copy a folded pane
+        if (solo && !body.hasClass(SOLO_CLASS) && this.splitPages) {
+            this.splitShots ??= new WeakMap();
+            for (const leaf of this.splitPages.values()) {
+                try {
+                    const shot = leaf && this.snapshotPage(leaf);
+                    if (shot) this.splitShots.set(leaf, shot);
+                } catch (e) { /* keep the old copy */ }
+            }
+        }
         const off = new Set();
         let node = solo?.parent;
         while (node && node !== this.app.workspace.rootSplit && node.parent) {
