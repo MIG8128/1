@@ -68,6 +68,9 @@ const FLOAT_CLASS = { left: FLOAT_LEFT_CLASS, right: FLOAT_RIGHT_CLASS };
 const PEEK_DWELL_MS = 150; // the pointer rests at an edge this long before the sidebar comes out
 const PEEK_LEAVE_MS = 400; // and stays away this long before it goes again (the ribbon's delay)
 const PEEK_REACH = 16; // px past the sidebar the pointer may wander without closing it
+const TOP_OPTION_CLASS = "goguryeo-fullscreen-autohide"; // the theme's "Hide the top rows in full screen" option
+const TOP_HIDDEN_CLASS = "goguryeo-top-hidden"; // body: full screen, the path and tab rows slid away
+const TOP_PEEK_CLASS = "goguryeo-top-peek"; // body: and brought back over the note by the pointer
 const PEEK_TOP = 40; // px at the top where the window edges belong to the title bar
 const OMNI_CLASS = "goguryeo-omnibox"; // the quick switcher docked on the path capsule
 const OMNI_MIN_WIDTH = 420; // px it takes at least (the iPhone folder pill is small)
@@ -266,6 +269,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.app.workspace.onLayoutReady(() => this.patchSelectTab());
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
         this.app.workspace.onLayoutReady(() => this.setupSidebarPeek());
+        this.app.workspace.onLayoutReady(() => this.setupTopPeek());
         this.app.workspace.onLayoutReady(() => this.setupPhoneBar());
         this.androidNav = this.app.loadLocalStorage(ANDROID_NAV_KEY) === "buttons" ? "buttons" : "gestures";
         if (Platform.isMobile) this.setupEdgeSwipe();
@@ -673,6 +677,97 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
         };
         this.peekFrames[side] = window.requestAnimationFrame(settle);
+    }
+
+    // ---- Full screen: the top rows hide, the top edge brings them back ----
+
+    // In full screen (F11; Obsidian puts is-fullscreen on body) with the
+    // theme's option on, the path row and the tab row slide up out of
+    // sight (goguryeo-top-hidden). Rest the pointer on the top edge over
+    // the note area and they slide back over the note (goguryeo-top-peek),
+    // like a closed sidebar; move below them and they go again. A menu or
+    // modal opened from them keeps them out.
+    setupTopPeek() {
+        if (!Platform.isDesktopApp) return;
+        this.topTimer = null;
+        const observer = new MutationObserver(() => this.updateTopHidden());
+        observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+        this.register(() => {
+            observer.disconnect();
+            this.waitTop(null);
+            document.body.removeClass(TOP_HIDDEN_CLASS, TOP_PEEK_CLASS);
+        });
+        this.registerDomEvent(document, "pointermove", (e) => this.onTopMove(e), { passive: true });
+        this.registerDomEvent(document.documentElement, "pointerleave", (e) => this.onTopMove(e, true));
+        this.updateTopHidden();
+    }
+
+    updateTopHidden() {
+        const body = document.body;
+        const on = body.hasClass("is-fullscreen") && body.hasClass(TOP_OPTION_CLASS) && !body.hasClass("goguryeo-no-cards")
+            && !Platform.isMobile && this.app.customCss?.theme === "Goguryeo";
+        if (body.hasClass(TOP_HIDDEN_CLASS) === on) return;
+        body.toggleClass(TOP_HIDDEN_CLASS, on);
+        if (!on) {
+            this.waitTop(null);
+            body.removeClass(TOP_PEEK_CLASS);
+        }
+        this.scheduleThumbs?.();
+    }
+
+    // Runs `fn` after `ms` unless the same kind of wait is running; null stops it
+    waitTop(kind, ms, fn) {
+        if (kind && this.topTimer?.kind === kind) return;
+        window.clearTimeout(this.topTimer?.id);
+        this.topTimer = null;
+        if (!kind) return;
+        const id = window.setTimeout(() => {
+            this.topTimer = null;
+            fn();
+        }, ms);
+        this.topTimer = { kind, id };
+    }
+
+    onTopMove(e, left) {
+        const body = document.body;
+        if (!body.hasClass(TOP_HIDDEN_CLASS) || e.pointerType === "touch") return;
+        const busy = document.querySelector(".modal-container, .menu");
+        if (body.hasClass(TOP_PEEK_CLASS)) {
+            if ((!left && e.clientY <= this.topRowsBottom() + PEEK_REACH) || busy || this.holdsTop()) this.waitTop(null);
+            else this.waitTop("leave", PEEK_LEAVE_MS, () => body.removeClass(TOP_PEEK_CLASS));
+        } else if (!left && !busy && e.buttons === 0 && e.clientY <= (this.peekZone || 12) && this.overNoteArea(e.clientX)) {
+            this.waitTop("open", PEEK_DWELL_MS, () => {
+                if (body.hasClass(TOP_HIDDEN_CLASS)) body.addClass(TOP_PEEK_CLASS);
+            });
+        } else {
+            this.waitTop(null);
+        }
+    }
+
+    // The lowest edge of the rows on screen (at least the row height's worth)
+    topRowsBottom() {
+        let bottom = 90;
+        const rows = document.querySelectorAll(
+            ".mod-root .workspace-leaf-content > .view-header, .goguryeo-shared-tabs-bar, .mod-root .workspace-tabs > .workspace-tab-header-container",
+        );
+        for (const el of rows) {
+            const r = el.getBoundingClientRect();
+            if (r.height > 0 && r.bottom > 0 && r.bottom < window.innerHeight / 2) bottom = Math.max(bottom, r.bottom);
+        }
+        return bottom;
+    }
+
+    // Over the note area, not a sidebar
+    overNoteArea(x) {
+        const r = this.app.workspace.rootSplit?.containerEl.getBoundingClientRect();
+        return !r || (x >= r.left && x <= r.right);
+    }
+
+    // Typing in the rows (a rename in the path) keeps them out
+    holdsTop() {
+        const active = document.activeElement;
+        return !!active?.closest?.(".mod-root .view-header, .goguryeo-shared-tabs-bar")
+            && active.matches("input, textarea, [contenteditable='true']");
     }
 
     // ---- iPhone: a right sidebar button (Obsidian has none on phones) ----

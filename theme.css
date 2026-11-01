@@ -43,6 +43,12 @@ settings:
         type: class-toggle
         default: false
     -
+        id: goguryeo-fullscreen-autohide
+        title: Hide the top rows in full screen
+        description: In full screen (F11), the path row and the tab row slide away and the note takes their room. Rest the pointer on the top edge and they slide back over the note; they hide again when the pointer leaves. Needs the Goguryeo Companion plugin.
+        type: class-toggle
+        default: true
+    -
         id: goguryeo-no-cards
         title: Turn off floating panel layout
         type: class-toggle
@@ -1758,6 +1764,74 @@ body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock > .workspace-tabs > .
     padding-block: 3.5px;
     border-width: 0;
     background-clip: content-box;
+}
+
+/* Full screen (F11) with "Hide the top rows in full screen": the path row
+   and the tab row slide up out of sight and the note takes their room
+   (companion: body goguryeo-top-hidden). The pointer resting on the top
+   edge brings them back over the note, like a closed sidebar
+   (goguryeo-top-peek); the note doesn't move. */
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-top-shift: calc(-1 * (var(--g-row2-top) + var(--g-row2-h) + 24px));
+    --g-bar-offset: 10px !important;
+    --g-split-top: var(--g-gap) !important;
+}
+
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header,
+body.goguryeo-top-hidden:not(.goguryeo-split):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
+body.goguryeo-top-hidden.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    translate: 0 var(--g-top-shift);
+    transition: translate 0.32s cubic-bezier(0.3, 1.15, 0.4, 1);
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header,
+body.goguryeo-top-hidden.goguryeo-top-peek:not(.goguryeo-split):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    translate: 0 0;
+}
+
+/* The shared tab row moves by its top, not a translate: a translate would
+   become the box for its pinned glass layer and drop the glass below it */
+body.goguryeo-top-hidden.goguryeo-shared-tabs.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-shared-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-top-shift)) !important;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-shared-tabs.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-shared-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px) !important;
+}
+
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar,
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar::before {
+    transition: top 0.32s cubic-bezier(0.3, 1.15, 0.4, 1);
+}
+
+/* The panes' move bars would show through the rows */
+body.goguryeo-top-hidden.goguryeo-top-peek .mod-root .workspace-tabs > .goguryeo-pane-grip {
+    visibility: hidden;
+}
+
+/* A lone card over a background keeps its tab row inside the card. It
+   fades out (its pinned buttons slide with row 1), and comes back where
+   the tab row sits in the usual layout, under row 1. */
+body.goguryeo-top-hidden.goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    --g-row2-top: calc(var(--g-row1-top) + var(--g-row-h) + 6px - var(--g-gap));
+    --g-bar-offset: 4px;
+}
+
+body.goguryeo-top-hidden.goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* The frosted band behind the rows goes with them */
+body.goguryeo-top-hidden:not(.goguryeo-top-peek):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+    opacity: 0;
 }
 
 
