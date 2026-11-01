@@ -81,6 +81,7 @@ const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the e
 const OVERVIEW_CLASS = "goguryeo-tab-overview"; // the tab overview sheet (desktop and iPad)
 const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⧉, which the theme shows in place of ⌄
 const OVERVIEW_MS = 240; // the sheet fading in and out
+const TAB_SPRING = "cubic-bezier(0.3, 1.5, 0.4, 1)"; // tabs and slots growing in, with a bounce
 const CARD_HOLD_MS = 300; // a finger rests on a card this long before it lifts (a mouse drags at once)
 const CARD_SLOP = 6; // px a pointer may wander before it counts as a drag (or, for a finger, a scroll)
 const CARD_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // the other cards making room, and the drop
@@ -2136,6 +2137,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
             document.body.addClass("goguryeo-pane-dragging");
             d.drop = document.body.createDiv("goguryeo-pane-drop");
         }
+        // Over the top tab bar: the pane's page leaves the split there, as a
+        // tab of its own (a slot opens where it will stand)
+        const index = this.barDropAt(ev.clientX, ev.clientY);
+        if (index != null) {
+            d.drop.removeClass("is-shown");
+            if (d.target?.bar && d.target.index === index) return;
+            d.target = { bar: true, index };
+            this.showBarSlot(index);
+            this.haptic();
+            return;
+        }
+        this.hideBarSlot();
         const t = this.paneDropAt(ev.clientX, ev.clientY, d.pane);
         if (t?.pane === d.target?.pane && t?.side === d.target?.side) return;
         d.target = t;
@@ -2187,12 +2200,237 @@ module.exports = class GoguryeoCompanion extends Plugin {
         d.pane.containerEl.removeClass("goguryeo-pane-lifted");
         document.body.removeClass("goguryeo-pane-dragging");
         d.drop?.remove();
+        const toBar = !cancelled && d.moving && d.target?.bar;
+        this.hideBarSlot(toBar);
         if (cancelled || !d.moving || !d.target) return;
         try {
-            this.movePane(d.pane, d.target.pane, d.target.side);
+            if (toBar) this.unsplitPage(this.splitPages?.get(d.pane), d.target.index);
+            else this.movePane(d.pane, d.target.pane, d.target.side);
             this.haptic();
         } catch (err) {
             console.error("Goguryeo: couldn't move the pane", err);
+        }
+    }
+
+    // ---- Split screen: a page leaves the split, into the top tab bar ----
+
+    // Where in the top tab bar (x, y) would drop something: the index among
+    // its tabs (the joined split tab counts as one), or null when it's not
+    // over the bar. `skip`: an element of the bar that doesn't take drops.
+    barDropAt(x, y, skip) {
+        const bar = this.sharedBar;
+        if (!bar?.isConnected) return null;
+        const r = bar.getBoundingClientRect();
+        if (x < r.left || x > r.right || y < r.top - 24 || y > r.bottom + 16) return null;
+        if (skip) {
+            const k = skip.getBoundingClientRect();
+            if (x >= k.left && x <= k.right) return null;
+        }
+        let index = 0;
+        for (const el of bar.children) {
+            if (!el.hasClass("goguryeo-stab") || el.hasClass("is-leaving")) continue;
+            const t = el.getBoundingClientRect();
+            if (x > t.left + t.width / 2) index++;
+        }
+        return index;
+    }
+
+    // An empty glass slot in the bar where the page will stand; it grows in,
+    // pushing the tabs aside, and moves by shrinking away and growing anew
+    showBarSlot(index) {
+        const bar = this.sharedBar;
+        if (!bar) return;
+        if (this.barSlot?.isConnected && this.barSlot.gIndex === index) return;
+        this.hideBarSlot();
+        const slot = this.barSlot = createDiv("goguryeo-stab-slot");
+        slot.gIndex = index;
+        this.placeBarSlot();
+        slot.animate([{ flexGrow: 0, opacity: 0 }, { flexGrow: 1, opacity: 1 }], { duration: 380, easing: TAB_SPRING });
+        this.followBar(420);
+    }
+
+    // The tabs are changing width (a slot or a tab growing or shrinking):
+    // the glass pill follows them frame by frame for `ms`
+    followBar(ms) {
+        this.followUntil = Math.max(this.followUntil ?? 0, performance.now() + ms);
+        if (this.followFrame) return;
+        const step = () => {
+            const bar = this.sharedBar;
+            if (!bar?.isConnected || performance.now() > this.followUntil) {
+                this.followFrame = 0;
+                this.scheduleThumbs();
+                return;
+            }
+            this.placeThumb(bar, bar, SHARED_ACTIVE, SHARED_INNER);
+            this.followFrame = window.requestAnimationFrame(step);
+        };
+        this.followFrame = window.requestAnimationFrame(step);
+    }
+
+    // Puts the slot at its index (the bar redraws by appending its tabs anew)
+    placeBarSlot() {
+        const bar = this.sharedBar;
+        const slot = this.barSlot;
+        if (!bar || !slot) return;
+        const tabs = [...bar.children].filter((el) => el.hasClass("goguryeo-stab") && !el.hasClass("is-leaving"));
+        const before = tabs[slot.gIndex] ?? tabs[tabs.length - 1]?.nextSibling ?? null;
+        if (slot.parentElement === bar && slot.nextSibling === before) return;
+        bar.insertBefore(slot, before);
+    }
+
+    hideBarSlot(now = false) {
+        const slot = this.barSlot;
+        this.barSlot = null;
+        if (!slot) return;
+        if (now) return slot.remove();
+        slot.animate([{ flexGrow: 1, opacity: 1 }, { flexGrow: 0, opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" })
+            .finished.catch(() => {}).finally(() => slot.remove());
+        this.followBar(240);
+    }
+
+    // A split page becomes a tab of its own, at `index` in the bar. Its pane
+    // leaves the split: its tabs join the pane beside the drop (a pane left
+    // empty closes itself), and the page stands where it was dropped. It
+    // then shows alone, as a normal tab does.
+    unsplitPage(leaf, index) {
+        const { workspace } = this.app;
+        const src = leaf?.parent;
+        const pages = this.splitPages;
+        const groups = (this.splitGroups ?? []).filter((p) => p.parent);
+        if (!src || !pages || groups.length < 2) return;
+        const tabs = [...(this.sharedBar?.children ?? [])].filter((el) => el.hasClass("goguryeo-stab") && !el.hasClass("is-leaving"));
+        const leafOf = (el) => (el && !el.hasClass("goguryeo-stab-split") && el.gLeaf?.parent ? el.gLeaf : null);
+        let anchor = leafOf(tabs[index]);
+        let after = false;
+        if (!anchor) {
+            anchor = leafOf(tabs[index - 1]);
+            after = !!anchor;
+        }
+        const home = anchor && anchor.parent !== src ? anchor.parent : groups.find((p) => p !== src);
+        if (!home) return;
+        if (!anchor) {
+            // Only the joined tab beside the drop: next to the split's page
+            anchor = pages.get(home);
+            after = !tabs[index]?.hasClass("goguryeo-stab-split");
+        }
+        for (const l of [...src.children]) {
+            src.removeChild(l); // src closes once empty
+            home.insertChild(home.children.length, l);
+        }
+        pages.delete(src);
+        if (anchor && anchor !== leaf) {
+            home.removeChild(leaf);
+            let at = home.children.indexOf(anchor);
+            at = at < 0 ? home.children.length : at + (after ? 1 : 0);
+            home.insertChild(at, leaf);
+        }
+        home.selectTab(leaf); // on screen, or Obsidian keeps showing the old tab
+        this.dropInTab = leaf; // its new tab pops in
+        workspace.setActiveLeaf(leaf, { focus: true });
+        workspace.requestSaveLayout?.();
+        this.scheduleThumbs();
+    }
+
+    // A page of the joined tab dragged out of it, along the bar: it becomes
+    // a tab of its own where it's dropped. A mouse drags as soon as it
+    // moves; a finger holds first (CARD_HOLD_MS), so a quick swipe still
+    // scrolls the bar.
+    onPartDown(e, part, leaf) {
+        if (e.button > 0 || this.partDrag || this.paneDrag || e.target.closest(".goguryeo-stab-close")) return;
+        const d = this.partDrag = { part, leaf, id: e.pointerId, x: e.clientX, y: e.clientY, live: false, touch: e.pointerType === "touch", target: null };
+        if (d.touch) d.timer = window.setTimeout(() => this.liftPart(d), CARD_HOLD_MS);
+        const move = (ev) => this.onPartMove(ev);
+        const up = (ev) => this.endPartDrag(ev, false);
+        const cancel = (ev) => this.endPartDrag(ev, true);
+        const touch = (ev) => { if (d.live) ev.preventDefault(); }; // the bar must not scroll under it
+        const key = (ev) => {
+            if (ev.key !== "Escape" || !d.live) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.endPartDrag(null, true);
+        };
+        window.addEventListener("pointermove", move, true);
+        window.addEventListener("pointerup", up, true);
+        window.addEventListener("pointercancel", cancel, true);
+        window.addEventListener("touchmove", touch, { capture: true, passive: false });
+        window.addEventListener("keydown", key, true);
+        d.off = () => {
+            window.clearTimeout(d.timer);
+            window.removeEventListener("pointermove", move, true);
+            window.removeEventListener("pointerup", up, true);
+            window.removeEventListener("pointercancel", cancel, true);
+            window.removeEventListener("touchmove", touch, { capture: true });
+            window.removeEventListener("keydown", key, true);
+        };
+    }
+
+    liftPart(d) {
+        if (this.partDrag !== d || d.live) return;
+        d.live = true;
+        const r = d.part.getBoundingClientRect();
+        const ghost = d.ghost = d.part.cloneNode(true);
+        ghost.addClass("goguryeo-stab-ghost");
+        ghost.style.minWidth = r.width + "px";
+        ghost.style.height = r.height + "px";
+        document.body.appendChild(ghost);
+        d.gx = d.x - r.left;
+        d.gy = d.y - r.top;
+        this.placePartGhost(d);
+        window.requestAnimationFrame(() => ghost.addClass("is-lifted"));
+        d.part.addClass("is-placeholder");
+        document.body.addClass("goguryeo-pane-dragging");
+        this.haptic();
+    }
+
+    placePartGhost(d) {
+        d.ghost.style.left = (d.x - d.gx) + "px";
+        d.ghost.style.top = (d.y - d.gy) + "px";
+    }
+
+    onPartMove(e) {
+        const d = this.partDrag;
+        if (!d || e.pointerId !== d.id) return;
+        if (!d.live) {
+            if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+            if (d.touch) return this.endPartDrag(null, true); // moved before the hold: a scroll
+            this.liftPart(d);
+        }
+        e.preventDefault();
+        d.x = e.clientX;
+        d.y = e.clientY;
+        this.placePartGhost(d);
+        // Back over the joined tab: it stays in the split
+        const index = this.barDropAt(d.x, d.y, this.splitTab);
+        if (index === d.target) return;
+        d.target = index;
+        if (index == null) this.hideBarSlot();
+        else {
+            this.showBarSlot(index);
+            this.haptic();
+        }
+    }
+
+    endPartDrag(e, cancelled) {
+        const d = this.partDrag;
+        if (!d || (e && e.pointerId !== d.id)) return;
+        this.partDrag = null;
+        d.off();
+        d.ghost?.remove();
+        d.part.removeClass("is-placeholder");
+        document.body.removeClass("goguryeo-pane-dragging");
+        if (d.live) {
+            // the click that ends a drag isn't a tap on the page
+            this.swallowPartClick = true;
+            window.setTimeout(() => { this.swallowPartClick = false; }, 400);
+        }
+        const drop = !cancelled && d.live && d.target != null;
+        this.hideBarSlot(drop);
+        if (!drop) return;
+        try {
+            this.unsplitPage(d.leaf, d.target);
+            this.haptic();
+        } catch (err) {
+            console.error("Goguryeo: couldn't take the page out of the split", err);
         }
     }
 
@@ -2430,6 +2668,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         for (const el of [...bar.children]) {
             if (el.hasClass("goguryeo-stab") && !keep.has(el)) el.remove();
         }
+        this.placeBarSlot();
         this.placeThumb(bar, bar, SHARED_ACTIVE, SHARED_INNER);
     }
 
@@ -2503,8 +2742,14 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.haptic();
             leaf.detach();
         });
+        tab.gLeaf = leaf;
+        if (part) tab.addEventListener("pointerdown", (e) => this.onPartDown(e, tab, leaf));
         tab.addEventListener("click", (e) => {
             e.stopPropagation(); // a part's click is not the joined tab's
+            if (part && this.swallowPartClick) {
+                this.swallowPartClick = false;
+                return;
+            }
             this.haptic();
             workspace.setActiveLeaf(leaf, { focus: true });
         });
@@ -2534,6 +2779,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     clearSplit() {
         const body = document.body;
         if (this.paneDrag) this.endPaneDrag(null, true);
+        if (this.partDrag) this.endPartDrag(null, true);
         this.renderGrips([]);
         body.removeClass(SPLIT_CLASS, ONE_PANE_CLASS);
         this.removeSharedTabs();
