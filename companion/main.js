@@ -245,6 +245,15 @@ class GoguryeoSettingTab extends PluginSettingTab {
                     plugin.refreshFolderNotes();
                     this.display();
                 }));
+        new Setting(this.containerEl)
+            .setName("Underline folders that have a note")
+            .setDesc("A faint line under the folder's name in the file list.")
+            .addToggle((t) => t.setValue(!!plugin.folderNoteSettings.underline).setDisabled(other)
+                .onChange(async (v) => {
+                    plugin.folderNoteSettings.underline = v;
+                    await plugin.saveData(plugin.folderNoteSettings);
+                    plugin.refreshFolderNotes();
+                }));
         // What it sees, to tell "not loaded" from "not found" from "not
         // matched in the file list". Counts only, no names.
         const st = plugin.folderNoteStatus();
@@ -1402,7 +1411,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
             notes.map((p) => `${list} .tree-item.nav-file:has(> .nav-file-title${q(p)})`).join(",\n") + " { display: none; }",
             // the folder's name: a link to its note
             notes.map((p) => `${list} .nav-folder-title${q(p.slice(0, p.lastIndexOf("/")))} .nav-folder-title-content`).join(",\n")
-                + " { text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; cursor: pointer; }",
+                + (this.folderNoteSettings.underline
+                    ? " { text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; cursor: pointer; }"
+                    : " { cursor: pointer; }"),
             // and the current row while its note is open
             notes.map((p) => `${list} .nav-folder:has(> .nav-folder-children .nav-file-title.is-active${q(p)}) > .nav-folder-title`).join(",\n")
                 + " { background-color: var(--nav-item-background-active); color: var(--nav-item-color-active); font-weight: var(--nav-item-weight-active); }",
@@ -1455,11 +1466,15 @@ module.exports = class GoguryeoCompanion extends Plugin {
         // listener on the document still ticks
         e.preventDefault();
         e.stopPropagation();
-        this.openFolderNote(note, e);
-        // Opens the folder too, never folds it
+        // The first touch opens the note and unfolds the folder; touching it
+        // again while its note is open folds and unfolds it, like a plain folder
+        const shown = this.app.workspace.getActiveFile() === note;
+        if (!shown || Keymap.isModEvent(e)) this.openFolderNote(note, e);
+        const collapsed = !!title.parentElement?.hasClass("is-collapsed");
+        if (!shown && !collapsed) return;
         const item = this.app.workspace.getLeavesOfType("file-explorer")[0]?.view?.fileItems?.[title.dataset.path];
-        if (item?.collapsed && typeof item.setCollapsed === "function") item.setCollapsed(false, true);
-        else if (title.parentElement?.hasClass("is-collapsed")) title.querySelector(".collapse-icon")?.click();
+        if (typeof item?.setCollapsed === "function") item.setCollapsed(!collapsed, true);
+        else title.querySelector(".collapse-icon")?.click(); // left to Obsidian (onFolderClick skips the arrow)
     }
 
     openFolderNote(note, e = null) {
