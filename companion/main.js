@@ -2645,7 +2645,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
         let bar = this.sharedBar;
         const first = !bar?.isConnected; // a new bar: its tabs don't pop in
         if (first) {
-            bar = this.sharedBar = document.body.createDiv("goguryeo-shared-tabs-bar");
+            // Inside the app's box, not on body: the background option
+            // isolates .app-container, and a bar on body would then paint
+            // over everything in it, a sidebar floating over the note too
+            const host = document.body.querySelector(":scope > .app-container") ?? document.body;
+            bar = this.sharedBar = host.createDiv("goguryeo-shared-tabs-bar");
             this.sharedTabs = new WeakMap(); // leaf → its tab (or its part of the joined tab)
             this.splitTab = null;
         }
