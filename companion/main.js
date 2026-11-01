@@ -268,6 +268,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.registerEvent(this.app.workspace.on("css-change", () => this.updateBackground()));
         this.setupBackgroundPickers();
 
+        this.app.workspace.onLayoutReady(() => this.setupPopouts());
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.patchSelectTab());
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
@@ -289,6 +290,50 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.registerDomEvent(document, "touchend", () => this.onTouchEnd(), opts);
         this.registerDomEvent(document, "touchcancel", () => this.onTouchEnd(), opts);
         this.registerDomEvent(document, "click", (e) => this.onClick(e), { capture: true });
+    }
+
+    // ---- New windows (popouts) ----
+
+    // Obsidian copies the main window's body classes and --variables onto
+    // every popout window, again on each change. Those that describe the
+    // main window's layout (its split, folded panes, floating sidebars,
+    // hidden top rows, drags) made a popout lay itself out as the main
+    // window's split: no top rows, one empty card. Each popout's body is
+    // watched and loses them right after each copy, so it gets the plain
+    // layout (path row, tab row, one card); the theme options stay.
+    setupPopouts() {
+        const classes = [
+            SPLIT_CLASS, ONE_PANE_CLASS, SHARED_TABS_CLASS, SOLO_CLASS, PANE_PREVIEW_CLASS,
+            FLOAT_LEFT_CLASS, FLOAT_RIGHT_CLASS, PEEK_CLASS.left, PEEK_CLASS.right,
+            TOP_HIDDEN_CLASS, TOP_PEEK_CLASS, OPEN_CLASS, OVERVIEW_CLASS + "-open",
+            "goguryeo-pane-dragging", "goguryeo-phone-menu-open",
+        ];
+        const vars = ["--g-root-top", "--g-root-left", "--g-root-right"];
+        const strip = (body) => {
+            for (const c of classes) if (body.classList.contains(c)) body.classList.remove(c);
+            for (const v of vars) if (body.style.getPropertyValue(v)) body.style.removeProperty(v);
+        };
+        const watched = new Map(); // popout body → its observer
+        const watch = (doc) => {
+            const body = doc?.body;
+            if (!body || body === document.body || watched.has(body)) return;
+            strip(body);
+            const observer = new doc.defaultView.MutationObserver(() => strip(body));
+            observer.observe(body, { attributes: true, attributeFilter: ["class", "style"] });
+            watched.set(body, observer);
+            // its tab rows get the glass pill too (updateThumbs)
+            this.registerDomEvent(doc.defaultView, "resize", () => this.scheduleThumbs());
+            this.scheduleThumbs();
+        };
+        const { workspace } = this.app;
+        workspace.floatingSplit?.children?.forEach((w) => watch(w.doc ?? w.containerEl?.doc));
+        this.registerEvent(workspace.on("window-open", (w) => watch(w.doc ?? w.win?.document)));
+        this.registerEvent(workspace.on("window-close", (w) => {
+            const body = (w.doc ?? w.win?.document)?.body;
+            watched.get(body)?.disconnect();
+            watched.delete(body);
+        }));
+        this.register(() => watched.forEach((o) => o.disconnect()));
     }
 
     onunload() {
@@ -3187,7 +3232,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         document.body.addClass(THUMB_CLASS);
         this.updateSplit();
-        for (const bar of document.querySelectorAll(".workspace-tab-header-container")) {
+        // every window's tab rows: the main one and each popout
+        const docs = [document, ...(this.app.workspace.floatingSplit?.children ?? []).map((w) => w.doc).filter(Boolean)];
+        for (const bar of docs.flatMap((doc) => [...doc.querySelectorAll(".workspace-tab-header-container")])) {
             const strip = bar.querySelector(":scope > .workspace-tab-header-container-inner");
             if (!strip) continue;
             if (!this.observed.has(strip)) {
