@@ -54,6 +54,7 @@ const WEB_ZOOM_MAX = 5; // a trackpad pinch magnifies a web viewer page up to 5x
 const WEB_ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]; // Ctrl + wheel, Chrome's levels
 const WEB_SHOT_WIDTH = 1280; // px: web page pictures (swipe back, tab overview) are made no wider
 const SWIPE_STYLE_KEY = "goguryeo-swipe-style"; // "smooth" or "chrome": the trackpad swipe's look (this device)
+const WHEEL_GLIDE_STEPS = 4; // shrinking wheel steps in a row that mean the fingers have let go (the trackpad's glide)
 const ARROW_PULL = 400; // px of sideways wheel the Chrome-style arrow follows; past EDGE_SWIPE_AT of it, letting go goes
 const WEB_LOAD_MAX_MS = 4000; // most to keep a web page's picture over it while the page loads again
 const WEB_SETTLE_MS = 250; // after it has loaded, for its late parts to fall into place
@@ -2421,7 +2422,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const state = original.apply(this, args);
             if (Platform.isDesktopApp && plugin.swipeStyle === "chrome") return state; // no copies wanted
             try {
-                const snapshot = plugin.snapshotPage(this);
+                // a swipe away from this page already copied it
+                const reuse = plugin.leavingSnapshot?.leaf === this ? plugin.leavingSnapshot.snapshot : null;
+                if (reuse) plugin.leavingSnapshot = null;
+                const snapshot = reuse ?? plugin.snapshotPage(this);
                 if (snapshot && state && typeof state === "object") plugin.snapshots.set(state, snapshot);
             } catch (e) {
                 console.error("Goguryeo: page snapshot failed", e);
@@ -2516,6 +2520,25 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (s.locked) {
             e.preventDefault?.();
             this.queuePageSwipe(s, Math.min(s.width, s.sum));
+        }
+        // Past the go point, the fingers letting go: a trackpad keeps
+        // sending its glide, each step no bigger than the last, together
+        // down by a sixth or more. Go now, as a button would, not once the
+        // glide has died away (half a second and more); the rest of the
+        // glide is swallowed (swipeQuietUntil).
+        const step = Math.abs(dx);
+        if (dx * s.dir > 0 && step <= (s.lastStep ?? 0)) {
+            s.glide ??= { from: s.lastStep, n: 0 };
+            s.glide.n++;
+        } else {
+            s.glide = null;
+        }
+        s.lastStep = step;
+        if (s.locked && s.glide && s.glide.n >= WHEEL_GLIDE_STEPS && step <= s.glide.from * 0.85
+            && s.pulled >= s.width * EDGE_SWIPE_AT) {
+            window.clearTimeout(s.idle);
+            this.endWheelSwipe(s);
+            return;
         }
         window.clearTimeout(s.idle);
         s.idle = window.setTimeout(() => this.endWheelSwipe(s), 120);
@@ -2700,6 +2723,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const web = leaf.view?.getViewType?.() === "webviewer" && this.webShots?.get(entry?.state?.state?.url);
         const target = web ? null : this.snapshots.get(entry);
         const currentPage = this.makeSwipePage(current, null, true);
+        s.current = current; // kept for coming back, if the swipe goes
         const targetPage = this.makeSwipePage(target, entry);
         const stage = createDiv("goguryeo-swipe-stage");
         stage.setAttr("inert", "");
@@ -2799,17 +2823,32 @@ module.exports = class GoguryeoCompanion extends Plugin {
         s.raf = 0;
         s.stage.addClass("is-settling");
         this.setPageSwipe(s, go ? s.width : 0);
+        // Going: the page changes at once, as with Obsidian's own back
+        // button, and the slide plays out over it, so the new page is ready
+        // underneath when it ends. Only within the same view (note to note,
+        // web page to web page): another kind of page replaces the view, and
+        // the stage with it, so that one changes after the slide, as before.
+        const sleep = (ms) => new Promise((r) => window.setTimeout(r, ms));
+        let drawn = null; // the new page in, plus a moment to draw it
+        let loaded = null;
+        const navigate = () => {
+            const webview = s.leaf.view?.getViewType?.() === "webviewer" ? s.leaf.view.webview : null;
+            loaded = webview ? this.webPageLoaded(webview) : null;
+            // The page being left was just copied for the stage: that copy
+            // is the one kept for coming back (getHistoryState), not a new one
+            if (s.current) this.leavingSnapshot = { leaf: s.leaf, snapshot: s.current };
+            drawn = Promise.resolve(s.leaf.history.go(s.dir))
+                .catch((e) => console.error("Goguryeo: swipe navigation failed", e))
+                .finally(() => { this.leavingSnapshot = null; })
+                .then(() => sleep(80));
+        };
+        if (go && s.entry?.state?.type && s.entry.state.type === s.leaf.view?.getViewType?.()) navigate();
         window.setTimeout(async () => {
             if (go) {
+                if (!drawn) navigate();
                 // Let the new page draw before the copy lifts off it, but
                 // don't hold the screen if Obsidian takes its time
-                const sleep = (ms) => new Promise((r) => window.setTimeout(r, ms));
-                const nav = Promise.resolve(s.leaf.history.go(s.dir)).catch((e) => {
-                    console.error("Goguryeo: swipe navigation failed", e);
-                });
-                const webview = s.leaf.view?.getViewType?.() === "webviewer" ? s.leaf.view.webview : null;
-                const loaded = webview ? this.webPageLoaded(webview) : null;
-                await Promise.race([nav.then(() => sleep(80)), sleep(SWIPE_DRAW_MS)]);
+                await Promise.race([drawn, sleep(SWIPE_DRAW_MS)]);
                 // A web page loads anew when gone back to (the web viewer
                 // doesn't keep it as a browser does) and shuffles about
                 // while it does: its picture stays over it until it's done
