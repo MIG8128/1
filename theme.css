@@ -1628,6 +1628,19 @@ body.goguryeo-split .mod-root .workspace-tabs.goguryeo-pane-lifted .workspace-le
     opacity: 0.3;
 }
 
+/* A closed tab in Obsidian's own tab row: a copy shrinks away in its place
+   (companion: onTabMutations) */
+.workspace-tab-header.goguryeo-tab-leaving {
+    flex: none !important;
+    max-width: none !important;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.workspace-tab-header.goguryeo-tab-leaving .workspace-tab-header-inner::after {
+    opacity: 0 !important;
+}
+
 /* The cards' own tab rows go; the note starts near the card's top */
 body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     --g-bar-offset: 4px;

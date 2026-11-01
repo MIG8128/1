@@ -2638,11 +2638,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const { workspace } = this.app;
         document.body.addClass(SHARED_TABS_CLASS);
         let bar = this.sharedBar;
-        if (!bar?.isConnected) {
+        const first = !bar?.isConnected; // a new bar: its tabs don't pop in
+        if (first) {
             bar = this.sharedBar = document.body.createDiv("goguryeo-shared-tabs-bar");
             this.sharedTabs = new WeakMap(); // leaf → its tab (or its part of the joined tab)
             this.splitTab = null;
         }
+        this.sharedSeen ??= new WeakSet(); // leaves that had a tab in the bar
+        this.sharedFirst = first;
+        // Where each tab stood, so a closing one shrinks away in its place
+        // (the tabs that stay are appended anew below)
+        const prevOf = new Map();
+        for (const el of bar.children) prevOf.set(el, el.previousElementSibling);
         const focused = workspace.getMostRecentLeaf(workspace.rootSplit);
         const pages = this.splitPages ?? new Map();
         const isPage = new Set(pages.values());
@@ -2657,7 +2664,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
                     continue;
                 }
                 let tab = this.sharedTabs.get(leaf);
-                if (!tab || tab.hasClass("goguryeo-stab-part")) tab = this.makeSharedTab(leaf);
+                if (!tab || tab.hasClass("goguryeo-stab-part")) {
+                    tab = this.makeSharedTab(leaf);
+                    if (!first && (!this.sharedSeen.has(leaf) || leaf === this.dropInTab)) this.popTab(tab);
+                }
+                this.sharedSeen.add(leaf);
                 keep.add(tab);
                 bar.appendChild(tab);
                 tab.toggleClass("is-active", leaf === solo);
@@ -2666,8 +2677,15 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
         }
         for (const el of [...bar.children]) {
-            if (el.hasClass("goguryeo-stab") && !keep.has(el)) el.remove();
+            if (!el.hasClass("goguryeo-stab") || keep.has(el)) continue;
+            if (!el.hasClass("is-leaving")) {
+                el.gPrev = prevOf.get(el);
+                this.leaveTab(el);
+            }
+            const prev = el.gPrev;
+            if (prev?.parentElement === bar && prev.nextSibling !== el) prev.after(el);
         }
+        this.dropInTab = null;
         this.placeBarSlot();
         this.placeThumb(bar, bar, SHARED_ACTIVE, SHARED_INNER);
     }
@@ -2689,22 +2707,156 @@ module.exports = class GoguryeoCompanion extends Plugin {
             });
         }
         const inner = tab.querySelector(".goguryeo-stab-inner");
+        const prevParts = new Map();
+        for (const el of inner.children) prevParts.set(el, el.previousElementSibling);
         tab.toggleClass("is-active", !solo);
         const parts = new Set();
         for (const pane of groups) {
             const leaf = pages.get(pane);
             if (!leaf) continue;
             let part = this.sharedTabs.get(leaf);
-            if (!part || !part.hasClass("goguryeo-stab-part")) part = this.makeSharedTab(leaf, true);
+            if (!part || !part.hasClass("goguryeo-stab-part")) {
+                part = this.makeSharedTab(leaf, true);
+                if (!this.sharedFirst && !this.sharedSeen.has(leaf)) this.popPart(part);
+            }
+            this.sharedSeen.add(leaf);
             parts.add(part);
             inner.appendChild(part);
             part.toggleClass("is-focused", !solo && leaf === focused);
             this.fillTab(part, leaf);
         }
         for (const el of [...inner.children]) {
-            if (!parts.has(el)) el.remove();
+            if (parts.has(el)) continue;
+            if (!el.hasClass("is-leaving")) {
+                el.gPrev = prevParts.get(el);
+                this.leavePart(el);
+            }
+            const prev = el.gPrev;
+            if (prev?.parentElement === inner && prev.nextSibling !== el) prev.after(el);
         }
         return tab;
+    }
+
+    // ---- Tabs coming and going (exaggerated on purpose: the user's ask) ----
+
+    reducedMotion() {
+        return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+
+    // A new tab in the shared bar: it springs up from nothing, overshoots
+    // and settles, pushing the others aside
+    popTab(tab) {
+        if (this.reducedMotion()) return;
+        tab.style.minWidth = "0px";
+        tab.animate([
+            { flexGrow: 0, opacity: 0, scale: "0.3", translate: "0 -10px" },
+            { flexGrow: 1.2, opacity: 1, scale: "1.14", translate: "0 0", offset: 0.6 },
+            { flexGrow: 1, opacity: 1, scale: "1", translate: "0 0" },
+        ], { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" })
+            .finished.catch(() => {}).finally(() => tab.style.removeProperty("min-width"));
+        this.followBar(600);
+    }
+
+    // A closed tab: it swells for a beat, then shrinks to nothing in its place
+    leaveTab(tab) {
+        tab.addClass("is-leaving");
+        tab.removeClass("is-active", "is-focused");
+        if (this.reducedMotion()) return tab.remove();
+        tab.style.minWidth = "0px";
+        tab.style.pointerEvents = "none";
+        tab.animate([
+            { flexGrow: 1, opacity: 1, scale: "1" },
+            { flexGrow: 1, opacity: 1, scale: "1.1", offset: 0.22 },
+            { flexGrow: 0, opacity: 0, scale: "0.3" },
+        ], { duration: 360, easing: "ease-in", fill: "forwards" })
+            .finished.catch(() => {}).finally(() => tab.remove());
+        this.followBar(400);
+    }
+
+    // The same for a page's name inside the joined split tab
+    popPart(part) {
+        if (this.reducedMotion()) return;
+        part.animate([
+            { opacity: 0, scale: "0.3" },
+            { opacity: 1, scale: "1.18", offset: 0.6 },
+            { opacity: 1, scale: "1" },
+        ], { duration: 520, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" });
+        this.followBar(560);
+    }
+
+    leavePart(part) {
+        part.addClass("is-leaving");
+        if (this.reducedMotion()) return part.remove();
+        const w = part.offsetWidth;
+        part.style.overflow = "hidden";
+        part.style.pointerEvents = "none";
+        part.animate([
+            { maxWidth: w + "px", opacity: 1, scale: "1", paddingLeft: "9px", paddingRight: "9px" },
+            { maxWidth: w + "px", opacity: 1, scale: "1.12", paddingLeft: "9px", paddingRight: "9px", offset: 0.22 },
+            { maxWidth: "0px", opacity: 0, scale: "0.3", paddingLeft: "0px", paddingRight: "0px" },
+        ], { duration: 340, easing: "ease-in", fill: "forwards" })
+            .finished.catch(() => {}).finally(() => part.remove());
+        this.followBar(380);
+    }
+
+    // Obsidian's own tab rows (one pane, or each card): Obsidian grows a new
+    // tab's width; the plugin adds the springy pop on its contents. A closed
+    // tab Obsidian simply drops, so a copy of it takes its place and shrinks
+    // away. A tab only moved (re-appended, or dragged to another pane) does
+    // neither.
+    watchTabAnimations(strip) {
+        if (!strip.closest(".mod-root")) return;
+        this.tabSeen ??= new WeakSet();
+        for (const el of strip.children) this.tabSeen.add(el);
+        if (!this.tabAnimObserver) {
+            this.tabAnimObserver = new MutationObserver((list) => this.onTabMutations(list));
+            this.register(() => {
+                this.tabAnimObserver.disconnect();
+                document.querySelectorAll(".goguryeo-tab-leaving").forEach((el) => el.remove());
+            });
+        }
+        this.tabAnimObserver.observe(strip, { childList: true });
+    }
+
+    onTabMutations(list) {
+        if (this.app.customCss?.theme !== "Goguryeo" || this.reducedMotion()) return;
+        // Headers of tabs that still exist: those were only moved or re-added
+        let live = null;
+        const isLive = (el) => {
+            if (!live) {
+                live = new Set();
+                this.app.workspace.iterateAllLeaves((leaf) => { if (leaf.tabHeaderEl) live.add(leaf.tabHeaderEl); });
+            }
+            return live.has(el);
+        };
+        const isTab = (el) => el.nodeType === 1 && el.hasClass("workspace-tab-header") && !el.hasClass("goguryeo-tab-leaving");
+        for (const m of list) {
+            for (const el of m.addedNodes) {
+                if (!isTab(el) || this.tabSeen.has(el)) continue;
+                this.tabSeen.add(el);
+                el.querySelector(".workspace-tab-header-inner")?.animate([
+                    { opacity: 0, scale: "0.3", translate: "0 -10px" },
+                    { opacity: 1, scale: "1.14", translate: "0 0", offset: 0.6 },
+                    { opacity: 1, scale: "1", translate: "0 0" },
+                ], { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" });
+            }
+            const strip = m.target;
+            for (const el of m.removedNodes) {
+                if (!isTab(el) || el.isConnected || !strip.isConnected || isLive(el)) continue;
+                const ghost = el.cloneNode(true);
+                ghost.removeClass("is-active", "mod-active", "is-focused");
+                ghost.addClass("goguryeo-tab-leaving");
+                const next = m.nextSibling?.parentNode === strip ? m.nextSibling : null;
+                strip.insertBefore(ghost, next);
+                const w = ghost.getBoundingClientRect().width;
+                ghost.animate([
+                    { width: w + "px", opacity: 1, scale: "1" },
+                    { width: w + "px", opacity: 1, scale: "1.1", offset: 0.22 },
+                    { width: "0px", opacity: 0, scale: "0.3" },
+                ], { duration: 360, easing: "ease-in", fill: "forwards" })
+                    .finished.catch(() => {}).finally(() => ghost.remove());
+            }
+        }
     }
 
     // Icon and name; the icon shows while the tab is on screen, as on
@@ -2812,6 +2964,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                     attributeFilter: ["class", "style"],
                 });
                 this.resizeObserver.observe(strip);
+                this.watchTabAnimations(strip);
                 this.registerDomEvent(strip, "scroll", () => this.scheduleThumbs(), { passive: true });
             }
             this.placeThumb(bar, strip);
