@@ -1064,6 +1064,34 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-he
     display: none;
 }
 
+/* A web page's capsule is Obsidian's address field: its input keeps the
+   stock text-field box (fill, border, focus ring), a second layer inside
+   the glass. The capsule alone is the field; the address sits centered
+   like a note's path, and goes left while it's being edited. */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .webviewer-address {
+    height: 100%;
+    margin: 0;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .webviewer-address input {
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    text-align: center;
+    text-overflow: ellipsis;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .webviewer-address input:focus {
+    text-align: start;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container.webviewer-address-container:focus-within {
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border-focus);
+}
+
 body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-actions) {
     height: var(--g-row-h);
     padding: 0 2px;
