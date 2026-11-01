@@ -84,6 +84,9 @@ const PEEK_REACH = 16; // px past the sidebar the pointer may wander without clo
 const TOP_OPTION_CLASS = "goguryeo-fullscreen-autohide"; // the theme's "Hide the top rows in full screen" option
 const TOP_HIDDEN_CLASS = "goguryeo-top-hidden"; // body: full screen, the path and tab rows slid away
 const TOP_PEEK_CLASS = "goguryeo-top-peek"; // body: and brought back over the note by the pointer
+const READY_CLASS = "goguryeo-ready"; // body: the UI has been laid out once; the theme fades it in (kept for good)
+const BG_SHOWN_CLASS = "goguryeo-bg-shown"; // body: the background picture has loaded and the UI is in; the theme fades it in
+const REVEAL_MS = 320; // the theme's fade-in of the UI, which the picture waits for
 const FOLDER_NOTES_CLASS = "goguryeo-folder-notes"; // body: the built-in folder notes are on
 const FOLDER_NOTES_PLUGIN = "folder-notes"; // the community Folder notes plugin: while it's on, ours stays off
 const PEEK_TOP = 40; // px at the top where the window edges belong to the title bar
@@ -350,6 +353,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (Platform.isMobile) this.setupHaptics();
         if (!Platform.isPhone) this.setupTabOverview(); // after the haptics, so ⧉ ticks once
         this.setupFolderNotes(); // after the haptics: a folder click in the file list ticks there
+        // last: after every other layout-ready step has laid the UI out
+        this.app.workspace.onLayoutReady(() => this.revealUI());
 
         if (!Platform.isDesktopApp) return;
 
@@ -594,10 +599,42 @@ module.exports = class GoguryeoCompanion extends Plugin {
         document.body.removeClass(FOLDER_NOTES_CLASS);
         this.folderNoteStyle?.remove();
         document.body.style.removeProperty("--g-bg-url");
+        document.body.removeClass(BG_SHOWN_CLASS); // READY_CLASS stays: removing it would hide the UI again
         const ribbon = this.getRibbon();
         if (ribbon) this.clearInline(ribbon);
     }
 
+    // ---- Startup: the UI comes in once, laid out, then the picture ----
+
+    // Obsidian draws the workspace before the plugins have finished: first
+    // the plain dark look, then Style Settings' options (the background),
+    // then the companion's layout (the floating card, the sidebar buttons),
+    // each a jump. The theme keeps the panes hidden until this runs, after
+    // every other layout-ready step and the frame that lays the cards out;
+    // they fade in, then the background picture fades in under the glass
+    // (only after: while the panes fade, their glass can't blur what's
+    // behind them, and would sharpen at the end).
+    revealUI() {
+        const body = document.body;
+        if (body.hasClass(READY_CLASS)) { // the plugin reloaded
+            this.uiShown = true;
+            this.showBackground();
+            return;
+        }
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+            body.addClass(READY_CLASS);
+            this.uiShownTimer = window.setTimeout(() => {
+                this.uiShown = true;
+                this.showBackground();
+            }, this.reducedMotion() ? 0 : REVEAL_MS);
+        }));
+        this.register(() => window.clearTimeout(this.uiShownTimer));
+    }
+
+    // The picture behind everything. Loaded and decoded before it's used,
+    // so it never shows half-drawn: at startup it then fades in (the theme,
+    // once BG_SHOWN_CLASS is on), and a new picture replaces the old one
+    // only once it's ready.
     updateBackground() {
         const body = document.body;
         const raw = getComputedStyle(body).getPropertyValue("--g-bg-image").trim()
@@ -612,8 +649,29 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 ?? this.app.vault.getFileByPath(normalizePath(raw));
             if (file) url = this.app.vault.getResourcePath(file);
         }
-        if (url) body.style.setProperty("--g-bg-url", `url("${url.replace(/"/g, "%22")}")`);
-        else body.style.removeProperty("--g-bg-url");
+        const value = url ? `url("${url.replace(/"/g, "%22")}")` : "";
+        if (value === this.bgValue) {
+            this.showBackground();
+            return;
+        }
+        this.bgValue = value;
+        if (!value) {
+            body.style.removeProperty("--g-bg-url");
+            return;
+        }
+        const done = () => {
+            if (this.bgValue !== value) return; // a newer one came meanwhile
+            body.style.setProperty("--g-bg-url", value);
+            this.bgReady = true;
+            this.showBackground();
+        };
+        const img = new Image();
+        img.src = url;
+        img.decode().then(done, done); // a broken link still gets its dim veil
+    }
+
+    showBackground() {
+        if (this.uiShown && this.bgReady) document.body.addClass(BG_SHOWN_CLASS);
     }
 
     // ---- Background image pickers ----

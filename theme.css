@@ -3571,6 +3571,12 @@ body.goguryeo-bg-image .app-container::before {
     pointer-events: none;
 }
 
+/* ...shown once the companion has loaded it (it then fades in, section 13);
+   until then the plain dark (or light) base, which the glass matches */
+body.goguryeo-bg-image:not(.goguryeo-bg-shown) .app-container::before {
+    opacity: 0;
+}
+
 /* Mobile keyboard: Obsidian shortens the app to end above it, but the
    keyboard's rounded corners show what's below. The picture (with its dim
    and blur) already spans the screen, as the app box is not positioned;
@@ -3709,8 +3715,49 @@ body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-
    13. Motion
    ------------------------------------------------------------------------- */
 
+/* Startup. Obsidian draws the workspace before the plugins are done, so it
+   used to rebuild before your eyes: the plain dark look, then the
+   background, then the floating card. The panes now stay hidden until the
+   companion has laid them out (body.goguryeo-ready), fade in once, and
+   then the background picture fades in under the glass (goguryeo-bg-shown,
+   once it has loaded; section 12 keeps it hidden until then). Without the
+   companion they show anyway after 1.6s. Fill "backwards" only: once done,
+   the animations leave the elements' own opacity alone. */
+@keyframes goguryeo-startup-hold {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes goguryeo-startup-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+body:not(.goguryeo-ready) :is(.workspace, .status-bar, .mobile-navbar) {
+    animation: goguryeo-startup-hold 0.3s ease-out 1.6s backwards;
+}
+
+body.goguryeo-ready :is(.workspace, .status-bar, .mobile-navbar) {
+    animation: goguryeo-startup-in 0.32s ease-out backwards;
+}
+
+@keyframes goguryeo-bg-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+body.goguryeo-bg-image.goguryeo-bg-shown .app-container::before {
+    animation: goguryeo-bg-in 0.6s ease-out backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
     body:not(.is-mobile) .workspace-ribbon.mod-primary {
         transition: none;
+    }
+
+    /* still in one piece, but at once */
+    body.goguryeo-ready :is(.workspace, .status-bar, .mobile-navbar),
+    body.goguryeo-bg-image.goguryeo-bg-shown .app-container::before {
+        animation-duration: 1ms;
     }
 }
