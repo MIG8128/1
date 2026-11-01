@@ -334,6 +334,7 @@ class GoguryeoSettingTab extends PluginSettingTab {
 
 module.exports = class GoguryeoCompanion extends Plugin {
     onload() {
+        this.setupLayoutHub(); // first: the parts below subscribe to it
         // Obsidian puts the left sidebar button inside the ribbon whenever the
         // ribbon "is shown" (has an offsetParent). The theme's floating ribbon
         // still has one, because Obsidian gives <body> `contain: strict`, so
@@ -344,11 +345,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.patchUpdateFrameless();
             this.refreshFrame();
         });
-        this.registerEvent(this.app.workspace.on("css-change", () => this.refreshFrame()));
+        this.onLayout(["css-change"], () => this.refreshFrame());
 
         this.setupBakedGlass();
         this.app.workspace.onLayoutReady(() => this.updateBackground());
-        this.registerEvent(this.app.workspace.on("css-change", () => this.updateBackground()));
+        this.onLayout(["css-change"], () => this.updateBackground());
         this.setupBackgroundPickers();
 
         this.app.workspace.onLayoutReady(() => this.setupPopouts());
@@ -379,6 +380,57 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.registerDomEvent(document, "touchend", () => this.onTouchEnd(), opts);
         this.registerDomEvent(document, "touchcancel", () => this.onTouchEnd(), opts);
         this.registerDomEvent(document, "click", (e) => this.onClick(e), { capture: true });
+    }
+
+    // ---- One place where the layout events come in ----
+
+    // Obsidian's layout events come in bursts: one tab switch fires
+    // active-leaf-change, layout-change and file-open, a window resize both
+    // the window's and the workspace's resize. Each part that keeps
+    // something in step with the layout subscribes here (onLayout) and runs
+    // once per frame, however many of its events came, in the order the
+    // parts subscribed, and an error in one doesn't stop the others. Work
+    // that must happen at the event itself (closing a menu) keeps its own
+    // listener. Events: Obsidian's layout-change, active-leaf-change,
+    // file-open, css-change, resize; the vault's rename; the window's
+    // resize as "window-resize".
+    setupLayoutHub() {
+        this.layoutSubs = [];
+        this.layoutPending = new Set();
+        this.layoutFrame = 0;
+        const fire = (name) => this.nudgeLayout(name);
+        for (const name of ["layout-change", "active-leaf-change", "file-open", "css-change", "resize"]) {
+            this.registerEvent(this.app.workspace.on(name, () => fire(name)));
+        }
+        this.registerEvent(this.app.vault.on("rename", () => fire("rename")));
+        this.registerDomEvent(window, "resize", () => fire("window-resize"));
+        this.register(() => window.cancelAnimationFrame(this.layoutFrame));
+    }
+
+    onLayout(names, fn) {
+        this.layoutSubs.push({ names, fn });
+    }
+
+    // An event for the hub's next frame; the parts also nudge it themselves
+    // (the tab glass: "thumbs", from its observers and its own changes)
+    nudgeLayout(name) {
+        this.layoutPending.add(name);
+        if (this.layoutFrame) return;
+        this.layoutFrame = window.requestAnimationFrame(() => this.runLayoutHub());
+    }
+
+    runLayoutHub() {
+        this.layoutFrame = 0;
+        const came = this.layoutPending;
+        this.layoutPending = new Set();
+        for (const { names, fn } of this.layoutSubs) {
+            if (!names.some((n) => came.has(n))) continue;
+            try {
+                fn(came);
+            } catch (e) {
+                console.error("Goguryeo:", e);
+            }
+        }
     }
 
     // ---- Web viewer: a trackpad pinch zooms the page ----
@@ -514,8 +566,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             ready(webview);
         });
         scan();
-        this.registerEvent(this.app.workspace.on("layout-change", scan));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", scan));
+        this.onLayout(["layout-change", "active-leaf-change"], scan);
         this.register(() => {
             for (const webview of wired) {
                 webview.gGoguryeoOff?.();
@@ -973,10 +1024,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // opening one never makes the other jump.
     setupFloatingSidebars() {
         if (!Platform.isDesktopApp) return;
-        this.registerDomEvent(window, "resize", () => this.updateFloatingSidebars());
-        for (const name of ["layout-change", "resize", "css-change"]) {
-            this.registerEvent(this.app.workspace.on(name, () => this.updateFloatingSidebars()));
-        }
+        this.onLayout(["window-resize", "layout-change", "resize", "css-change"], () => this.updateFloatingSidebars());
         this.registerDomEvent(document, "pointerdown", (e) => this.onFloatingDismiss(e), { capture: true });
         this.register(() => {
             document.body.removeClass(FLOAT_LEFT_CLASS, FLOAT_RIGHT_CLASS);
@@ -1093,7 +1141,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.peekTimers = { left: null, right: null };
         this.peekFrames = { left: 0, right: 0 };
         this.updatePeekZone();
-        this.registerEvent(this.app.workspace.on("css-change", () => this.updatePeekZone()));
+        this.onLayout(["css-change"], () => this.updatePeekZone());
         this.registerDomEvent(document, "pointermove", (e) => this.onPeekMove(e), { passive: true });
         this.registerDomEvent(document.documentElement, "pointerleave", (e) => this.onPeekMove(e, true));
         this.register(() => {
@@ -1314,11 +1362,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         };
         paint();
         this.phoneMenu = null;
-        this.registerEvent(this.app.workspace.on("layout-change", paint));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
-            paint();
-            this.closePhoneMenu();
-        }));
+        this.onLayout(["layout-change", "active-leaf-change"], paint);
+        this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.closePhoneMenu()));
         this.register(() => {
             const el = iconEl();
             if (el) setIcon(el, "menu");
@@ -1533,9 +1578,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 this.followFolderRename(file, oldPath);
                 later();
             }));
-            for (const name of ["file-open", "layout-change", "active-leaf-change"]) {
-                this.registerEvent(this.app.workspace.on(name, () => this.scheduleCrumbs()));
-            }
+            this.onLayout(["file-open", "layout-change", "active-leaf-change"], () => this.markCrumbs());
             // Turning the Folder notes plugin on or off
             for (const name of ["enablePlugin", "disablePlugin"]) {
                 const plugins = this.app.plugins;
@@ -1667,11 +1710,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 + " { background-color: var(--nav-item-background-active); color: var(--nav-item-color-active); font-weight: var(--nav-item-weight-active); }",
         ].join("\n") : "";
         this.markCrumbs();
-    }
-
-    scheduleCrumbs() {
-        clearTimeout(this.crumbTimer);
-        this.crumbTimer = window.setTimeout(() => this.markCrumbs(), 0);
     }
 
     // The path above a note (its folders, one breadcrumb each, outermost
@@ -1935,10 +1973,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
             });
         };
         this.app.workspace.onLayoutReady(addIcons);
-        this.registerEvent(this.app.workspace.on("layout-change", () => {
+        this.onLayout(["layout-change"], () => {
             addIcons();
             if (this.overview) this.renderOverview();
-        }));
+        });
         this.register(() => {
             this.closeOverview(true);
             document.querySelectorAll(`.${OVERVIEW_ICON_CLASS}`).forEach((el) => el.remove());
@@ -1957,7 +1995,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             e.stopImmediatePropagation();
             this.closeOverview();
         }, { capture: true });
-        this.registerDomEvent(window, "resize", () => this.overview && this.renderOverview());
+        this.onLayout(["window-resize"], () => this.overview && this.renderOverview());
         this.registerDomEvent(window, "pointermove", (e) => this.onCardMove(e));
         this.registerDomEvent(window, "pointerup", (e) => this.onCardUp(e));
         this.registerDomEvent(window, "pointercancel", (e) => this.onCardUp(e, true));
@@ -2513,13 +2551,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 capsule.style.setProperty("--g-capsule-name-w", `${Math.ceil(ctx.measureText(title.textContent).width)}px`);
             });
         };
-        const later = () => window.setTimeout(measure, 0);
-        this.app.workspace.onLayoutReady(later);
-        this.registerEvent(this.app.workspace.on("layout-change", later));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", later));
-        this.registerEvent(this.app.workspace.on("file-open", later));
-        this.registerEvent(this.app.workspace.on("css-change", later));
-        this.registerEvent(this.app.vault.on("rename", later));
+        this.app.workspace.onLayoutReady(() => window.setTimeout(measure, 0));
+        this.onLayout(["layout-change", "active-leaf-change", "file-open", "css-change", "rename"], measure);
         this.register(() => document.querySelectorAll(".view-header-title-container")
             .forEach((el) => el.style.removeProperty("--g-capsule-name-w")));
     }
@@ -3071,23 +3104,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.register(() => {
             this.mutationObserver.disconnect();
             this.resizeObserver.disconnect();
-            window.cancelAnimationFrame(this.thumbFrame);
             this.removeThumbs();
         });
-        for (const name of ["layout-change", "active-leaf-change", "css-change"]) {
-            this.registerEvent(this.app.workspace.on(name, () => this.scheduleThumbs()));
-        }
-        this.registerDomEvent(window, "resize", () => this.scheduleThumbs());
+        this.onLayout(["layout-change", "active-leaf-change", "css-change", "window-resize", "thumbs"], () => this.updateThumbs());
         if (this.app.workspace.rootSplit) this.resizeObserver.observe(this.app.workspace.rootSplit.containerEl);
         this.scheduleThumbs();
     }
 
+    // In the hub's next frame, with whatever else the layout needs
     scheduleThumbs() {
-        if (this.thumbFrame) return;
-        this.thumbFrame = window.requestAnimationFrame(() => {
-            this.thumbFrame = 0;
-            this.updateThumbs();
-        });
+        this.nudgeLayout("thumbs");
     }
 
     removeThumbs() {
