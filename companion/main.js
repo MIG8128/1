@@ -2134,6 +2134,71 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (groups.length > 1) this.renderSharedTabs(groups, shown);
         else this.removeSharedTabs();
         this.renderGrips(groups.length > 1 ? groups : []);
+        this.flipCards(groups);
+    }
+
+    // ---- Split screen: the cards glide when the layout changes ----
+
+    // A pane closing, opening or moving, or the screen switching between a
+    // split and a lone tab: each card glides from where it stood to its
+    // new place instead of jumping (pinned with position: fixed and slid,
+    // as in the drag preview, so the pinned toolbar stays put); a card
+    // coming on screen fades in. Only when the layout itself changed (its
+    // panes, their order, what's folded), not on a resize.
+    flipCards(groups) {
+        const els = groups.map((g) => g.containerEl);
+        const shape = (node) => (node.type === "tabs"
+            ? (node.containerEl.hasClass(SOLO_OFF_CLASS) ? "o" : "s")
+            : (node.direction === "vertical" ? "v(" : "h(") + (node.children ?? []).map(shape).join(",") + ")");
+        const sig = shape(this.app.workspace.rootSplit) + "|" + els.length;
+        // mid-glide and nothing new: let it finish (the pinned boxes
+        // would read as the cards' places)
+        if (this.flipping && sig === this.cardSig) return;
+        this.endFlip();
+        const rects = new Map(els.map((el) => [el, el.getBoundingClientRect()]));
+        const old = this.cardRects;
+        const changed = old && sig !== this.cardSig;
+        this.cardRects = rects;
+        this.cardSig = sig;
+        if (!changed || this.flipSkip || this.panePreview || this.paneDrag || this.reducedMotion()
+            || !document.body.hasClass(SPLIT_CLASS)) {
+            this.flipSkip = false;
+            return;
+        }
+        const moves = [];
+        for (const el of els) {
+            const a = old.get(el);
+            const b = rects.get(el);
+            if (!b.width || !b.height) continue; // folded away
+            if (!a || !a.width || !a.height) {
+                el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+                continue;
+            }
+            const d = Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height);
+            if (d > 2) moves.push([el, a, b]);
+        }
+        if (!moves.length) return;
+        const pin = (el, r) => Object.assign(el.style, {
+            position: "fixed", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
+            margin: "0", boxSizing: "border-box",
+        });
+        for (const [el, a] of moves) pin(el, a);
+        void document.body.offsetWidth;
+        document.body.addClass(PANE_PREVIEW_CLASS);
+        for (const [el, , b] of moves) pin(el, b);
+        this.flipping = moves.map(([el]) => el);
+        this.flipTimer = window.setTimeout(() => this.endFlip(), PANE_PREVIEW_MS + 40);
+    }
+
+    endFlip() {
+        window.clearTimeout(this.flipTimer);
+        const els = this.flipping;
+        if (!els) return;
+        this.flipping = null;
+        for (const el of els) {
+            for (const key of ["position", "left", "top", "width", "height", "margin", "box-sizing"]) el.style.removeProperty(key);
+        }
+        if (!this.panePreview) document.body.removeClass(PANE_PREVIEW_CLASS);
     }
 
     // ---- Split screen: move a pane by the bar on its top (iPad Safari style) ----
@@ -2269,6 +2334,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const toBar = !cancelled && d.moving && d.target?.bar;
         this.hideBarSlot(toBar);
         const toPane = !cancelled && d.moving && d.target && !d.target.bar;
+        if (toPane) this.flipSkip = true;
         // Dropped: the real layout takes over where the preview left the
         // cards; otherwise they glide back
         this.clearPanePreview(toPane);
@@ -2796,6 +2862,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         d.ghost?.remove();
         d.drop?.remove();
         const toEdge = !cancelled && d.live && d.edge;
+        if (toEdge) this.flipSkip = true;
         this.clearPanePreview(!!toEdge);
         if (toEdge) {
             this.hideBarSlot(true);
@@ -3222,6 +3289,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         // (the tabs that stay are appended anew below)
         const prevOf = new Map();
         for (const el of bar.children) prevOf.set(el, el.previousElementSibling);
+        // where each tab stood, so a tab that changes place slides there
+        const was = new Map();
+        if (!first) for (const el of bar.children) if (el.hasClass("goguryeo-stab")) was.set(el, el.getBoundingClientRect().left);
         const focused = workspace.getMostRecentLeaf(workspace.rootSplit);
         this.splitTabs ??= new Map();
         const keep = new Set();
@@ -3259,6 +3329,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (prev?.parentElement === bar && prev.nextSibling !== el) prev.after(el);
         }
         for (const [id, tab] of [...this.splitTabs]) if (!keep.has(tab)) this.splitTabs.delete(id);
+        if (was.size && !this.reducedMotion()) {
+            let slid = false;
+            for (const el of keep) {
+                const from = was.get(el);
+                if (from == null || el.getAnimations().length) continue;
+                const dx = from - el.getBoundingClientRect().left;
+                if (Math.abs(dx) < 2) continue;
+                el.animate([{ translate: `${dx}px 0` }, { translate: "0 0" }], { duration: 340, easing: TAB_SPRING });
+                slid = true;
+            }
+            if (slid) this.followBar(380);
+        }
         this.dropInTab = null;
         this.placeBarSlot();
         this.placeThumb(bar, bar, SHARED_ACTIVE, SHARED_INNER);
@@ -3659,6 +3741,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     clearSplit() {
         this.closeGripMenu(true);
+        this.endFlip();
+        this.cardRects = null;
         const body = document.body;
         if (this.paneDrag) this.endPaneDrag(null, true);
         this.clearPanePreview(true);
