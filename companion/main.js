@@ -1294,7 +1294,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                     menu.addItem((item) => item.setTitle("Create folder note").setIcon("file-plus")
                         .setSection("action").onClick(() => this.createFolderNote(file)));
                 }
-            } else if (file instanceof TFile && file.extension === "md" && !this.isFolderNote(file)) {
+            } else if (file instanceof TFile && !this.isFolderNote(file)) {
                 menu.addItem((item) => item.setTitle("Turn into folder note").setIcon("folder-input")
                     .setSection("action").onClick(() => this.turnIntoFolderNote(file)));
             }
@@ -1313,16 +1313,33 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return normalizePath(`${folder.path}/${folder.name}.md`);
     }
 
-    // The folder note of the folder at this path, if it has one
-    folderNoteOf(path) {
-        const folder = path && this.app.vault.getFolderByPath?.(path);
-        if (!folder || folder.isRoot()) return null;
-        return this.app.vault.getFileByPath(this.folderNotePath(folder));
+    // A file's name without its extensions: Novel.md, Novel.canvas,
+    // Novel.base and Novel.excalidraw.md are all "Novel"
+    folderNoteName(file) {
+        return file.basename.replace(/\.excalidraw$/i, "");
+    }
+
+    // The note of a folder (or of the folder at this path), if it has one: a
+    // file inside it named like it, any extension (the Folder notes plugin
+    // allows md, canvas, base, excalidraw...). If several, a plain .md first,
+    // then canvas, then base, then the rest.
+    folderNoteOf(folder) {
+        if (typeof folder === "string") folder = this.app.vault.getAbstractFileByPath(folder);
+        if (!(folder instanceof TFolder) || folder.isRoot()) return null;
+        const rank = (f) => {
+            const i = ["md", "canvas", "base"].indexOf(f.extension.toLowerCase());
+            return (i < 0 ? 3 : i) + (f.basename === folder.name ? 0 : 0.5);
+        };
+        let best = null;
+        for (const f of folder.children) {
+            if (!(f instanceof TFile) || this.folderNoteName(f) !== folder.name) continue;
+            if (!best || rank(f) < rank(best)) best = f;
+        }
+        return best;
     }
 
     isFolderNote(file) {
-        return file instanceof TFile && !!file.parent && !file.parent.isRoot()
-            && file.extension === "md" && file.basename === file.parent.name;
+        return file instanceof TFile && !!file.parent && this.folderNoteOf(file.parent) === file;
     }
 
     scheduleFolderNotes() {
@@ -1338,7 +1355,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.folderNotePaths = new Set();
         if (on) {
             for (const f of this.app.vault.getAllLoadedFiles()) {
-                if (this.isFolderNote(f)) this.folderNotePaths.add(f.path);
+                const note = f instanceof TFolder && this.folderNoteOf(f);
+                if (note) this.folderNotePaths.add(note.path);
             }
         }
         const q = (p) => `[data-path="${CSS.escape(p)}"]`;
@@ -1379,7 +1397,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const match = on && crumbs.length === folders.length;
             crumbs.forEach((crumb, i) => {
                 const folder = match ? folders[i] : null;
-                const has = !!folder && this.folderNotePaths.has(this.folderNotePath(folder));
+                const has = !!folder && !!this.folderNoteOf(folder);
                 crumb.toggleClass("has-folder-note", has);
                 if (has) crumb.dataset.goguryeoFolder = folder.path;
                 else delete crumb.dataset.goguryeoFolder;
@@ -1423,7 +1441,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // Folder/Note.md → Folder/Note/Note.md, links kept (fileManager)
     async turnIntoFolderNote(file) {
         const parent = file.parent?.isRoot() ? "" : `${file.parent.path}/`;
-        const folderPath = normalizePath(`${parent}${file.basename}`);
+        const folderPath = normalizePath(`${parent}${this.folderNoteName(file)}`);
         const target = normalizePath(`${folderPath}/${file.name}`);
         if (this.app.vault.getAbstractFileByPath(target)) {
             new Notice(`"${target}" already exists.`);
@@ -1443,9 +1461,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (!this.folderNotesOn() || !(file instanceof TFolder)) return;
         const oldName = oldPath.slice(oldPath.lastIndexOf("/") + 1);
         if (oldName === file.name) return; // only moved
-        const note = this.app.vault.getFileByPath(normalizePath(`${file.path}/${oldName}.md`));
-        const target = this.folderNotePath(file);
-        if (!note || this.app.vault.getAbstractFileByPath(target)) return;
+        // the note under its old name, any extension; it keeps its extension
+        const note = file.children.find((f) => f instanceof TFile && this.folderNoteName(f) === oldName);
+        if (!note) return;
+        const target = normalizePath(`${file.path}/${note.name.replace(oldName, file.name)}`);
+        if (this.app.vault.getAbstractFileByPath(target)) return;
         // after Obsidian has finished moving the folder's files
         window.setTimeout(() => {
             if (note.parent === file && !this.app.vault.getAbstractFileByPath(target)) {
