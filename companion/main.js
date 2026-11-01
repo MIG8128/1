@@ -302,8 +302,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // Zoom on a web viewer's page, as in Chrome. A trackpad pinch magnifies
     // the spot under the fingers without reflowing the page: Chromium's own
-    // pinch-zoom, which Electron keeps off in a <webview> until its visual
-    // zoom may go past 1x (up to WEB_ZOOM_MAX). Ctrl + mouse wheel steps the
+    // pinch-zoom where it gets one (Electron keeps it off in a <webview>
+    // until its visual zoom may go past 1x, up to WEB_ZOOM_MAX), and on
+    // Windows, where the pinch arrives as small Ctrl + wheel steps, the
+    // page's listener magnifies it itself. Ctrl + mouse wheel steps the
     // page zoom through Chrome's levels (WEB_ZOOM_STEPS), text and layout
     // growing: a small listener put in each page it loads takes that wheel
     // (a notch is ~100; a pinch sends a few units at a time and is left to
@@ -311,14 +313,29 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // isn't touched.
     setupWebPinch() {
         const MARK = "\u2063goguryeo:";
-        const listen = `if (!window.__goguryeoZoom2) { window.__goguryeoZoom2 = true;
+        // In the page. A notch (~100): the plugin steps the page zoom. A
+        // pinch (a few units at a time; on Windows it comes as Ctrl + wheel,
+        // Chromium's own pinch-zoom never sees it): the page is magnified
+        // around the pointer, scaled as a whole, not laid out anew, and
+        // scrolls about inside the bigger picture; pinched back to 1x it's
+        // as it was.
+        const listen = `if (!window.__goguryeoZoom3) { window.__goguryeoZoom3 = true;
+            let mag = 1;
+            const html = document.documentElement;
             addEventListener("wheel", (e) => {
+                if (!e.ctrlKey) return;
                 // the page sees the wheel divided by its zoom: undo that
                 const raw = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1) * (window.__goguryeoZoomF || 1);
-                if (!e.ctrlKey || Math.abs(raw) < 40) return; // a pinch: Chromium's
                 e.preventDefault();
-                console.debug("${MARK}zoom:" + Math.sign(e.deltaY)); },
-                { passive: false, capture: true }); }`;
+                if (Math.abs(raw) >= 40) { console.debug("${MARK}zoom:" + Math.sign(e.deltaY)); return; }
+                const next = Math.min(${WEB_ZOOM_MAX}, Math.max(1, mag * Math.exp(-raw / 100)));
+                if (next === mag) return;
+                const px = (scrollX + e.clientX) / mag, py = (scrollY + e.clientY) / mag;
+                mag = next < 1.01 ? 1 : next;
+                html.style.transformOrigin = mag === 1 ? "" : "0 0";
+                html.style.transform = mag === 1 ? "" : "scale(" + mag + ")";
+                scrollTo(px * mag - e.clientX, py * mag - e.clientY);
+            }, { passive: false, capture: true }); }`;
         const tell = (webview) => webview.executeJavaScript(`window.__goguryeoZoomF = ${webview.getZoomFactor()}`).catch(() => {});
         const ready = (webview) => {
             try {
