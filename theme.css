@@ -1811,10 +1811,9 @@ body.goguryeo-top-hidden.goguryeo-top-peek .mod-root .workspace-tabs > .goguryeo
 }
 
 /* A lone card over a background keeps its tab row inside the card. It
-   fades out (its pinned buttons slide with row 1), and comes back where
-   the tab row sits in the usual layout, under row 1. */
-body.goguryeo-top-hidden.goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
-    --g-row2-top: calc(var(--g-row1-top) + var(--g-row-h) + 6px - var(--g-gap));
+   fades out (its pinned buttons slide with row 1) and comes back with the
+   card's usual place. */
+body.goguryeo-top-hidden:not(.goguryeo-top-peek).goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     --g-bar-offset: 4px;
 }
 
@@ -1840,12 +1839,24 @@ body.goguryeo-top-hidden:not(.goguryeo-top-peek):not(.is-mobile):not(.goguryeo-n
     opacity: 0;
 }
 
-body.goguryeo-top-hidden.goguryeo-top-peek:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top .workspace-leaf-content::after {
+body.goguryeo-top-hidden.goguryeo-top-peek:not(.goguryeo-split):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top .workspace-leaf-content::after {
     height: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-row2-h) + 16px);
 }
 
-body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top .workspace-leaf-content::after {
-    height: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-row2-h) + 16px - var(--g-gap));
+/* Split screen: the rows can't float over the cards (the cards' edges and
+   the gaps between them would cut through the rows), so the cards slide
+   down to their usual place and the rows come back above them, as in the
+   normal split layout */
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-split-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px) !important;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-shared-tabs.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-split-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-row2-h) + 8px) !important;
+}
+
+body.goguryeo-top-hidden.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top {
+    transition: margin-top 0.32s cubic-bezier(0.3, 1.15, 0.4, 1);
 }
 
 
