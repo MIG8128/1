@@ -232,17 +232,29 @@ class GoguryeoSettingTab extends PluginSettingTab {
         const plugin = this.plugin;
         new Setting(this.containerEl).setName("Folder notes").setHeading();
         const other = plugin.otherFolderNotesOn();
+        if (!plugin.folderNoteSettings) plugin.folderNoteSettings = { enabled: true };
         new Setting(this.containerEl)
             .setName("Folder notes")
             .setDesc(other
                 ? "The Folder notes plugin is on. Turn it off in Community plugins to use these instead."
-                : "A note named like its folder, inside it (Novel/Novel.md), is the folder's note. Clicking the folder opens it, the note itself is hidden from the file list, and renaming the folder renames the note. Right-click a folder to make one, or a note to turn it into one.")
+                : "A file named like its folder, inside it (Novel/Novel.md, .canvas, .base...), is the folder's note. Clicking the folder opens it, the note itself is hidden from the file list, and renaming the folder renames the note. Right-click a folder to make one, or a note to turn it into one.")
             .addToggle((t) => t.setValue(plugin.folderNoteSettings.enabled).setDisabled(other)
                 .onChange(async (v) => {
                     plugin.folderNoteSettings.enabled = v;
                     await plugin.saveData(plugin.folderNoteSettings);
                     plugin.refreshFolderNotes();
+                    this.display();
                 }));
+        // What it sees, to tell "not loaded" from "not found" from "not
+        // matched in the file list". Counts only, no names.
+        const st = plugin.folderNoteStatus();
+        new Setting(this.containerEl)
+            .setName("Status")
+            .setDesc(`Companion ${plugin.manifest.version} · ${st.on ? "on" : "off"} · ${st.found} folder notes found · file list: ${st.folders} folder rows, ${st.hidden} notes hidden, ${st.visible} still shown${st.error ? ` · error: ${st.error}` : ""}`)
+            .addExtraButton((b) => b.setIcon("refresh-cw").setTooltip("Check again").onClick(() => {
+                plugin.refreshFolderNotes();
+                this.display();
+            }));
         new Setting(this.containerEl).setName("Theme").setHeading();
     }
 
@@ -1342,6 +1354,20 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return file instanceof TFile && !!file.parent && this.folderNoteOf(file.parent) === file;
     }
 
+    folderNoteStatus() {
+        const rows = [...document.querySelectorAll(".nav-files-container .nav-file-title")]
+            .filter((r) => this.folderNotePaths?.has(r.dataset.path));
+        const hidden = rows.filter((r) => !r.offsetParent || r.getBoundingClientRect().height === 0).length;
+        return {
+            on: this.folderNotesOn(),
+            found: this.folderNotePaths?.size ?? 0,
+            folders: document.querySelectorAll(".nav-files-container .nav-folder-title").length,
+            hidden,
+            visible: rows.length - hidden,
+            error: this.folderNoteError ?? "",
+        };
+    }
+
     scheduleFolderNotes() {
         clearTimeout(this.folderNoteTimer);
         this.folderNoteTimer = window.setTimeout(() => this.refreshFolderNotes(), 50);
@@ -1350,6 +1376,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // The file list is redrawn often, so the marks are CSS rules by path,
     // not classes on its rows
     refreshFolderNotes() {
+        try {
+            this.folderNoteError = "";
+            this.drawFolderNotes();
+        } catch (err) {
+            this.folderNoteError = String(err?.message ?? err);
+            console.error("Goguryeo folder notes", err);
+        }
+    }
+
+    drawFolderNotes() {
         const on = this.folderNotesOn();
         document.body.toggleClass(FOLDER_NOTES_CLASS, on);
         this.folderNotePaths = new Set();
