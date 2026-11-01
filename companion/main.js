@@ -53,6 +53,8 @@ const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane prev
 const WEB_ZOOM_MAX = 5; // a trackpad pinch magnifies a web viewer page up to 5x, as in Chrome
 const WEB_ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]; // Ctrl + wheel, Chrome's levels
 const WEB_SHOT_WIDTH = 1280; // px: web page pictures (swipe back, tab overview) are made no wider
+const WEB_LOAD_MAX_MS = 4000; // most to keep a web page's picture over it while the page loads again
+const WEB_SETTLE_MS = 250; // after it has loaded, for its late parts to fall into place
 const WEB_SHOT_GAP_MS = 3000; // a page that keeps loading gets a new picture at most this often
 const NEW_PANE = Object.freeze({ newPane: true }); // previewPanes: a pane not made yet (a tab dropped on an edge)
 const PANE_PREVIEW_MS = 320; // that glide (the theme's transition)
@@ -2678,10 +2680,56 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 const nav = Promise.resolve(s.leaf.history.go(s.dir)).catch((e) => {
                     console.error("Goguryeo: swipe navigation failed", e);
                 });
+                const webview = s.leaf.view?.getViewType?.() === "webviewer" ? s.leaf.view.webview : null;
+                const loaded = webview ? this.webPageLoaded(webview) : null;
                 await Promise.race([nav.then(() => sleep(80)), sleep(SWIPE_DRAW_MS)]);
+                // A web page loads anew when gone back to (the web viewer
+                // doesn't keep it as a browser does) and shuffles about
+                // while it does: its picture stays over it until it's done
+                if (loaded) {
+                    await loaded;
+                    if (this.edgeSwipe === s) await this.liftPageSwipe(s);
+                }
             }
             if (this.edgeSwipe === s) this.endPageSwipe();
         }, SWIPE_SETTLE_MS);
+    }
+
+    // Resolves once a web viewer's page that's about to load has loaded and
+    // settled, or soon if it doesn't start loading, or at WEB_LOAD_MAX_MS
+    webPageLoaded(webview) {
+        return new Promise((resolve) => {
+            let timer = 0;
+            const off = () => {
+                window.clearTimeout(timer);
+                webview.removeEventListener("did-start-loading", onStart);
+                webview.removeEventListener("did-stop-loading", onStop);
+                webview.removeEventListener("did-fail-load", onStop);
+            };
+            const done = () => { off(); resolve(); };
+            const onStop = () => { off(); window.setTimeout(resolve, WEB_SETTLE_MS); };
+            const onStart = () => {
+                window.clearTimeout(timer);
+                timer = window.setTimeout(done, WEB_LOAD_MAX_MS);
+            };
+            webview.addEventListener("did-start-loading", onStart);
+            webview.addEventListener("did-stop-loading", onStop);
+            webview.addEventListener("did-fail-load", onStop);
+            // not loading anything after all (a page it kept): don't wait
+            timer = window.setTimeout(() => {
+                let loading = false;
+                try { loading = webview.isLoading(); } catch (e) { /* gone */ }
+                if (loading) onStart();
+                else done();
+            }, SWIPE_DRAW_MS + 200);
+        });
+    }
+
+    // The copy fades off the new page instead of vanishing
+    liftPageSwipe(s) {
+        s.frame.removeClass("goguryeo-swiping"); // the page shows again under it
+        s.stage.addClass("is-lifting");
+        return new Promise((r) => window.setTimeout(r, 160));
     }
 
     endPageSwipe() {

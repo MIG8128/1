@@ -2886,6 +2886,12 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
     transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1), clip-path 0.28s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
+/* A web page's picture fades off it once the page has loaded again */
+.goguryeo-swipe-stage.is-lifting {
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+}
+
 .goguryeo-swipe-stage.is-settling .goguryeo-swipe-dim {
     transition: opacity 0.28s ease-out;
 }
