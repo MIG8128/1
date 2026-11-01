@@ -2874,19 +2874,20 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
     box-shadow: -10px 0 28px rgba(0, 0, 0, 0.3);
 }
 
-.goguryeo-swipe-page.is-under::after {
-    content: "";
+.goguryeo-swipe-dim {
     position: absolute;
     inset: 0;
-    background-color: rgba(0, 0, 0, var(--g-swipe-dim, 0));
+    background-color: rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    pointer-events: none;
 }
 
 .goguryeo-swipe-stage.is-settling > .goguryeo-swipe-page {
     transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1), clip-path 0.28s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.goguryeo-swipe-stage.is-settling > .goguryeo-swipe-page.is-under::after {
-    transition: background-color 0.28s ease-out;
+.goguryeo-swipe-stage.is-settling .goguryeo-swipe-dim {
+    transition: opacity 0.28s ease-out;
 }
 
 /* A web viewer's page is a picture of it (a <webview> can't be copied) */

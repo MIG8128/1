@@ -2414,7 +2414,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         if (s.locked) {
             e.preventDefault?.();
-            this.setPageSwipe(s, Math.min(s.width, s.sum));
+            this.queuePageSwipe(s, Math.min(s.width, s.sum));
         }
         window.clearTimeout(s.idle);
         s.idle = window.setTimeout(() => this.endWheelSwipe(s), 120);
@@ -2453,8 +2453,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return { frame, scrolls: [], ready };
         }
         const scrolls = [];
+        // The text inside an editor or a reading view doesn't scroll on its
+        // own: not walked, which in a long note is most of the page
+        const deep = ".cm-content, .cm-gutters, .markdown-preview-sizer, svg";
         const walk = (el, path) => {
             if (el.scrollTop || el.scrollLeft) scrolls.push([path, el.scrollTop, el.scrollLeft]);
+            if (el.matches(deep)) return;
             const kids = el.children;
             for (let i = 0; i < kids.length; i++) walk(kids[i], path.concat(i));
         };
@@ -2466,11 +2470,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
     }
 
     // A page for the swipe stage: the snapshot, or failing that a plain page
-    // with the entry's name
-    makeSwipePage(snapshot, entry) {
+    // with the entry's name. fresh: a snapshot made for this page alone,
+    // used as it is (a long note's copy isn't copied once more)
+    makeSwipePage(snapshot, entry, fresh = false) {
         const page = createDiv("goguryeo-swipe-page");
         if (snapshot) {
-            page.appendChild(snapshot.frame.cloneNode(true));
+            page.appendChild(fresh ? snapshot.frame : snapshot.frame.cloneNode(true));
             // a web page's picture, if it wasn't there yet
             snapshot.ready?.then((src) => {
                 const img = page.querySelector(".goguryeo-swipe-shot");
@@ -2560,7 +2565,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (dt > 0) s.v = 0.8 * ((t.clientX - s.x) / dt) + 0.2 * s.v;
         s.x = t.clientX;
         s.t = e.timeStamp;
-        this.setPageSwipe(s, Math.max(0, Math.min(s.width, dx)));
+        this.queuePageSwipe(s, Math.max(0, Math.min(s.width, dx)));
         // A tick each time the swipe crosses the point where letting go goes
         const armed = s.pulled >= s.width * EDGE_SWIPE_AT;
         if (armed !== !!s.armed) this.haptic();
@@ -2591,7 +2596,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const current = this.snapshotPage(leaf);
         const web = leaf.view?.getViewType?.() === "webviewer" && this.webShots?.get(entry?.state?.state?.url);
         const target = web ? null : this.snapshots.get(entry);
-        const currentPage = this.makeSwipePage(current, null);
+        const currentPage = this.makeSwipePage(current, null, true);
         const targetPage = this.makeSwipePage(target, entry);
         const stage = createDiv("goguryeo-swipe-stage");
         stage.setAttr("inert", "");
@@ -2599,6 +2604,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         s.over = dir < 0 ? currentPage : targetPage;
         s.under.addClass("is-under");
         s.over.addClass("is-over");
+        // its own layer: a variable on the page would restyle the whole copy each frame
+        s.dim = s.under.createDiv("goguryeo-swipe-dim");
         stage.append(s.under, s.over);
         frame.appendChild(stage);
         frame.addClass("goguryeo-swiping");
@@ -2619,11 +2626,24 @@ module.exports = class GoguryeoCompanion extends Plugin {
         s.over.style.transform = `translateX(${edge}px)`;
         s.under.style.transform = `translateX(${underX}px)`;
         s.under.style.clipPath = `inset(0 ${w - edge + underX}px 0 ${-underX}px)`;
-        s.under.style.setProperty("--g-swipe-dim", String(0.18 * (1 - edge / w)));
+        if (s.dim) s.dim.style.opacity = String(1 - edge / w);
+    }
+
+    // From wheel and touch moves, which come faster than the screen draws:
+    // the newest place is drawn once a frame
+    queuePageSwipe(s, pulled) {
+        s.pulled = pulled;
+        if (s.raf) return;
+        s.raf = window.requestAnimationFrame(() => {
+            s.raf = 0;
+            if (!s.settling && s.stage) this.setPageSwipe(s, s.pulled);
+        });
     }
 
     settlePageSwipe(s, go) {
         s.settling = true;
+        if (s.raf) window.cancelAnimationFrame(s.raf);
+        s.raf = 0;
         s.stage.addClass("is-settling");
         this.setPageSwipe(s, go ? s.width : 0);
         window.setTimeout(async () => {
