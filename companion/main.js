@@ -52,6 +52,8 @@ const GRIP_MENU_CLASS = "goguryeo-grip-menu"; // a tap on the grip: own tab, swa
 const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane previews its move, the cards glide to their new boxes
 const WEB_ZOOM_MAX = 5; // a trackpad pinch magnifies a web viewer page up to 5x, as in Chrome
 const WEB_ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]; // Ctrl + wheel, Chrome's levels
+const WEB_SHOT_WIDTH = 1280; // px: web page pictures (swipe back, tab overview) are made no wider
+const WEB_SHOT_GAP_MS = 3000; // a page that keeps loading gets a new picture at most this often
 const NEW_PANE = Object.freeze({ newPane: true }); // previewPanes: a pane not made yet (a tab dropped on an edge)
 const PANE_PREVIEW_MS = 320; // that glide (the theme's transition)
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
@@ -487,6 +489,19 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
     }
 
+    // A web page's picture as a small JPEG: a full-size PNG took Obsidian's
+    // own thread long enough to stall it on every page load
+    webShotURL(image) {
+        try {
+            const { width } = image.getSize();
+            const small = width > WEB_SHOT_WIDTH ? image.resize({ width: WEB_SHOT_WIDTH, quality: "good" }) : image;
+            if (small.toJPEG) return "data:image/jpeg;base64," + small.toJPEG(80).toString("base64");
+            return small.toDataURL();
+        } catch (e) {
+            return null;
+        }
+    }
+
     // The last picture of each web page, by address (a few dozen kept)
     keepWebShot(webview) {
         let url = null;
@@ -496,10 +511,19 @@ module.exports = class GoguryeoCompanion extends Plugin {
         } catch (e) {
             return;
         }
+        // only a page on screen; a page that loads again and again (ads,
+        // live pages) at most every few seconds
+        if (!webview.isConnected || !webview.offsetWidth) return;
+        const now = Date.now();
+        if (now - (this.webShotAt?.get(url) ?? 0) < WEB_SHOT_GAP_MS) return;
+        (this.webShotAt ??= new Map()).set(url, now);
+        if (this.webShotAt.size > 80) this.webShotAt.delete(this.webShotAt.keys().next().value);
         webview.capturePage?.().then((image) => {
+            const src = this.webShotURL(image);
+            if (!src) return;
             const shots = (this.webShots ??= new Map());
             shots.delete(url);
-            shots.set(url, image.toDataURL());
+            shots.set(url, src);
             while (shots.size > 40) shots.delete(shots.keys().next().value);
         }).catch(() => {});
     }
@@ -2447,7 +2471,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             frame.appendChild(content.cloneNode(false)).createEl("img", { cls: "goguryeo-swipe-shot" });
             let ready = null;
             try {
-                ready = webview?.capturePage?.().then((image) => image.toDataURL()).catch(() => null) ?? null;
+                ready = webview?.capturePage?.().then((image) => this.webShotURL(image)).catch(() => null) ?? null;
             } catch (e) { /* not attached */ }
             ready?.then((src) => { if (src) frame.querySelector(".goguryeo-swipe-shot").src = src; });
             return { frame, scrolls: [], ready };
