@@ -3006,7 +3006,17 @@ module.exports = class GoguryeoCompanion extends Plugin {
         for (const pane of groups) {
             if (of.has(pane)) {
                 const page = pages.get(pane);
-                if (!page || page.parent !== pane) pages.set(pane, pane.children[pane.currentTab] ?? pane.children[0]);
+                if (page?.parent === pane) continue;
+                if (page) {
+                    // Its page was closed (or moved away): the pane leaves the
+                    // split, its other tabs stay normal tabs. A tab beside it
+                    // must not take the page's place in the split.
+                    of.delete(pane);
+                    pages.delete(pane);
+                    this.loosePanes.add(pane);
+                    continue;
+                }
+                pages.set(pane, pane.children[pane.currentTab] ?? pane.children[0]);
                 continue;
             }
             if (this.loosePanes.has(pane)) continue;
