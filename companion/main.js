@@ -2153,12 +2153,19 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const sig = shape(this.app.workspace.rootSplit) + "|" + els.length;
         // mid-glide and nothing new: let it finish (the pinned boxes
         // would read as the cards' places)
-        if (this.flipping && sig === this.cardSig) return;
+        if (this.flipping && sig === this.cardSig && !this.flipForce) return;
         this.endFlip();
         const rects = new Map(els.map((el) => [el, el.getBoundingClientRect()]));
+        // and by the page each card shows: after a swap or a move a page
+        // glides from the card it was in
+        const shownIn = (g) => g.children[g.currentTab];
+        const pageRects = new Map(groups.map((g) => [shownIn(g), rects.get(g.containerEl)]));
         const old = this.cardRects;
-        const changed = old && sig !== this.cardSig;
+        const oldPages = this.pageRects ?? new Map();
+        const changed = old && (sig !== this.cardSig || this.flipForce);
+        this.flipForce = false;
         this.cardRects = rects;
+        this.pageRects = pageRects;
         this.cardSig = sig;
         if (!changed || this.flipSkip || this.panePreview || this.paneDrag || this.reducedMotion()
             || !document.body.hasClass(SPLIT_CLASS)) {
@@ -2166,8 +2173,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return;
         }
         const moves = [];
-        for (const el of els) {
-            const a = old.get(el);
+        for (const g of groups) {
+            const el = g.containerEl;
+            const before = oldPages.get(shownIn(g));
+            const a = before?.width && before.height ? before : old.get(el);
             const b = rects.get(el);
             if (!b.width || !b.height) continue; // folded away
             if (!a || !a.width || !a.height) {
@@ -2997,6 +3006,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (srcShown) target.selectTab(srcShown);
         }
         if (active?.parent) workspace.setActiveLeaf(active, { focus: false });
+        if (!this.flipSkip) this.flipForce = true; // the pages glide to their new cards
         workspace.requestSaveLayout?.();
         this.scheduleThumbs();
     }
