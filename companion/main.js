@@ -1014,6 +1014,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
             : ".mod-root .view-header-title-container";
         this.registerDomEvent(document, "click", (e) => {
             if (!e.target.closest?.(path)) return;
+            // The web viewer turns the capsule into its own address field:
+            // a click there edits the web address
+            if (e.target.closest(".webviewer-address-container")) return;
             // A folder with a folder note is a link: the Folder notes plugin
             // marks it and opens the note
             if (e.target.closest(".view-header-breadcrumb.has-folder-note")) {
@@ -1097,6 +1100,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (Platform.isPhone) return null;
         const header = this.app.workspace.getMostRecentLeaf()?.view?.containerEl.querySelector(":scope > .view-header");
         const el = header?.querySelector(".view-header-title-container");
+        // A web page's capsule is its address field, not a path
+        if (el?.matches(".webviewer-address-container")) return null;
         const rect = el?.getBoundingClientRect();
         if (!rect || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0) return null;
         // A pill's 999px would make the dropped-down list an oval
