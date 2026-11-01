@@ -3634,6 +3634,57 @@ body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .works
     pointer-events: none;
 }
 
+/* The big glass over a still background doesn't blur live. A live blur
+   (backdrop-filter) is worked out again on every frame anything under or
+   over it changes (typing, scrolling, switching tabs), and over the note
+   area and the sidebars that tripled the time of each frame (measured).
+   Over a plain color there is nothing to blur: off. Over a picture, on
+   desktop, the companion blurs the picture once as the glass would
+   (goguryeo-glass-baked, --g-bg-glass: the glass's blur and saturation,
+   the background's own blur and dim), and these panels show that copy
+   fixed to the window, under their usual tint: the same look. Only while
+   they sit over nothing but the background: a sidebar floating over the
+   note, the ribbon, menus and the bars over scrolling text keep the live
+   blur, and so do iPad and iPhone (Safari ignores fixed backgrounds). */
+body.goguryeo-bg-color .workspace-split.mod-root .workspace-leaf::before {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-bg-image.goguryeo-glass-baked .workspace-split.mod-root .workspace-leaf::before {
+    background: linear-gradient(var(--g-note-bg), var(--g-note-bg)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ...the docked sidebars and the vault card under the left one */
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .mod-left-split .workspace-tabs,
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-right):not(.goguryeo-peek-right) .mod-right-split .workspace-tabs,
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .mod-left-split .workspace-tabs,
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-right):not(.goguryeo-peek-right) .mod-right-split .workspace-tabs,
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
+    background: linear-gradient(var(--glass-sidebar), var(--glass-sidebar)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ...and the frosted band behind the top rows in the card layout */
+body.goguryeo-split:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-split.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    background: linear-gradient(color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent), color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 /* Views paint their own --background-primary (Day Planner Pro, Dayloom and
    other plugin views); inside a pane it is clear, the pane already tints */
 body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .view-content {
