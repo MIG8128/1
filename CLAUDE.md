@@ -92,6 +92,15 @@ $dir = "C:\Users\MIG\Documents\Use with LLM\for coding\Goguryeo\sandbox\app-data
 Get-CimInstance Win32_Process -Filter "Name='Obsidian.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($dir) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 ```
 
+### Cloud sessions (Linux): the same test, in the container
+
+A cloud session has no Windows sandbox and no deploy (it pushes to its branch; the user deploys). Use `tools/cloud-sandbox/` instead: the Obsidian AppImage of the user's version from `obsidianmd/obsidian-releases`, run under `xvfb-run`, with its own user data and the same placeholder vault (Background: Image with a made-up `wall.png`), all in `/tmp/gsbx`, DevTools on 9231.
+- `bash tools/cloud-sandbox/setup.sh` (downloads once, builds the vault, copies the build), `… launch` (starts it and accepts the plugin trust dialog), `… copy` after an edit (then reload the plugin as usual), `… close`.
+- `node tools/cloud-sandbox/cdp.mjs`: `eval`, `evalfile`, `shot`, plus `record <js> <dir>` (screen frames while the JS runs), `startup <dir>` (frames of a reload: what the user sees at startup) and `slowmo <rate> '<js>' <prefix> <ms,…>` (all animations slowed, shots mid-way).
+- It renders without a GPU: about 12 frames a second, and each input event sent over DevTools takes ~75ms. Time logic with events dispatched from inside the page (`new WheelEvent(...)` at a real pace), look at motion with `slowmo`.
+- Obsidian's own CSS and JS are in `resources/obsidian.asar` of the extracted app (plain asar; a few lines of Python read it).
+- Linux, so no Windows-only behavior (window buttons, precision-touchpad events) and still no WebKit.
+
 ### Sandbox gotchas (verified 2026-10-24)
 
 - The settings window is its own DevTools page, and its title starts with "설정" (the sandbox UI is Korean). In it, `app` is undefined; use `window.opener.app`. Example: `node sandbox/cdp.mjs --page "설정" eval 'window.opener.app.customCss.theme'`. Open it with `app.setting.open()` and close it with `app.setting.close()`.
