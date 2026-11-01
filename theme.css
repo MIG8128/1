@@ -1487,6 +1487,91 @@ body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo
     display: none;
 }
 
+/* The bar on top of each split pane (iPad Safari style): drag it onto
+   another pane's edge to put the pane there, or its middle to swap them
+   (companion: renderGrips). Only while the split is on screen. */
+.goguryeo-pane-grip {
+    display: none;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:not(.goguryeo-solo):is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .goguryeo-pane-grip {
+    position: absolute;
+    top: -1.5px;
+    left: 50%;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 14px;
+    translate: -50% 0;
+    cursor: grab;
+    touch-action: none;
+}
+
+body.is-tablet .mod-root .workspace-tabs > .goguryeo-pane-grip {
+    width: 96px !important;
+    height: 22px !important;
+}
+
+.goguryeo-pane-grip-bar {
+    width: 36px;
+    height: 5px;
+    border-radius: 3px;
+    background-color: var(--text-faint);
+    opacity: 0.5;
+    transition: width 0.25s cubic-bezier(0.3, 1.3, 0.4, 1), opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.goguryeo-pane-grip:hover .goguryeo-pane-grip-bar {
+    width: 44px;
+    opacity: 0.9;
+}
+
+.goguryeo-current-pane > .goguryeo-pane-grip .goguryeo-pane-grip-bar {
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.75);
+}
+
+.goguryeo-pane-grip.is-held .goguryeo-pane-grip-bar {
+    width: 52px;
+    opacity: 1;
+    background-color: var(--interactive-accent);
+}
+
+body.goguryeo-pane-dragging,
+body.goguryeo-pane-dragging * {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+
+/* The pane being moved steps back */
+body.goguryeo-split .mod-root .workspace-tabs.goguryeo-pane-lifted {
+    opacity: 0.55;
+    scale: 0.985;
+    transition: opacity 0.2s ease, scale 0.25s cubic-bezier(0.3, 1.3, 0.4, 1);
+}
+
+/* Where it will go: a glass box over half the pane (an edge) or all of
+   it (the middle: swap) */
+.goguryeo-pane-drop {
+    position: fixed;
+    z-index: var(--layer-dragged-item, 80);
+    border: 1.5px solid hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7);
+    border-radius: 14px;
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-panel-shadow);
+    opacity: 0;
+    pointer-events: none;
+    transition: left 0.3s cubic-bezier(0.3, 1.15, 0.4, 1), top 0.3s cubic-bezier(0.3, 1.15, 0.4, 1),
+        width 0.3s cubic-bezier(0.3, 1.15, 0.4, 1), height 0.3s cubic-bezier(0.3, 1.15, 0.4, 1), opacity 0.15s ease;
+}
+
+.goguryeo-pane-drop.is-shown {
+    opacity: 1;
+}
+
 /* The cards' own tab rows go; the note starts near the card's top */
 body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     --g-bar-offset: 4px;

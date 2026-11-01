@@ -46,6 +46,7 @@ const SHARED_ACTIVE = ":scope > .goguryeo-stab.is-active"; // the split tab or t
 const SOLO_CLASS = "goguryeo-solo"; // body: a normal tab fills the screen, the split's panes fold away
 const SOLO_OFF_CLASS = "goguryeo-solo-off"; // a pane or split folded away for it
 const MEMBERS_KEY = "goguryeo-split-members"; // the split's page in each pane, by leaf id
+const GRIP_CLASS = "goguryeo-pane-grip"; // the bar on top of each split pane, to drag the pane elsewhere
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
 const EDGE_SWIPE_AT = 0.35; // share of the width to pull before letting go navigates
@@ -1969,6 +1970,182 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         if (groups.length > 1) this.renderSharedTabs(groups, solo);
         else this.removeSharedTabs();
+        this.renderGrips(groups.length > 1 ? groups : []);
+    }
+
+    // ---- Split screen: move a pane by the bar on its top (iPad Safari style) ----
+
+    // Each pane of the split gets a small bar at the top middle. Drag it
+    // (mouse or finger) over another pane: its left, right, top or bottom
+    // edge puts the pane on that side, its middle swaps the two. A glass
+    // box shows where it will go. Pointer events, so it works with touch
+    // on the iPad, where HTML drag and drop doesn't.
+    renderGrips(groups) {
+        this.grips ??= new WeakMap();
+        this.splitGroups = groups;
+        const els = new Set();
+        for (const pane of groups) {
+            let grip = this.grips.get(pane);
+            if (!grip) {
+                grip = createDiv({ cls: GRIP_CLASS, attr: { "aria-label": "Move this pane" } });
+                grip.createDiv("goguryeo-pane-grip-bar");
+                grip.addEventListener("pointerdown", (e) => this.onGripDown(e, pane));
+                this.grips.set(pane, grip);
+            }
+            if (grip.parentElement !== pane.containerEl) pane.containerEl.appendChild(grip);
+            els.add(grip);
+        }
+        document.querySelectorAll(`.${GRIP_CLASS}`).forEach((el) => {
+            if (!els.has(el)) el.remove();
+        });
+    }
+
+    onGripDown(e, pane) {
+        if (e.button > 0 || this.paneDrag) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const grip = e.currentTarget;
+        try { grip.setPointerCapture(e.pointerId); } catch (err) { /* moves still reach the window */ }
+        const d = this.paneDrag = { pane, grip, id: e.pointerId, x: e.clientX, y: e.clientY, moving: false, target: null };
+        grip.addClass("is-held");
+        this.haptic();
+        const move = (ev) => this.onGripMove(ev);
+        const up = (ev) => this.endPaneDrag(ev, false);
+        const cancel = (ev) => this.endPaneDrag(ev, true);
+        const key = (ev) => {
+            if (ev.key !== "Escape") return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.endPaneDrag(null, true);
+        };
+        window.addEventListener("pointermove", move, true);
+        window.addEventListener("pointerup", up, true);
+        window.addEventListener("pointercancel", cancel, true);
+        window.addEventListener("keydown", key, true);
+        d.off = () => {
+            window.removeEventListener("pointermove", move, true);
+            window.removeEventListener("pointerup", up, true);
+            window.removeEventListener("pointercancel", cancel, true);
+            window.removeEventListener("keydown", key, true);
+        };
+    }
+
+    onGripMove(ev) {
+        const d = this.paneDrag;
+        if (!d || ev.pointerId !== d.id) return;
+        ev.preventDefault();
+        if (!d.moving) {
+            if (Math.hypot(ev.clientX - d.x, ev.clientY - d.y) < 5) return;
+            d.moving = true;
+            d.pane.containerEl.addClass("goguryeo-pane-lifted");
+            document.body.addClass("goguryeo-pane-dragging");
+            d.drop = document.body.createDiv("goguryeo-pane-drop");
+        }
+        const t = this.paneDropAt(ev.clientX, ev.clientY, d.pane);
+        if (t?.pane === d.target?.pane && t?.side === d.target?.side) return;
+        d.target = t;
+        d.drop.toggleClass("is-shown", !!t);
+        if (!t) return;
+        this.haptic(); // crossed into a new place
+        const r = t.pane.containerEl.getBoundingClientRect();
+        let { left, top, width, height } = r;
+        if (t.side === "left" || t.side === "right") {
+            width /= 2;
+            if (t.side === "right") left += width;
+        } else if (t.side === "top" || t.side === "bottom") {
+            height /= 2;
+            if (t.side === "bottom") top += height;
+        }
+        const pad = 6;
+        Object.assign(d.drop.style, {
+            left: `${left + pad}px`,
+            top: `${top + pad}px`,
+            width: `${Math.max(0, width - pad * 2)}px`,
+            height: `${Math.max(0, height - pad * 2)}px`,
+        });
+        d.drop.toggleClass("is-swap", t.side === "center");
+    }
+
+    // The pane under the pointer and the part of it: the edge it is nearest
+    // to within its outer quarter, or its middle
+    paneDropAt(x, y, from) {
+        for (const pane of this.splitGroups ?? []) {
+            if (pane === from || pane.containerEl.hasClass(SOLO_OFF_CLASS)) continue;
+            const r = pane.containerEl.getBoundingClientRect();
+            if (x < r.left || x > r.right || y < r.top || y > r.bottom || !r.width || !r.height) continue;
+            const fx = (x - r.left) / r.width;
+            const fy = (y - r.top) / r.height;
+            const edges = [["left", fx], ["right", 1 - fx], ["top", fy], ["bottom", 1 - fy]];
+            edges.sort((a, b) => a[1] - b[1]);
+            return { pane, side: edges[0][1] < 0.25 ? edges[0][0] : "center" };
+        }
+        return null;
+    }
+
+    endPaneDrag(ev, cancelled) {
+        const d = this.paneDrag;
+        if (!d || (ev && ev.pointerId !== d.id)) return;
+        this.paneDrag = null;
+        d.off();
+        try { d.grip.releasePointerCapture(d.id); } catch (err) { /* already gone */ }
+        d.grip.removeClass("is-held");
+        d.pane.containerEl.removeClass("goguryeo-pane-lifted");
+        document.body.removeClass("goguryeo-pane-dragging");
+        d.drop?.remove();
+        if (cancelled || !d.moving || !d.target) return;
+        try {
+            this.movePane(d.pane, d.target.pane, d.target.side);
+            this.haptic();
+        } catch (err) {
+            console.error("Goguryeo: couldn't move the pane", err);
+        }
+    }
+
+    // Move a whole pane (all its tabs) beside another, or swap the two.
+    // A pane left empty closes itself, so each side keeps a stand-in tab
+    // until the real ones have arrived.
+    movePane(src, dst, side) {
+        const { workspace } = this.app;
+        if (!src?.parent || !dst?.parent || src === dst) return;
+        const active = workspace.getMostRecentLeaf(workspace.rootSplit);
+        const pages = (this.splitPages ??= new Map());
+        const srcPage = pages.get(src);
+        const dstPage = pages.get(dst);
+        const srcShown = src.children[src.currentTab];
+        const dstShown = dst.children[dst.currentTab];
+        const moveAll = (from, to, leaves) => {
+            for (const leaf of leaves) {
+                from.removeChild(leaf);
+                to.insertChild(to.children.length, leaf);
+            }
+        };
+        if (side === "center") {
+            const a = [...src.children];
+            const b = [...dst.children];
+            const keepA = workspace.createLeafInParent(src, src.children.length);
+            const keepB = workspace.createLeafInParent(dst, dst.children.length);
+            moveAll(src, dst, a);
+            moveAll(dst, src, b);
+            keepA.detach();
+            keepB.detach();
+            if (dstPage) pages.set(src, dstPage);
+            if (srcPage) pages.set(dst, srcPage);
+            if (dstShown) src.selectTab(dstShown);
+            if (srcShown) dst.selectTab(srcShown);
+        } else {
+            const anchor = dstShown ?? dst.children[0];
+            const sideways = side === "left" || side === "right";
+            const keep = workspace.createLeafBySplit(anchor, sideways ? "vertical" : "horizontal", side === "left" || side === "top");
+            const target = keep.parent;
+            moveAll(src, target, [...src.children]); // src closes once empty
+            keep.detach();
+            pages.delete(src);
+            if (srcPage) pages.set(target, srcPage);
+            if (srcShown) target.selectTab(srcShown);
+        }
+        if (active?.parent) workspace.setActiveLeaf(active, { focus: false });
+        workspace.requestSaveLayout?.();
+        this.scheduleThumbs();
     }
 
     // ---- Split screen, Chrome style: one tab row, the split as one tab ----
@@ -2261,6 +2438,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     clearSplit() {
         const body = document.body;
+        if (this.paneDrag) this.endPaneDrag(null, true);
+        this.renderGrips([]);
         body.removeClass(SPLIT_CLASS, ONE_PANE_CLASS);
         this.removeSharedTabs();
         body.style.removeProperty("--g-root-top");
