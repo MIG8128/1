@@ -1822,49 +1822,31 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // field opens in the capsule and the list drops down right below it; on
     // iPhone it stays Obsidian's own sheet, its field already at the bottom.
     setupPathSwitcher() {
-        const path = Platform.isPhone
-            ? ".mod-root .view-header-title-parent"
-            : ".mod-root .view-header-title-container";
         this.registerDomEvent(document, "click", (e) => {
-            if (!e.target.closest?.(path)) return;
-            // The web viewer turns the capsule into its own address field:
-            // a click there edits the web address
-            if (e.target.closest(".webviewer-address-container")) return;
-            // A folder with a folder note is a link: it opens the note (ours,
-            // or the Folder notes plugin's, which marks it and opens it itself)
-            const crumb = e.target.closest(".view-header-breadcrumb.has-folder-note");
-            if (crumb) {
+            const tap = this.pathTapAt(e);
+            if (!tap) return;
+            // Through the iPhone bar onto a folder with a note: the click on
+            // the folder itself ticks and opens it (below)
+            if (tap.viaBar && tap.crumb) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                tap.crumb.click();
+                return;
+            }
+            // A folder with a folder note is a link to it: ours opens here;
+            // the Folder notes plugin's opens from its own listener, and the
+            // haptics listener ticks for it
+            if (tap.crumb) {
+                const note = this.folderNotesOn() && this.folderNoteOf(tap.crumb.dataset.goguryeoFolder);
+                if (!note) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
                 this.haptic();
-                const note = this.folderNotesOn() && this.folderNoteOf(crumb.dataset.goguryeoFolder);
-                if (note) {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    this.openFolderNote(note, e);
-                }
+                this.openFolderNote(note, e);
                 return;
             }
             e.preventDefault();
             e.stopImmediatePropagation();
-            this.haptic();
-            this.app.commands.executeCommandById("switcher:open");
-        }, { capture: true });
-
-        // Phone: the capsule sits over Obsidian's tabs button (the bar is a
-        // layer above the note), so a tap on it would open all tabs. Like on
-        // desktop, it opens the quick switcher holding the note's path, all
-        // selected; a folder with a folder note still opens that note. A drag
-        // on the pill still swallows its click (and drag up = all tabs).
-        if (Platform.isPhone) this.registerDomEvent(document, "click", (e) => {
-            if (Date.now() <= (this.suppressClickUntil ?? 0)) return;
-            if (!e.target.closest?.(".mobile-navbar-action-tabs")) return;
-            if (!this.capsuleAt(e.clientX, e.clientY)) return;
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            const folder = this.capsuleFolderAt(e.clientX, e.clientY);
-            if (folder?.matches(".has-folder-note")) {
-                folder.click(); // ticks in the handler above
-                return;
-            }
             this.haptic();
             this.app.commands.executeCommandById("switcher:open");
         }, { capture: true });
@@ -1883,6 +1865,26 @@ module.exports = class GoguryeoCompanion extends Plugin {
             };
             this.register(() => { command.callback = callback; });
         });
+    }
+
+    // What a click means for the path, on every platform alike: null (not
+    // the path), else { crumb } (a folder with a folder note, or null: the
+    // rest of the path, which opens the quick switcher) and viaBar.
+    // Desktop and iPad: the path capsule. iPhone: its folder pill, and the
+    // capsule itself, which sits over Obsidian's tabs button (the bar is a
+    // layer above the note), so the click lands on the button and is matched
+    // by position; a drag on the pill swallows its click.
+    pathTapAt(e) {
+        const path = Platform.isPhone ? ".mod-root .view-header-title-parent" : ".mod-root .view-header-title-container";
+        if (e.target.closest?.(path)) {
+            // the web viewer's capsule is its own address field
+            if (e.target.closest(".webviewer-address-container")) return null;
+            return { crumb: e.target.closest(".view-header-breadcrumb.has-folder-note"), viaBar: false };
+        }
+        if (!Platform.isPhone || Date.now() <= (this.suppressClickUntil ?? 0)) return null;
+        if (!e.target.closest?.(".mobile-navbar-action-tabs") || !this.capsuleAt(e.clientX, e.clientY)) return null;
+        const folder = this.capsuleFolderAt(e.clientX, e.clientY);
+        return { crumb: folder?.matches(".has-folder-note") ? folder : null, viaBar: true };
     }
 
     // Phone: the bottom capsule, if (x, y) is over it
@@ -2673,23 +2675,14 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (!leaf?.view?.contentEl || ["canvas", "graph", "localgraph", "excalidraw"].includes(type)) return;
             if (document.querySelector(".modal-container, .menu")) return;
             const dir = dx < 0 ? -1 : 1; // fingers right: back
-            const steps = dir < 0 ? leaf.history?.backHistory : leaf.history?.forwardHistory;
-            if (!steps?.length) return;
-            s = this.edgeSwipe = { wheel: true, dir, leaf, entry: steps[steps.length - 1], locked: false, sum: 0, v: 0, t: now };
+            s = this.beginSwipe(leaf, dir, { wheel: true, sum: 0, t: now });
+            if (!s) return;
         }
         s.sum = Math.max(0, s.sum + dx * s.dir);
         const dt = now - s.t;
         if (dt > 0) s.v = 0.7 * ((dx * s.dir) / dt) + 0.3 * s.v;
         s.t = now;
-        if (!s.locked && s.sum > LOCK_AT) {
-            s.locked = true;
-            if (this.swipeStyle === "chrome") this.startArrowSwipe(s);
-            else this.startPageSwipe(s);
-        }
-        if (s.locked) {
-            e.preventDefault?.();
-            this.queuePageSwipe(s, Math.min(s.width, s.sum));
-        }
+        if (this.pullSwipe(s, s.sum)) e.preventDefault?.();
         // Past the go point, the fingers letting go: a trackpad keeps
         // sending its glide, each step no bigger than the last, together
         // down by a sixth or more. Go now, as a button would, not once the
@@ -2720,9 +2713,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return;
         }
         this.swipeQuietUntil = performance.now() + 400;
-        const go = s.pulled >= s.width * EDGE_SWIPE_AT;
-        if (s.arrow) this.settleArrowSwipe(s, go);
-        else this.settlePageSwipe(s, go);
+        this.releaseSwipe(s, s.pulled >= s.width * EDGE_SWIPE_AT);
     }
 
     // A still copy of a leaf's page: its content inside a bare copy of the
@@ -2831,13 +2822,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const dir = t.clientX <= EDGE_SWIPE_ZONE ? -1 : t.clientX >= window.innerWidth - EDGE_SWIPE_ZONE ? 1 : 0;
         if (!dir) return;
         const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
-        const history = leaf?.history;
-        const steps = dir < 0 ? history?.backHistory : history?.forwardHistory;
-        if (!steps?.length || !leaf.view?.contentEl) return;
-        this.edgeSwipe = {
-            dir, leaf, entry: steps[steps.length - 1],
-            x0: t.clientX, y0: t.clientY, locked: false, x: t.clientX, t: e.timeStamp, v: 0,
-        };
+        this.beginSwipe(leaf, dir, { x0: t.clientX, y0: t.clientY, x: t.clientX, t: e.timeStamp });
     }
 
     onEdgeMove(e) {
@@ -2846,38 +2831,63 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const t = e.touches[0];
         const dx = (t.clientX - s.x0) * -s.dir; // distance pulled inwards
         const dy = t.clientY - s.y0;
-        if (!s.locked) {
-            if (Math.abs(dy) > LOCK_AT && Math.abs(dy) > Math.abs(dx)) {
-                this.edgeSwipe = null; // a scroll, not a swipe
-                return;
-            }
-            if (dx < LOCK_AT) return;
-            s.locked = true;
-            this.startPageSwipe(s);
+        if (!s.locked && Math.abs(dy) > LOCK_AT && Math.abs(dy) > Math.abs(dx)) {
+            this.edgeSwipe = null; // a scroll, not a swipe
+            return;
         }
-        e.preventDefault();
         const dt = e.timeStamp - s.t;
         if (dt > 0) s.v = 0.8 * ((t.clientX - s.x) / dt) + 0.2 * s.v;
         s.x = t.clientX;
         s.t = e.timeStamp;
-        this.queuePageSwipe(s, Math.max(0, Math.min(s.width, dx)));
-        // A tick each time the swipe crosses the point where letting go goes
-        const armed = s.pulled >= s.width * EDGE_SWIPE_AT;
-        if (armed !== !!s.armed) this.haptic();
-        s.armed = armed;
+        if (this.pullSwipe(s, dx)) e.preventDefault();
     }
 
     onEdgeEnd(e, finished) {
         const s = this.edgeSwipe;
         if (!s || s.settling) return;
-        if (!s.locked) {
-            this.edgeSwipe = null;
-            return;
-        }
         // A flick inwards goes even when short; a flick back cancels
         const v = s.v * -s.dir; // px/ms, inwards
-        const go = finished && (v > 0.35 || (s.pulled >= s.width * EDGE_SWIPE_AT && v > -0.2));
-        this.settlePageSwipe(s, go);
+        this.releaseSwipe(s, finished && (v > 0.35 || (s.pulled >= s.width * EDGE_SWIPE_AT && v > -0.2)));
+    }
+
+    // ---- Back / forward swipes: one core for the finger and the trackpad ----
+
+    // A swipe follows a pull toward going back (dir -1) or forward (1): a
+    // finger from the screen's edge (iPad, iPhone: onEdge*) or two fingers on
+    // a trackpad (desktop: onSwipeWheel). The drivers only measure and
+    // decide; the core shows it: the first LOCK_AT px decide nothing, then
+    // the page stage (or the Chrome-style arrow, trackpad only) follows the
+    // pull, drawn once a frame, with a tick each time it crosses the point
+    // where letting go goes; let go, it goes or springs back.
+    beginSwipe(leaf, dir, extra = {}) {
+        const steps = dir < 0 ? leaf?.history?.backHistory : leaf?.history?.forwardHistory;
+        if (!steps?.length || !leaf.view?.contentEl) return null;
+        return this.edgeSwipe = { dir, leaf, entry: steps[steps.length - 1], locked: false, pulled: 0, v: 0, ...extra };
+    }
+
+    // The pull so far, in px inwards. True once the swipe has taken over
+    // (the driver then keeps the page from scrolling).
+    pullSwipe(s, distance) {
+        if (!s.locked) {
+            if (distance <= LOCK_AT) return false;
+            s.locked = true;
+            if (s.wheel && this.swipeStyle === "chrome") this.startArrowSwipe(s);
+            else this.startPageSwipe(s);
+        }
+        this.queuePageSwipe(s, Math.max(0, Math.min(s.width, distance)));
+        const armed = s.pulled >= s.width * EDGE_SWIPE_AT;
+        if (armed !== !!s.armed && !s.wheel) this.haptic(); // a finger feels it; a trackpad has its arrow
+        s.armed = armed;
+        return true;
+    }
+
+    releaseSwipe(s, go) {
+        if (!s.locked) {
+            if (this.edgeSwipe === s) this.edgeSwipe = null;
+            return;
+        }
+        if (s.arrow) this.settleArrowSwipe(s, go);
+        else this.settlePageSwipe(s, go);
     }
 
     // The stage covers the leaf's page: the page underneath (clipped to the
