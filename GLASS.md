@@ -362,9 +362,14 @@ Secondary text in a row: `--text-muted`. Meta and timestamps:
 | swell while sliding | `scale: 1.06 1.12` for 320 ms, `scale 0.2s ease` back |
 | hovers, fades, small state changes | `0.15s ease` |
 | panels sliding in or out | `0.25s cubic-bezier(0.2, 0.8, 0.2, 1)` |
+| floating glass appearing (menus, pop-ups, suggestion lists) | an animation from `opacity: 0; scale: 0.94`, `0.2s cubic-bezier(0.25, 1.25, 0.4, 1)` (`var(--g-pop, …)`), `transform-origin` at the corner it opens from; dialogs the same at 0.24s; a list dropping from a field from `opacity: 0; scale: 0.97; translate: 0 -6px` |
 
-No bouncing anywhere else, no motion on scroll, nothing longer than 0.45s.
-Everything turns off under `@media (prefers-reduced-motion: reduce)`.
+Use the individual `scale` / `translate` properties in these animations, so
+they add to a `transform` the element already has. Only the way in: Obsidian
+removes a closed surface at once. No other bouncing, no motion on scroll,
+nothing longer than 0.45s (the theme's own startup fade of the background
+picture is the one exception). Everything turns off under
+`@media (prefers-reduced-motion: reduce)`.
 
 ## 6. Backgrounds: the panes are see-through
 
