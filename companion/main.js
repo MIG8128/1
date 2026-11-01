@@ -2692,7 +2692,19 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 }
             }
             if (this.edgeSwipe === s) this.endPageSwipe();
+            // A trackpad swipe to a note: ready to type in it, as after a
+            // click (not after a finger's swipe: on iPad that would bring
+            // up the keyboard)
+            if (go && s.wheel) this.focusNote(s.leaf);
         }, SWIPE_SETTLE_MS);
+    }
+
+    focusNote(leaf) {
+        const view = leaf?.view;
+        if (view?.getViewType?.() !== "markdown" || view.getMode?.() !== "source") return;
+        if (document.querySelector(".modal-container, .menu")) return;
+        this.app.workspace.setActiveLeaf(leaf, { focus: true });
+        view.editor?.focus();
     }
 
     // Resolves once a web viewer's page that's about to load has loaded and
