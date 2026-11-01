@@ -53,6 +53,8 @@ const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane prev
 const WEB_ZOOM_MAX = 5; // a trackpad pinch magnifies a web viewer page up to 5x, as in Chrome
 const WEB_ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]; // Ctrl + wheel, Chrome's levels
 const WEB_SHOT_WIDTH = 1280; // px: web page pictures (swipe back, tab overview) are made no wider
+const SWIPE_STYLE_KEY = "goguryeo-swipe-style"; // "smooth" or "chrome": the trackpad swipe's look (this device)
+const ARROW_PULL = 400; // px of sideways wheel the Chrome-style arrow follows; past EDGE_SWIPE_AT of it, letting go goes
 const WEB_LOAD_MAX_MS = 4000; // most to keep a web page's picture over it while the page loads again
 const WEB_SETTLE_MS = 250; // after it has loaded, for its late parts to fall into place
 const WEB_SHOT_GAP_MS = 3000; // a page that keeps loading gets a new picture at most this often
@@ -268,6 +270,17 @@ class GoguryeoSettingTab extends PluginSettingTab {
                 plugin.refreshFolderNotes();
                 this.display();
             }));
+        if (Platform.isDesktopApp) {
+            new Setting(this.containerEl).setName("Back and forward").setHeading();
+            new Setting(this.containerEl)
+                .setName("Trackpad swipe style (this device)")
+                .setDesc("Two fingers sideways go back or forward. Smooth: the page slides with your fingers over the one it goes to. Chrome: an arrow comes in from the side and the page changes at once; lighter, for a slower computer.")
+                .addDropdown((d) => d
+                    .addOption("smooth", "Smooth (sliding page)")
+                    .addOption("chrome", "Chrome (arrow)")
+                    .setValue(plugin.swipeStyle)
+                    .onChange((v) => plugin.setSwipeStyle(v)));
+        }
         new Setting(this.containerEl).setName("Theme").setHeading();
     }
 
@@ -331,6 +344,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.app.workspace.onLayoutReady(() => this.setupTopPeek());
         this.app.workspace.onLayoutReady(() => this.setupPhoneBar());
         this.androidNav = this.app.loadLocalStorage(ANDROID_NAV_KEY) === "buttons" ? "buttons" : "gestures";
+        this.swipeStyle = this.app.loadLocalStorage(SWIPE_STYLE_KEY) === "chrome" ? "chrome" : "smooth";
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
         if (Platform.isMobile) this.setupHaptics();
@@ -513,6 +527,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         } catch (e) {
             return;
         }
+        if (this.swipeStyle === "chrome") return; // pictures only for the sliding page
         // only a page on screen; a page that loads again and again (ads,
         // live pages) at most every few seconds
         if (!webview.isConnected || !webview.offsetWidth) return;
@@ -2346,6 +2361,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const plugin = this;
         const patched = function (...args) {
             const state = original.apply(this, args);
+            if (Platform.isDesktopApp && plugin.swipeStyle === "chrome") return state; // no copies wanted
             try {
                 const snapshot = plugin.snapshotPage(this);
                 if (snapshot && state && typeof state === "object") plugin.snapshots.set(state, snapshot);
@@ -2436,7 +2452,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         s.t = now;
         if (!s.locked && s.sum > LOCK_AT) {
             s.locked = true;
-            this.startPageSwipe(s);
+            if (this.swipeStyle === "chrome") this.startArrowSwipe(s);
+            else this.startPageSwipe(s);
         }
         if (s.locked) {
             e.preventDefault?.();
@@ -2453,7 +2470,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return;
         }
         this.swipeQuietUntil = performance.now() + 400;
-        this.settlePageSwipe(s, s.pulled >= s.width * EDGE_SWIPE_AT);
+        const go = s.pulled >= s.width * EDGE_SWIPE_AT;
+        if (s.arrow) this.settleArrowSwipe(s, go);
+        else this.settlePageSwipe(s, go);
     }
 
     // A still copy of a leaf's page: its content inside a bare copy of the
@@ -2662,8 +2681,58 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (s.raf) return;
         s.raf = window.requestAnimationFrame(() => {
             s.raf = 0;
-            if (!s.settling && s.stage) this.setPageSwipe(s, s.pulled);
+            if (s.settling) return;
+            if (s.arrow) this.setArrowSwipe(s, s.pulled);
+            else if (s.stage) this.setPageSwipe(s, s.pulled);
         });
+    }
+
+    // ---- Chrome style: an arrow at the edge instead of the sliding page ----
+
+    // For a slow computer (the user's choice, per device): no copies of
+    // pages at all. Two fingers sideways bring a round glass arrow in from
+    // the side the page would go to; past the go point it fills, and
+    // letting go there goes back or forward at once, like Chrome.
+    startArrowSwipe(s) {
+        const arrow = createDiv("goguryeo-swipe-arrow");
+        arrow.addClass(s.dir < 0 ? "is-back" : "is-forward");
+        arrow.setAttr("inert", "");
+        setIcon(arrow, s.dir < 0 ? "arrow-left" : "arrow-right");
+        s.leaf.containerEl.appendChild(arrow);
+        s.arrow = arrow;
+        s.width = ARROW_PULL;
+        this.setArrowSwipe(s, 0);
+    }
+
+    setArrowSwipe(s, pulled) {
+        s.pulled = pulled;
+        const p = Math.min(1, pulled / (s.width * EDGE_SWIPE_AT));
+        const x = (-56 + 76 * p) * (s.dir < 0 ? 1 : -1); // from out of sight to 20px in
+        s.arrow.style.transform = `translateX(${x}px) scale(${0.7 + 0.3 * p})`;
+        s.arrow.style.opacity = String(Math.min(1, p * 1.5));
+        const armed = p >= 1;
+        if (armed !== s.arrow.hasClass("is-armed")) s.arrow.toggleClass("is-armed", armed);
+    }
+
+    settleArrowSwipe(s, go) {
+        s.settling = true;
+        if (s.raf) window.cancelAnimationFrame(s.raf);
+        s.raf = 0;
+        const arrow = s.arrow;
+        arrow.addClass("is-settling");
+        arrow.style.opacity = "0";
+        if (!go) this.setArrowSwipe(s, 0);
+        window.setTimeout(() => arrow.remove(), 200);
+        if (this.edgeSwipe === s) this.edgeSwipe = null;
+        if (!go) return;
+        Promise.resolve(s.leaf.history.go(s.dir))
+            .then(() => this.focusNote(s.leaf))
+            .catch((e) => console.error("Goguryeo: swipe navigation failed", e));
+    }
+
+    setSwipeStyle(value) {
+        this.swipeStyle = value;
+        this.app.saveLocalStorage(SWIPE_STYLE_KEY, value);
     }
 
     settlePageSwipe(s, go) {
@@ -2747,6 +2816,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     endPageSwipe() {
         const s = this.edgeSwipe;
         this.edgeSwipe = null;
+        s?.arrow?.remove();
         if (!s?.stage) return;
         s.stage.remove();
         s.frame.removeClass("goguryeo-swiping");

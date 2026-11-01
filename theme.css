@@ -2886,6 +2886,47 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
     transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1), clip-path 0.28s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
+/* Chrome-style trackpad swipe (companion option): a round glass arrow
+   comes in from the side; filled once letting go would go */
+.goguryeo-swipe-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: var(--layer-popover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-top: -22px;
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    background-color: var(--glass-bg-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+    color: var(--text-muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+
+.goguryeo-swipe-arrow.is-back {
+    left: 0;
+}
+
+.goguryeo-swipe-arrow.is-forward {
+    right: 0;
+}
+
+.goguryeo-swipe-arrow.is-armed {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.goguryeo-swipe-arrow.is-settling {
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
 /* A web page's picture fades off it once the page has loaded again */
 .goguryeo-swipe-stage.is-lifting {
     opacity: 0;
