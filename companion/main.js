@@ -95,16 +95,27 @@ const PEEK_TOP = 40; // px at the top where the window edges belong to the title
 const OMNI_CLASS = "goguryeo-omnibox"; // the quick switcher docked on the path capsule
 const OMNI_MIN_WIDTH = 420; // px it takes at least (the iPhone folder pill is small)
 const OMNI_MARGIN = 8; // px it keeps from the window edges
+// Motion: every animation of the companion uses these curves and times, the
+// same ones theme section 13 names for CSS (--g-ease, --g-spring, ...), so
+// whatever moves, script or CSS, moves alike
+const EASE = {
+    out: "cubic-bezier(0.2, 0.8, 0.2, 1)", // settling: slides and fades in (--g-ease)
+    in: "cubic-bezier(0.4, 0, 1, 1)", // going away
+    spring: "cubic-bezier(0.3, 1.3, 0.4, 1)", // menus and panels opening, the tab glass (--g-spring)
+    soft: "cubic-bezier(0.3, 1.15, 0.4, 1)", // gliding to a new place, making room (--g-spring-soft)
+    bounce: "cubic-bezier(0.3, 1.5, 0.4, 1)", // tabs and slots growing in (--g-spring-bounce)
+    pop: "cubic-bezier(0.2, 0.8, 0.3, 1)", // keyframed pops: their overshoot is in the keyframes
+};
+const DUR = { in: 240, out: 150, fade: 200, glide: 280, pop: 540, leave: 350 }; // ms (in, out: --g-dur-in, --g-dur-out)
 const OMNI_MS = 320; // the list unrolling below the capsule
-const OMNI_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // a soft spring, settling past its spot and back
+const OMNI_EASE = EASE.soft;
 const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the end, so its shadow shows
 const OVERVIEW_CLASS = "goguryeo-tab-overview"; // the tab overview sheet (desktop and iPad)
 const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⧉, which the theme shows in place of ⌄
-const OVERVIEW_MS = 240; // the sheet fading in and out
-const TAB_SPRING = "cubic-bezier(0.3, 1.5, 0.4, 1)"; // tabs and slots growing in, with a bounce
+const TAB_SPRING = EASE.bounce; // tabs and slots growing in, with a bounce
 const CARD_HOLD_MS = 300; // a finger rests on a card this long before it lifts (a mouse drags at once)
 const CARD_SLOP = 6; // px a pointer may wander before it counts as a drag (or, for a finger, a scroll)
-const CARD_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // the other cards making room, and the drop
+const CARD_EASE = EASE.soft; // the other cards making room, and the drop
 const SNAP ="transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
 
@@ -1422,12 +1433,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
         }
 
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        panel.animate(
-            [{ opacity: 0, transform: "translateY(16px) scale(0.96)" }, { opacity: 1, transform: "none" }],
-            { duration: 280, easing: "cubic-bezier(0.3, 1.3, 0.4, 1)" },
-        );
-        bg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });
+        this.enter(panel, { scale: 0.96, y: 16 });
+        this.fadeIn(bg);
     }
 
     // The items of the menu Obsidian's own ⋯ (more options) opens, built the
@@ -1491,20 +1498,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (!menu) return;
         this.phoneMenu = null;
         document.body.removeClass("goguryeo-phone-menu-open");
-        const remove = () => {
+        if (now) {
             menu.bg.remove();
             menu.panel.remove();
-        };
-        if (now || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-            remove();
             return;
         }
-        menu.bg.style.pointerEvents = menu.panel.style.pointerEvents = "none";
-        menu.bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "ease-in", fill: "forwards" });
-        menu.panel.animate(
-            [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.92)" }],
-            { duration: 150, easing: "ease-in", fill: "forwards" },
-        ).finished.then(remove, remove);
+        this.fadeOut(menu.bg);
+        this.leave(menu.panel, { scale: 0.92 });
     }
 
     // ---- Folder notes ----
@@ -1910,16 +1910,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
         container.style.setProperty("--g-omni-height", `${c.height}px`);
         container.style.setProperty("--g-omni-radius", radius);
 
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        if (this.reducedMotion()) return;
         const p = prompt.getBoundingClientRect();
         const start = `inset(0 ${Math.max(0, p.right - c.right)}px ${Math.max(0, p.height - c.height)}px ${Math.max(0, c.left - p.left)}px round ${radius})`;
         const end = parseFloat(getComputedStyle(prompt).borderTopLeftRadius) + SHADOW_ROOM;
-        prompt.animate(
-            [{ clipPath: start }, { clipPath: `inset(-${SHADOW_ROOM}px round ${end}px)` }],
-            { duration: OMNI_MS, easing: OMNI_EASE },
-        );
+        this.play(prompt, [{ clipPath: start }, { clipPath: `inset(-${SHADOW_ROOM}px round ${end}px)` }], { duration: OMNI_MS, easing: OMNI_EASE });
         const dim = container.querySelector(".modal-bg");
-        if (dim) dim.animate([{ opacity: 0 }, { opacity: getComputedStyle(dim).opacity }], { duration: OMNI_MS, easing: "ease-out" });
+        this.fadeIn(dim, { duration: OMNI_MS });
     }
 
     // ---- Desktop and iPad: the tab overview, Safari style ----
@@ -1989,9 +1986,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.overview = { sheet, box };
         document.body.addClass(OVERVIEW_CLASS + "-open");
         this.renderOverview();
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        sheet.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OVERVIEW_MS, easing: "ease-out" });
-        box.animate([{ transform: "scale(1.04)" }, { transform: "none" }], { duration: OVERVIEW_MS * 1.5, easing: OMNI_EASE });
+        this.fadeIn(sheet, { duration: DUR.in });
+        this.enter(box, { scale: 1.04, opacity: 1, duration: DUR.in * 1.5, easing: EASE.soft });
     }
 
     // The sheet covers the panes from the tab row down, so row 1 (and ⧉ in
@@ -2242,7 +2238,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const now = drag.slots.get(el);
             const dx = was.left - now.left;
             const dy = was.top - now.top;
-            if (dx || dy) el.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 260, easing: CARD_EASE });
+            this.glide(el, dx, dy);
         }
     }
 
@@ -2272,11 +2268,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const from = ghost.getBoundingClientRect();
         const to = card.getBoundingClientRect();
         ghost.removeClass("is-lifted");
-        const land = ghost.animate([
+        this.play(ghost, [
             { translate: "0 0", scale: "1" },
             { translate: `${to.left - from.left}px ${to.top - from.top}px`, scale: `${to.width / (from.width || 1)}` },
-        ], { duration: 260, easing: CARD_EASE, fill: "forwards" });
-        land.finished.catch(() => {}).finally(() => {
+        ], { duration: DUR.glide, easing: EASE.soft, fill: "forwards" }).then(() => {
             ghost.remove();
             card.removeClass("is-placeholder");
             if (cancelled || !pane || !leaf.parent || this.overview !== o) return; // closed meanwhile
@@ -2311,13 +2306,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (!o) return;
         this.overview = null;
         document.body.removeClass(OVERVIEW_CLASS + "-open");
-        if (now || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        if (now) {
             o.sheet.remove();
             return;
         }
-        o.sheet.style.pointerEvents = "none";
-        o.sheet.animate([{ opacity: 1 }, { opacity: 0 }], { duration: OVERVIEW_MS, easing: "ease-in", fill: "forwards" })
-            .finished.finally(() => o.sheet.remove());
+        this.fadeOut(o.sheet, { duration: DUR.in });
     }
 
     // ---- iPhone: haptics ----
@@ -2478,16 +2471,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
             pill.style.transition = pill.style.translate = pill.style.opacity = "";
             const target = d.target === NEW_TAB ? this.app.workspace.getLeaf("tab") : d.target;
             this.app.workspace.setActiveLeaf(target, { focus: true });
-            const easing = "cubic-bezier(0.25, 0.8, 0.25, 1)";
+            // the new tab's name and page come in from the side it was pulled from
             const from = -toward;
-            target.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container")?.animate(
-                [{ translate: `${from * 40}px 0`, opacity: 0 }, { translate: "0 0", opacity: 1 }],
-                { duration: 260, easing },
-            );
-            target.view?.contentEl?.animate(
-                [{ transform: `translateX(${from * 48}px)`, opacity: 0.4 }, { transform: "none", opacity: 1 }],
-                { duration: 260, easing },
-            );
+            const slide = { scale: 1, duration: DUR.in, easing: EASE.out };
+            this.enter(target.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container"), { ...slide, x: from * 40 });
+            this.enter(target.view?.contentEl, { ...slide, x: from * 48, opacity: 0.4 });
         }, 140);
     }
 
@@ -3205,7 +3193,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const b = rects.get(el);
             if (!b.width || !b.height) continue; // folded away
             if (!a || !a.width || !a.height) {
-                el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+                this.fadeIn(el, { duration: DUR.glide });
                 continue;
             }
             const d = Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height);
@@ -3582,7 +3570,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const slot = this.barSlot = createDiv("goguryeo-stab-slot");
         slot.gIndex = index;
         this.placeBarSlot();
-        slot.animate([{ flexGrow: 0, opacity: 0 }, { flexGrow: 1, opacity: 1 }], { duration: 380, easing: TAB_SPRING });
+        this.play(slot, [{ flexGrow: 0, opacity: 0 }, { flexGrow: 1, opacity: 1 }], { duration: DUR.glide + 100, easing: EASE.bounce });
         this.followBar(420);
     }
 
@@ -3620,8 +3608,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.barSlot = null;
         if (!slot) return;
         if (now) return slot.remove();
-        slot.animate([{ flexGrow: 1, opacity: 1 }, { flexGrow: 0, opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" })
-            .finished.catch(() => {}).finally(() => slot.remove());
+        this.play(slot, [{ flexGrow: 1, opacity: 1 }, { flexGrow: 0, opacity: 0 }], { duration: DUR.fade, easing: EASE.in, fill: "forwards" })
+            .then(() => slot.remove());
         this.followBar(240);
     }
 
@@ -4371,7 +4359,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 if (from == null || el.getAnimations().length) continue;
                 const dx = from - el.getBoundingClientRect().left;
                 if (Math.abs(dx) < 2) continue;
-                el.animate([{ translate: `${dx}px 0` }, { translate: "0 0" }], { duration: 340, easing: TAB_SPRING });
+                this.glide(el, dx, 0, { easing: EASE.bounce });
                 slid = true;
             }
             if (slid) this.followBar(380);
@@ -4441,18 +4429,91 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
 
+    // ---- Motion: one set of moves for everything the companion animates ----
+
+    // Keyframes on an element, unless the user asked for less motion.
+    // Resolves once done (at once without motion); never throws.
+    play(el, keyframes, options) {
+        if (!el || this.reducedMotion()) return Promise.resolve();
+        try {
+            return el.animate(keyframes, options).finished.then(() => {}, () => {});
+        } catch (e) {
+            return Promise.resolve();
+        }
+    }
+
+    // A surface comes in, from a little smaller (or bigger), offset and
+    // see-through. The individual scale / translate properties add to any
+    // transform the theme gives it.
+    enter(el, { scale = 0.94, x = 0, y = 0, opacity = 0, duration = DUR.in, easing = EASE.spring } = {}) {
+        return this.play(el, [
+            { opacity, scale: String(scale), translate: `${x}px ${y}px` },
+            { opacity: 1, scale: "1", translate: "0 0" },
+        ], { duration, easing });
+    }
+
+    // ...and goes: it stops taking clicks at once, shrinks a little, fades,
+    // and is removed
+    leave(el, { scale = 0.94, x = 0, y = 0, duration = DUR.out, remove = true } = {}) {
+        if (!el) return Promise.resolve();
+        el.style.pointerEvents = "none";
+        return this.play(el, [
+            { opacity: 1, scale: "1", translate: "0 0" },
+            { opacity: 0, scale: String(scale), translate: `${x}px ${y}px` },
+        ], { duration, easing: EASE.in, fill: "forwards" }).then(() => { if (remove) el.remove(); });
+    }
+
+    // A dim or a sheet fading in to its own opacity, or out and removed
+    fadeIn(el, { duration = DUR.fade } = {}) {
+        if (!el) return Promise.resolve();
+        return this.play(el, [{ opacity: 0 }, { opacity: getComputedStyle(el).opacity }], { duration, easing: EASE.out });
+    }
+
+    fadeOut(el, { duration = DUR.out, remove = true } = {}) {
+        if (!el) return Promise.resolve();
+        el.style.pointerEvents = "none";
+        return this.play(el, [{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration, easing: EASE.in, fill: "forwards" })
+            .then(() => { if (remove) el.remove(); });
+    }
+
+    // From where it stood to where it is now (dx, dy: old place less new)
+    glide(el, dx, dy = 0, { duration = DUR.glide, easing = EASE.soft } = {}) {
+        if (!dx && !dy) return Promise.resolve();
+        return this.play(el, [{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration, easing });
+    }
+
+    // A tab or a page's name springs in: from small, past its size, back.
+    // grow: the property that opens its room with it (flexGrow in a row)
+    springIn(el, { grow = null, swell = 1.14, y = -10, duration = DUR.pop } = {}) {
+        const at = (opacity, scale, dy, room) => ({
+            opacity, scale: String(scale), translate: `0 ${dy}px`, ...(grow ? { [grow]: room } : {}),
+        });
+        return this.play(el, [
+            at(0, 0.3, y, 0),
+            { ...at(1, swell, 0, 1.2), offset: 0.6 },
+            at(1, 1, 0, 1),
+        ], { duration, easing: EASE.pop });
+    }
+
+    // ...and one closing swells for a beat, then shrinks to nothing, its
+    // room closing with it (room: the properties at full size and at none),
+    // and is removed
+    springOut(el, { room = [{}, {}], swell = 1.1, duration = DUR.leave } = {}) {
+        el.style.pointerEvents = "none";
+        return this.play(el, [
+            { ...room[0], opacity: 1, scale: "1" },
+            { ...room[0], opacity: 1, scale: String(swell), offset: 0.22 },
+            { ...room[1], opacity: 0, scale: "0.3" },
+        ], { duration, easing: EASE.in, fill: "forwards" }).then(() => el.remove());
+    }
+
     // A new tab in the shared bar: it springs up from nothing, overshoots
     // and settles, pushing the others aside
     popTab(tab) {
         if (this.reducedMotion()) return;
         tab.style.minWidth = "0px";
-        tab.animate([
-            { flexGrow: 0, opacity: 0, scale: "0.3", translate: "0 -10px" },
-            { flexGrow: 1.2, opacity: 1, scale: "1.14", translate: "0 0", offset: 0.6 },
-            { flexGrow: 1, opacity: 1, scale: "1", translate: "0 0" },
-        ], { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" })
-            .finished.catch(() => {}).finally(() => tab.style.removeProperty("min-width"));
-        this.followBar(600);
+        this.springIn(tab, { grow: "flexGrow" }).then(() => tab.style.removeProperty("min-width"));
+        this.followBar(DUR.pop + 40);
     }
 
     // A closed tab: it swells for a beat, then shrinks to nothing in its place
@@ -4461,25 +4522,15 @@ module.exports = class GoguryeoCompanion extends Plugin {
         tab.removeClass("is-active", "is-focused");
         if (this.reducedMotion()) return tab.remove();
         tab.style.minWidth = "0px";
-        tab.style.pointerEvents = "none";
-        tab.animate([
-            { flexGrow: 1, opacity: 1, scale: "1" },
-            { flexGrow: 1, opacity: 1, scale: "1.1", offset: 0.22 },
-            { flexGrow: 0, opacity: 0, scale: "0.3" },
-        ], { duration: 360, easing: "ease-in", fill: "forwards" })
-            .finished.catch(() => {}).finally(() => tab.remove());
-        this.followBar(400);
+        this.springOut(tab, { room: [{ flexGrow: 1 }, { flexGrow: 0 }] });
+        this.followBar(DUR.leave + 40);
     }
 
     // The same for a page's name inside the joined split tab
     popPart(part) {
         if (this.reducedMotion()) return;
-        part.animate([
-            { opacity: 0, scale: "0.3" },
-            { opacity: 1, scale: "1.18", offset: 0.6 },
-            { opacity: 1, scale: "1" },
-        ], { duration: 520, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" });
-        this.followBar(560);
+        this.springIn(part, { swell: 1.18, y: 0 });
+        this.followBar(DUR.pop + 40);
     }
 
     leavePart(part) {
@@ -4487,14 +4538,14 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (this.reducedMotion()) return part.remove();
         const w = part.offsetWidth;
         part.style.overflow = "hidden";
-        part.style.pointerEvents = "none";
-        part.animate([
-            { maxWidth: w + "px", opacity: 1, scale: "1", paddingLeft: "9px", paddingRight: "9px" },
-            { maxWidth: w + "px", opacity: 1, scale: "1.12", paddingLeft: "9px", paddingRight: "9px", offset: 0.22 },
-            { maxWidth: "0px", opacity: 0, scale: "0.3", paddingLeft: "0px", paddingRight: "0px" },
-        ], { duration: 340, easing: "ease-in", fill: "forwards" })
-            .finished.catch(() => {}).finally(() => part.remove());
-        this.followBar(380);
+        this.springOut(part, {
+            swell: 1.12,
+            room: [
+                { maxWidth: w + "px", paddingLeft: "9px", paddingRight: "9px" },
+                { maxWidth: "0px", paddingLeft: "0px", paddingRight: "0px" },
+            ],
+        });
+        this.followBar(DUR.leave + 40);
     }
 
     // Obsidian's own tab rows (one pane, or each card): Obsidian grows a new
@@ -4532,11 +4583,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             for (const el of m.addedNodes) {
                 if (!isTab(el) || this.tabSeen.has(el)) continue;
                 this.tabSeen.add(el);
-                el.querySelector(".workspace-tab-header-inner")?.animate([
-                    { opacity: 0, scale: "0.3", translate: "0 -10px" },
-                    { opacity: 1, scale: "1.14", translate: "0 0", offset: 0.6 },
-                    { opacity: 1, scale: "1", translate: "0 0" },
-                ], { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" });
+                this.springIn(el.querySelector(".workspace-tab-header-inner"));
             }
             const strip = m.target;
             for (const el of m.removedNodes) {
@@ -4547,12 +4594,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 const next = m.nextSibling?.parentNode === strip ? m.nextSibling : null;
                 strip.insertBefore(ghost, next);
                 const w = ghost.getBoundingClientRect().width;
-                ghost.animate([
-                    { width: w + "px", opacity: 1, scale: "1" },
-                    { width: w + "px", opacity: 1, scale: "1.1", offset: 0.22 },
-                    { width: "0px", opacity: 0, scale: "0.3" },
-                ], { duration: 360, easing: "ease-in", fill: "forwards" })
-                    .finished.catch(() => {}).finally(() => ghost.remove());
+                this.springOut(ghost, { room: [{ width: w + "px" }, { width: "0px" }] });
             }
         }
     }
@@ -4745,10 +4787,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             },
         };
         this.placeGripMenu();
-        if (!this.reducedMotion()) {
-            menu.animate([{ opacity: 0, scale: "0.9", translate: "0 -6px" }, { opacity: 1, scale: "1", translate: "0 0" }],
-                { duration: 260, easing: "cubic-bezier(0.3, 1.3, 0.4, 1)" });
-        }
+        this.enter(menu, { scale: 0.9, y: -6 });
     }
 
     // Under the grip, centred on it, inside the window
@@ -4768,10 +4807,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.gripMenu = null;
         m.off();
         m.grip.removeClass("is-open");
-        if (now || this.reducedMotion()) return m.menu.remove();
-        m.menu.style.pointerEvents = "none";
-        m.menu.animate([{ opacity: 1, scale: "1" }, { opacity: 0, scale: "0.94" }], { duration: 150, easing: "ease-in", fill: "forwards" })
-            .finished.catch(() => {}).finally(() => m.menu.remove());
+        if (now) return m.menu.remove();
+        this.leave(m.menu);
     }
 
     clearSplit() {
