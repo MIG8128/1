@@ -1502,10 +1502,11 @@ body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.g
     color: var(--text-normal);
 }
 
-/* A normal tab in focus fills the screen alone: the split's other panes
-   (and splits) fold to nothing but keep their place in Obsidian's layout.
-   Their ◧ + ⧉ ◨ still show (fixed in row 1). */
-body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off {
+/* What isn't on screen folds away (body.goguryeo-folded): beside a normal
+   tab shown alone, every other pane; beside a split, the panes of the
+   other splits and loose panes. They fold to nothing but keep their place
+   in Obsidian's layout. Their ◧ + ⧉ ◨ still show (fixed in row 1). */
+body.goguryeo-folded.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off {
     flex: 0 0 0px !important;
     min-width: 0 !important;
     min-height: 0 !important;
@@ -1515,11 +1516,17 @@ body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo
     visibility: hidden;
 }
 
-body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+body.goguryeo-folded.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
     visibility: visible;
 }
 
 body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-resize-handle {
+    display: none;
+}
+
+/* A split on screen beside folded ones: no resize handle on the edge
+   that only folded panes follow */
+body.goguryeo-folded.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-split > :not(.goguryeo-solo-off):not(:has(~ :not(.goguryeo-solo-off))) > .workspace-leaf-resize-handle {
     display: none;
 }
 
