@@ -1683,6 +1683,23 @@ body.goguryeo-pane-preview .goguryeo-pane-drop {
     opacity: 0.3;
 }
 
+/* A normal tab lifted out of the bar: its place closes up while it's
+   carried, and the slot where it will land grows in */
+.goguryeo-stab-ghost .goguryeo-stab-inner > .goguryeo-stab-close {
+    display: none;
+}
+
+.goguryeo-shared-tabs-bar > .goguryeo-stab {
+    transition: flex-grow 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), opacity 0.2s ease;
+}
+
+.goguryeo-shared-tabs-bar > .goguryeo-stab.is-placeholder {
+    flex-grow: 0.0001;
+    min-width: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
 /* A closed tab in Obsidian's own tab row: a copy shrinks away in its place
    (companion: onTabMutations) */
 .workspace-tab-header.goguryeo-tab-leaving {

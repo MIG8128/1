@@ -2509,9 +2509,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // a tab of its own where it's dropped. A mouse drags as soon as it
     // moves; a finger holds first (CARD_HOLD_MS), so a quick swipe still
     // scrolls the bar.
-    onPartDown(e, part, leaf) {
+    onPartDown(e, part, leaf, tab = false) {
         if (e.button > 0 || this.partDrag || this.paneDrag || e.target.closest(".goguryeo-stab-close")) return;
-        const d = this.partDrag = { part, leaf, id: e.pointerId, x: e.clientX, y: e.clientY, live: false, touch: e.pointerType === "touch", target: null };
+        e.stopPropagation(); // a part's drag is not the joined tab's
+        const d = this.partDrag = { part, leaf, tab, id: e.pointerId, x: e.clientX, y: e.clientY, live: false, touch: e.pointerType === "touch", target: null };
         if (d.touch) d.timer = window.setTimeout(() => this.liftPart(d), CARD_HOLD_MS);
         const move = (ev) => this.onPartMove(ev);
         const up = (ev) => this.endPartDrag(ev, false);
@@ -2552,6 +2553,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.placePartGhost(d);
         window.requestAnimationFrame(() => ghost.addClass("is-lifted"));
         d.part.addClass("is-placeholder");
+        if (d.tab) this.followBar(400); // its place closes up
         document.body.addClass("goguryeo-pane-dragging");
         this.haptic();
     }
@@ -2573,8 +2575,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
         d.x = e.clientX;
         d.y = e.clientY;
         this.placePartGhost(d);
-        // Back over the joined tab: it stays in the split
-        const index = this.barDropAt(d.x, d.y, this.splitTab);
+        // Back over the joined tab: it stays in the split. A normal tab over
+        // itself, or right beside it, stays where it is.
+        let index = this.barDropAt(d.x, d.y, d.tab ? d.part : this.splitTab);
+        if (d.tab && index != null) {
+            const own = this.barTabs().indexOf(d.part);
+            if (index === own || index === own + 1) index = null;
+        }
         if (index === d.target) return;
         d.target = index;
         if (index == null) this.hideBarSlot();
@@ -2591,6 +2598,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         d.off();
         d.ghost?.remove();
         d.part.removeClass("is-placeholder");
+        if (d.tab) this.followBar(400);
         document.body.removeClass("goguryeo-pane-dragging");
         if (d.live) {
             // the click that ends a drag isn't a tap on the page
@@ -2601,11 +2609,61 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.hideBarSlot(drop);
         if (!drop) return;
         try {
-            this.unsplitPage(d.leaf, d.target);
+            if (d.tab) this.moveTab(d.leaf, d.target);
+            else this.unsplitPage(d.leaf, d.target);
             this.haptic();
         } catch (err) {
-            console.error("Goguryeo: couldn't take the page out of the split", err);
+            console.error("Goguryeo: couldn't move the tab", err);
         }
+    }
+
+    // The bar's tabs, in order (the joined tab counts as one)
+    barTabs() {
+        return [...(this.sharedBar?.children ?? [])].filter((el) => el.hasClass("goguryeo-stab") && !el.hasClass("is-leaving"));
+    }
+
+    // A normal tab moves to `index` in the bar. The bar shows the panes' tabs
+    // in order (the joined tab where its first page is), so the tab's leaf
+    // moves beside its new neighbour's leaf, into that pane if need be.
+    // What each pane shows stays as it was.
+    moveTab(leaf, index) {
+        const { workspace } = this.app;
+        const src = leaf?.parent;
+        if (!src) return;
+        const tabs = this.barTabs();
+        const pages = this.splitPages ?? new Map();
+        const leafAt = (el) => {
+            if (!el) return null;
+            if (!el.hasClass("goguryeo-stab-split")) return el.gLeaf?.parent ? el.gLeaf : null;
+            // the joined tab stands where its first page is
+            for (const pane of this.splitGroups ?? []) {
+                const page = pane.children.find((l) => [...pages.values()].includes(l));
+                if (page) return page;
+            }
+            return null;
+        };
+        let anchor = leafAt(tabs[index]);
+        let after = false;
+        if (!anchor) {
+            anchor = leafAt(tabs[index - 1]);
+            after = true;
+        }
+        if (!anchor || anchor === leaf || !anchor.parent) return;
+        const dst = anchor.parent;
+        const solo = workspace.getMostRecentLeaf(workspace.rootSplit) === leaf;
+        const shown = new Map([src, dst].map((p) => [p, p.children[p.currentTab]]));
+        src.removeChild(leaf);
+        const at = dst.children.indexOf(anchor) + (after ? 1 : 0);
+        dst.insertChild(at, leaf);
+        if (solo) {
+            dst.selectTab(leaf);
+            workspace.setActiveLeaf(leaf, { focus: true });
+        } else {
+            for (const [pane, l] of shown) if (l && l !== leaf && l.parent === pane) pane.selectTab(l);
+            if (shown.get(src) === leaf && pages.get(src)) src.selectTab(pages.get(src));
+        }
+        workspace.requestSaveLayout?.();
+        this.scheduleThumbs();
     }
 
     // Move a whole pane (all its tabs) beside another, or swap the two.
@@ -3061,7 +3119,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // split, or into another pane).
     makeSharedTab(leaf, part = false) {
         const { workspace } = this.app;
-        const tab = createDiv({ cls: part ? "goguryeo-stab-part" : "goguryeo-stab", attr: part ? {} : { draggable: "true" } });
+        const tab = createDiv(part ? "goguryeo-stab-part" : "goguryeo-stab");
         const inner = part ? tab : tab.createDiv("goguryeo-stab-inner");
         const close = inner.createDiv({ cls: "clickable-icon goguryeo-stab-close", attr: { "aria-label": "Close" } });
         setIcon(close, "lucide-x");
@@ -3073,10 +3131,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
             leaf.detach();
         });
         tab.gLeaf = leaf;
-        if (part) tab.addEventListener("pointerdown", (e) => this.onPartDown(e, tab, leaf));
+        // Dragged along the bar: a page leaves the split, a normal tab moves
+        tab.addEventListener("pointerdown", (e) => this.onPartDown(e, tab, leaf, !part));
         tab.addEventListener("click", (e) => {
             e.stopPropagation(); // a part's click is not the joined tab's
-            if (part && this.swallowPartClick) {
+            if (this.swallowPartClick) {
                 this.swallowPartClick = false;
                 return;
             }
@@ -3093,7 +3152,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
             e.stopPropagation();
             leaf.onOpenTabHeaderMenu?.(e, tab);
         });
-        if (!part) tab.addEventListener("dragstart", (e) => workspace.onDragLeaf?.(e, leaf));
         this.sharedTabs.set(leaf, tab);
         return tab;
     }
