@@ -1199,7 +1199,9 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mo
 }
 
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-current-pane) .workspace-leaf-content > .view-header {
-    display: none;
+    /* !important: the web viewer's header has Obsidian's
+       .view-header-always-show (display: flex !important) */
+    display: none !important;
 }
 
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane .workspace-leaf-content > .view-header {
