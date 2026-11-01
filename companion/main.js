@@ -316,25 +316,54 @@ module.exports = class GoguryeoCompanion extends Plugin {
         // In the page. A notch (~100): the plugin steps the page zoom. A
         // pinch (a few units at a time; on Windows it comes as Ctrl + wheel,
         // Chromium's own pinch-zoom never sees it): the page is magnified
-        // around the pointer, scaled as a whole, not laid out anew, and
-        // scrolls about inside the bigger picture; pinched back to 1x it's
-        // as it was.
-        const listen = `if (!window.__goguryeoZoom3) { window.__goguryeoZoom3 = true;
-            let mag = 1;
+        // around the pointer as one picture, not laid out anew, like
+        // Chrome's pinch. While magnified, scrolling first moves about the
+        // picture (both ways); at its edge the scroll goes on to the page.
+        // The picture is drawn from where the page is scrolled to, and the
+        // page's own scrollbars are left alone. Pinched back to 1x it's as
+        // it was.
+        const listen = `if (!window.__goguryeoZoom4) { window.__goguryeoZoom4 = true;
+            let mag = 1, ox = 0, oy = 0, saved = null;
             const html = document.documentElement;
+            const apply = () => {
+                if (mag === 1) {
+                    html.style.transform = ""; html.style.transformOrigin = "";
+                    if (saved !== null) { html.style.overflow = saved; saved = null; }
+                    return;
+                }
+                if (saved === null) saved = html.style.overflow;
+                html.style.overflow = "hidden"; // the picture adds no scrollbars
+                html.style.transformOrigin = scrollX + "px " + scrollY + "px";
+                html.style.transform = "translate(" + (-ox) + "px, " + (-oy) + "px) scale(" + mag + ")";
+            };
+            const clamp = () => {
+                ox = Math.min((mag - 1) * innerWidth, Math.max(0, ox));
+                oy = Math.min((mag - 1) * innerHeight, Math.max(0, oy));
+            };
+            addEventListener("scroll", () => { if (mag > 1) apply(); }, true);
+            addEventListener("resize", () => { if (mag > 1) { clamp(); apply(); } });
             addEventListener("wheel", (e) => {
-                if (!e.ctrlKey) return;
-                // the page sees the wheel divided by its zoom: undo that
-                const raw = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1) * (window.__goguryeoZoomF || 1);
-                e.preventDefault();
-                if (Math.abs(raw) >= 40) { console.debug("${MARK}zoom:" + Math.sign(e.deltaY)); return; }
-                const next = Math.min(${WEB_ZOOM_MAX}, Math.max(1, mag * Math.exp(-raw / 100)));
-                if (next === mag) return;
-                const px = (scrollX + e.clientX) / mag, py = (scrollY + e.clientY) / mag;
-                mag = next < 1.01 ? 1 : next;
-                html.style.transformOrigin = mag === 1 ? "" : "0 0";
-                html.style.transform = mag === 1 ? "" : "scale(" + mag + ")";
-                scrollTo(px * mag - e.clientX, py * mag - e.clientY);
+                const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
+                if (e.ctrlKey) {
+                    // the page sees the wheel divided by its zoom: undo that
+                    const raw = e.deltaY * unit * (window.__goguryeoZoomF || 1);
+                    e.preventDefault();
+                    if (Math.abs(raw) >= 40) { console.debug("${MARK}zoom:" + Math.sign(e.deltaY)); return; }
+                    const next = Math.min(${WEB_ZOOM_MAX}, Math.max(1, mag * Math.exp(-raw / 100)));
+                    if (next === mag) return;
+                    const cx = (e.clientX + ox) / mag, cy = (e.clientY + oy) / mag;
+                    mag = next < 1.01 ? 1 : next;
+                    ox = cx * mag - e.clientX; oy = cy * mag - e.clientY;
+                    if (mag === 1) { ox = 0; oy = 0; }
+                    clamp(); apply();
+                    return;
+                }
+                if (mag === 1) return;
+                const bx = ox, by = oy;
+                ox += e.deltaX * unit; oy += e.deltaY * unit;
+                clamp(); apply();
+                if (Math.abs(ox - bx) + Math.abs(oy - by) > 0.5) { e.preventDefault(); return; }
+                scrollBy(e.deltaX * unit / mag, e.deltaY * unit / mag); // at its edge: on to the page
             }, { passive: false, capture: true }); }`;
         const tell = (webview) => webview.executeJavaScript(`window.__goguryeoZoomF = ${webview.getZoomFactor()}`).catch(() => {});
         const ready = (webview) => {
