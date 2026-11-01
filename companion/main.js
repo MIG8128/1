@@ -47,6 +47,8 @@ const SOLO_CLASS = "goguryeo-solo"; // body: a normal tab fills the screen, the 
 const SOLO_OFF_CLASS = "goguryeo-solo-off"; // a pane or split folded away for it
 const MEMBERS_KEY = "goguryeo-split-members"; // the split's page in each pane, by leaf id
 const GRIP_CLASS = "goguryeo-pane-grip"; // the bar on top of each split pane, to drag the pane elsewhere
+const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane previews its move, the cards glide to their new boxes
+const PANE_PREVIEW_MS = 320; // that glide (the theme's transition)
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
 const EDGE_SWIPE_AT = 0.35; // share of the width to pull before letting go navigates
@@ -2148,6 +2150,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (index != null) {
             d.drop.removeClass("is-shown");
             if (d.target?.bar && d.target.index === index) return;
+            if (d.target && !d.target.bar) this.clearPanePreview();
             d.target = { bar: true, index };
             this.showBarSlot(index);
             this.haptic();
@@ -2155,20 +2158,17 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         this.hideBarSlot();
         const t = this.paneDropAt(ev.clientX, ev.clientY, d.pane);
-        if (t?.pane === d.target?.pane && t?.side === d.target?.side) return;
+        if (t && t.pane === d.target?.pane && t.side === d.target?.side) return;
+        if (!t && d.target && !d.target.bar) this.clearPanePreview();
         d.target = t;
         d.drop.toggleClass("is-shown", !!t);
         if (!t) return;
         this.haptic(); // crossed into a new place
-        const r = t.pane.containerEl.getBoundingClientRect();
-        let { left, top, width, height } = r;
-        if (t.side === "left" || t.side === "right") {
-            width /= 2;
-            if (t.side === "right") left += width;
-        } else if (t.side === "top" || t.side === "bottom") {
-            height /= 2;
-            if (t.side === "bottom") top += height;
-        }
+        // The other panes make room: every card glides to where the move
+        // would put it, and the drop box sits where the pane will land
+        const rects = this.previewPanes(d.pane, t);
+        const r = rects?.get(d.pane) ?? t.pane.containerEl.getBoundingClientRect();
+        const { left, top, width, height } = r;
         const pad = 6;
         Object.assign(d.drop.style, {
             left: `${left + pad}px`,
@@ -2184,7 +2184,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
     paneDropAt(x, y, from) {
         for (const pane of this.splitGroups ?? []) {
             if (pane === from || pane.containerEl.hasClass(SOLO_OFF_CLASS)) continue;
-            const r = pane.containerEl.getBoundingClientRect();
+            // Where the cards stood before the preview moved them
+            const r = this.panePreview?.home.get(pane) ?? pane.containerEl.getBoundingClientRect();
             if (x < r.left || x > r.right || y < r.top || y > r.bottom || !r.width || !r.height) continue;
             const fx = (x - r.left) / r.width;
             const fy = (y - r.top) / r.height;
@@ -2207,6 +2208,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         d.drop?.remove();
         const toBar = !cancelled && d.moving && d.target?.bar;
         this.hideBarSlot(toBar);
+        const toPane = !cancelled && d.moving && d.target && !d.target.bar;
+        // Dropped: the real layout takes over where the preview left the
+        // cards; otherwise they glide back
+        this.clearPanePreview(toPane);
         if (cancelled || !d.moving || !d.target) return;
         try {
             if (toBar) this.unsplitPage(this.splitPages?.get(d.pane), d.target.index);
@@ -2215,6 +2220,170 @@ module.exports = class GoguryeoCompanion extends Plugin {
         } catch (err) {
             console.error("Goguryeo: couldn't move the pane", err);
         }
+    }
+
+    // ---- Split screen: the panes make room while one is dragged ----
+
+    // Lays the cards out as moving `src` to `t` would, from a model of
+    // Obsidian's splits (each split's direction and its children's sizes,
+    // as in splitPlaces), and glides every card there. A card is pinned
+    // with position: fixed at its new box, so the page inside reflows like
+    // the real thing; no transform, which would take the pinned toolbar
+    // along. Returns the new boxes.
+    previewPanes(src, t) {
+        const panes = (this.splitGroups ?? []).filter((pane) => !pane.containerEl.hasClass(SOLO_OFF_CLASS));
+        let p = this.panePreview;
+        if (p) window.clearTimeout(p.timer); // gliding home: turn around
+        else p = this.panePreview = {
+            panes,
+            home: new Map(panes.map((pane) => [pane, pane.containerEl.getBoundingClientRect()])),
+        };
+
+        // The model: { pane } or { dir, kids: [{ node, size }] }
+        const build = (node) => {
+            if (node.type === "tabs") return panes.includes(node) ? { pane: node } : null;
+            const kids = [];
+            for (const k of node.children ?? []) {
+                const m = build(k);
+                // Obsidian's own size, or null: an equal share
+                if (m) kids.push({ node: m, size: k.dimension > 0 ? k.dimension : null });
+            }
+            // A split with one child stays (Obsidian keeps it, and it has no
+            // margins of its own, unlike a card)
+            return kids.length ? { dir: node.direction, kids } : null;
+        };
+        const tree = build(this.app.workspace.rootSplit);
+        const find = (node, pane, parent = null) => {
+            if (node.pane === pane) return { node, parent };
+            for (const k of node.kids ?? []) {
+                const f = find(k.node, pane, node);
+                if (f) return f;
+            }
+            return null;
+        };
+        const s = tree && find(tree, src);
+        if (!s?.parent || !find(tree, t.pane)) return null;
+        if (t.side === "center") {
+            find(tree, t.pane).node.pane = src;
+            s.node.pane = t.pane;
+        } else {
+            // Out of its place: its siblings share its room
+            s.parent.kids = s.parent.kids.filter((k) => k.node !== s.node);
+            // In beside the target, which gives it half its room
+            const d = find(tree, t.pane);
+            const dir = t.side === "left" || t.side === "right" ? "vertical" : "horizontal";
+            const before = t.side === "left" || t.side === "top";
+            const entry = d.parent?.kids.find((k) => k.node === d.node);
+            if (entry && d.parent.dir === dir) {
+                if (entry.size !== null) entry.size /= 2; // as Obsidian's splitLeaf
+                const i = d.parent.kids.indexOf(entry);
+                d.parent.kids.splice(before ? i : i + 1, 0, { node: { pane: src }, size: entry.size });
+            } else {
+                const pair = [{ node: { pane: src }, size: null }, { node: { pane: t.pane }, size: null }];
+                if (!before) pair.reverse();
+                delete d.node.pane;
+                Object.assign(d.node, { dir, kids: pair });
+            }
+            // Then Obsidian folds a split left with one child into that
+            // child (not the root)
+            const fold = (node) => {
+                for (const k of node.kids ?? []) {
+                    fold(k.node);
+                    while (k.node.kids?.length === 1) k.node = k.node.kids[0].node;
+                }
+            };
+            fold(tree);
+        }
+
+        // Boxes as the browser would lay them out: each split shares its
+        // room by size after its cards' margins (only the cards have
+        // margins; the theme gives the top row's cards a tall top margin,
+        // room for the toolbar rows)
+        p.margins ??= new Map(panes.map((pane) => {
+            const s = getComputedStyle(pane.containerEl);
+            return [pane, [s.marginTop, s.marginRight, s.marginBottom, s.marginLeft].map(parseFloat)];
+        }));
+        if (!p.area) {
+            const root = this.app.workspace.rootSplit.containerEl;
+            const r = root.getBoundingClientRect();
+            const s = getComputedStyle(root);
+            p.area = {
+                x: r.left + parseFloat(s.paddingLeft), y: r.top + parseFloat(s.paddingTop),
+                w: r.width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight),
+                h: r.height - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom),
+            };
+        }
+        const homeTop = Math.min(...panes.map((pane) => p.home.get(pane).top - p.margins.get(pane)[0]));
+        const topPane = panes.find((pane) => p.home.get(pane).top - p.margins.get(pane)[0] <= homeTop + 1);
+        const lowPane = panes.find((pane) => pane !== topPane && p.home.get(pane).top - p.margins.get(pane)[0] > homeTop + 1);
+        const topMargin = topPane ? p.margins.get(topPane)[0] : 0;
+        const lowMargin = lowPane ? p.margins.get(lowPane)[0] : 0;
+        const [, mr, mb, ml] = p.margins.get(panes[0]);
+        const rects = new Map();
+        const walk = (node, x, y, w, h, atTop) => {
+            if (node.pane) {
+                const mt = atTop ? topMargin : lowMargin;
+                return void rects.set(node.pane, new DOMRect(x + ml, y + mt, w - ml - mr, h - mt - mb));
+            }
+            const across = node.dir === "vertical"; // side by side
+            const margin = (k, i) => (!k.node.pane ? 0 : across ? ml + mr : (atTop && i === 0 ? topMargin : lowMargin) + mb);
+            const known = node.kids.filter((k) => k.size !== null);
+            const even = known.length ? known.reduce((a, k) => a + k.size, 0) / known.length : 1;
+            const size = (k) => k.size ?? even;
+            const total = node.kids.reduce((a, k) => a + size(k), 0) || 1;
+            const free = (across ? w : h) - node.kids.reduce((a, k, i) => a + margin(k, i), 0);
+            let at = 0;
+            node.kids.forEach((k, i) => {
+                const len = free * size(k) / total + margin(k, i);
+                if (across) walk(k.node, x + at, y, len, h, atTop);
+                else walk(k.node, x, y + at, w, len, atTop && i === 0);
+                at += len;
+            });
+        };
+        walk(tree, p.area.x, p.area.y, p.area.w, p.area.h, true);
+
+        if (!p.live) {
+            // Pinned where they stand first, so the move below glides
+            p.live = true;
+            for (const pane of panes) this.pinPane(pane, p.home.get(pane));
+            void document.body.offsetWidth;
+            document.body.addClass(PANE_PREVIEW_CLASS);
+        }
+        for (const [pane, r] of rects) this.pinPane(pane, r);
+        return rects;
+    }
+
+    pinPane(pane, r) {
+        Object.assign(pane.containerEl.style, {
+            position: "fixed",
+            left: `${r.left}px`,
+            top: `${r.top}px`,
+            width: `${r.width}px`,
+            height: `${r.height}px`,
+            margin: "0",
+            boxSizing: "border-box",
+        });
+    }
+
+    // The cards glide home and are let go; `instant` lets go at once (a
+    // drop: the real layout takes over from where the preview left them)
+    clearPanePreview(instant) {
+        const p = this.panePreview;
+        if (!p) return;
+        window.clearTimeout(p.timer);
+        const done = () => {
+            if (this.panePreview !== p) return;
+            this.panePreview = null;
+            document.body.removeClass(PANE_PREVIEW_CLASS);
+            for (const pane of p.panes) {
+                for (const key of ["position", "left", "top", "width", "height", "margin", "box-sizing"]) {
+                    pane.containerEl.style.removeProperty(key);
+                }
+            }
+        };
+        if (instant || !p.live) return done();
+        for (const pane of p.panes) this.pinPane(pane, p.home.get(pane));
+        p.timer = window.setTimeout(done, PANE_PREVIEW_MS + 40);
     }
 
     // ---- Split screen: a page leaves the split, into the top tab bar ----
@@ -2940,6 +3109,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     clearSplit() {
         const body = document.body;
         if (this.paneDrag) this.endPaneDrag(null, true);
+        this.clearPanePreview(true);
         if (this.partDrag) this.endPartDrag(null, true);
         this.renderGrips([]);
         body.removeClass(SPLIT_CLASS, ONE_PANE_CLASS);

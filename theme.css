@@ -1580,11 +1580,36 @@ body.goguryeo-pane-dragging * {
     user-select: none !important;
 }
 
+/* A web page takes the pointer for itself: over one, the drag would never
+   hear the pointer move or let go */
+body.goguryeo-pane-dragging webview {
+    pointer-events: none !important;
+}
+
 /* The pane being moved steps back: only its page fades (a fade or scale on
    the pane would take its pinned toolbar along) */
 body.goguryeo-split .mod-root .workspace-tabs.goguryeo-pane-lifted .workspace-leaf-content > .view-content {
     opacity: 0.4;
     transition: opacity 0.2s ease;
+}
+
+/* The other panes make room while it's dragged: the companion pins each
+   card at the box the move would give it, and the cards glide there */
+body.goguryeo-pane-preview .mod-root .workspace-tabs {
+    transition: left 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), top 0.32s cubic-bezier(0.3, 1.1, 0.4, 1),
+        width 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), height 0.32s cubic-bezier(0.3, 1.1, 0.4, 1);
+}
+
+body.goguryeo-pane-preview .goguryeo-pane-drop {
+    transition: left 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), top 0.32s cubic-bezier(0.3, 1.1, 0.4, 1),
+        width 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), height 0.32s cubic-bezier(0.3, 1.1, 0.4, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.goguryeo-pane-preview .mod-root .workspace-tabs,
+    body.goguryeo-pane-preview .goguryeo-pane-drop {
+        transition: none;
+    }
 }
 
 /* Where it will go: a glass box over half the pane (an edge) or all of
