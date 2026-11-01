@@ -48,6 +48,7 @@ const SOLO_OFF_CLASS = "goguryeo-solo-off"; // a pane or split folded away for i
 const MEMBERS_KEY = "goguryeo-split-members"; // the split's page in each pane, by leaf id
 const GRIP_CLASS = "goguryeo-pane-grip"; // the bar on top of each split pane, to drag the pane elsewhere
 const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane previews its move, the cards glide to their new boxes
+const NEW_PANE = Object.freeze({ newPane: true }); // previewPanes: a pane not made yet (a tab dropped on an edge)
 const PANE_PREVIEW_MS = 320; // that glide (the theme's transition)
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
 const EDGE_SWIPE_ZONE = 24; // px from the left/right edge where a back/forward swipe starts
@@ -2306,14 +2307,15 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
             return null;
         };
-        const s = tree && find(tree, src);
-        if (!s?.parent || !find(tree, t.pane)) return null;
+        const fresh = src === NEW_PANE; // a tab about to become a pane
+        const s = tree && !fresh && find(tree, src);
+        if ((!fresh && !s?.parent) || !tree || !find(tree, t.pane)) return null;
         if (t.side === "center") {
             find(tree, t.pane).node.pane = src;
             s.node.pane = t.pane;
         } else {
             // Out of its place: its siblings share its room
-            s.parent.kids = s.parent.kids.filter((k) => k.node !== s.node);
+            if (!fresh) s.parent.kids = s.parent.kids.filter((k) => k.node !== s.node);
             // In beside the target, which gives it half its room
             const d = find(tree, t.pane);
             const dir = t.side === "left" || t.side === "right" ? "vertical" : "horizontal";
@@ -2394,7 +2396,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             void document.body.offsetWidth;
             document.body.addClass(PANE_PREVIEW_CLASS);
         }
-        for (const [pane, r] of rects) this.pinPane(pane, r);
+        for (const [pane, r] of rects) if (pane !== NEW_PANE) this.pinPane(pane, r);
         return rects;
     }
 
@@ -2627,6 +2629,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const own = this.barTabs().indexOf(d.part);
             if (index === own || index === own + 1) index = null;
         }
+        // A normal tab carried down onto the edge of a pane on screen: it
+        // becomes a pane of the split there, and the panes make room
+        if (d.tab && this.tabToEdge(d, index)) return;
         if (index === d.target) return;
         d.target = index;
         if (index == null) this.hideBarSlot();
@@ -2636,12 +2641,83 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
     }
 
+    // Over the panes (not the bar, the split on screen): the edge a tab
+    // would split, previewed. Returns whether the tab is over an edge.
+    tabToEdge(d, index) {
+        const bar = this.sharedBar?.getBoundingClientRect();
+        const offBar = !bar || d.y > bar.bottom + 16;
+        const t = index == null && offBar && !document.body.hasClass(SOLO_CLASS)
+            ? this.paneDropAt(d.x, d.y, null) : null;
+        const edge = t && t.side !== "center" ? t : null;
+        if (!edge) {
+            if (d.edge) {
+                d.edge = null;
+                d.drop?.removeClass("is-shown");
+                this.clearPanePreview();
+            }
+            return false;
+        }
+        if (d.target != null) {
+            d.target = null;
+            this.hideBarSlot();
+        }
+        if (edge.pane === d.edge?.pane && edge.side === d.edge?.side) return true;
+        d.edge = edge;
+        d.drop ??= document.body.createDiv("goguryeo-pane-drop");
+        const r = this.previewPanes(NEW_PANE, edge)?.get(NEW_PANE);
+        if (r) {
+            const pad = 6;
+            Object.assign(d.drop.style, {
+                left: `${r.left + pad}px`, top: `${r.top + pad}px`,
+                width: `${Math.max(0, r.width - pad * 2)}px`, height: `${Math.max(0, r.height - pad * 2)}px`,
+            });
+        }
+        d.drop.addClass("is-shown");
+        this.haptic();
+        return true;
+    }
+
+    // The tab leaves its pane and becomes a pane of the split beside
+    // `t.pane`, at its edge (Obsidian's splitLeaf, as a dropped tab does)
+    splitTabInto(leaf, t) {
+        const { workspace } = this.app;
+        const src = leaf?.parent;
+        const anchor = t.pane.children[t.pane.currentTab] ?? t.pane.children[0];
+        if (!src || !anchor || anchor === leaf) return;
+        const shown = src.children[src.currentTab];
+        src.removeChild(leaf);
+        if (shown && shown !== leaf && shown.parent === src) src.selectTab(shown);
+        const dir = t.side === "left" || t.side === "right" ? "vertical" : "horizontal";
+        workspace.splitLeaf(anchor, leaf, dir, t.side === "left" || t.side === "top");
+        if (leaf.parent) (this.splitPages ??= new Map()).set(leaf.parent, leaf);
+        workspace.setActiveLeaf(leaf, { focus: true });
+        workspace.requestSaveLayout?.();
+        this.scheduleThumbs();
+    }
+
     endPartDrag(e, cancelled) {
         const d = this.partDrag;
         if (!d || (e && e.pointerId !== d.id)) return;
         this.partDrag = null;
         d.off();
         d.ghost?.remove();
+        d.drop?.remove();
+        const toEdge = !cancelled && d.live && d.edge;
+        this.clearPanePreview(!!toEdge);
+        if (toEdge) {
+            this.hideBarSlot(true);
+            d.part.removeClass("is-placeholder");
+            document.body.removeClass("goguryeo-pane-dragging");
+            this.swallowPartClick = true;
+            window.setTimeout(() => { this.swallowPartClick = false; }, 400);
+            try {
+                this.splitTabInto(d.leaf, d.edge);
+                this.haptic();
+            } catch (err) {
+                console.error("Goguryeo: couldn't split the tab in", err);
+            }
+            return;
+        }
         d.part.removeClass("is-placeholder");
         if (d.tab) this.followBar(400);
         document.body.removeClass("goguryeo-pane-dragging");
