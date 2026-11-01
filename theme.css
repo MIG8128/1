@@ -1829,9 +1829,23 @@ body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.goguryeo-shared-t
     pointer-events: auto;
 }
 
-/* The frosted band behind the rows goes with them */
+/* The frosted band behind the rows goes with them, and comes back at its
+   full height with them (the note's top room is only 10px here, and the
+   band is sized from it). In a top card it starts at the card's top. */
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+    transition: opacity 0.25s ease;
+}
+
 body.goguryeo-top-hidden:not(.goguryeo-top-peek):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
     opacity: 0;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top .workspace-leaf-content::after {
+    height: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-row2-h) + 16px);
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top .workspace-leaf-content::after {
+    height: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-row2-h) + 16px - var(--g-gap));
 }
 
 
