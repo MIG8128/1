@@ -1593,6 +1593,56 @@ body.goguryeo-split .mod-root .workspace-tabs.goguryeo-pane-lifted .workspace-le
     transition: opacity 0.2s ease;
 }
 
+/* Obsidian's own tab drag (a tab dropped on a pane's edge splits it): it
+   previews the target pane, shrunk, in .workspace-fake-target-overlay, a
+   copy that keeps the cards' classes. The overlay has a transform, so the
+   copy's pinned rows landed inside it and its tall top margin squeezed the
+   page to nothing. The copy is a plain card here, without the rows (the
+   real ones stay on screen), and the drop place is the same glass box as
+   a dragged pane's. */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-fake-target-overlay {
+    border: 1.5px solid var(--g-pane-border, rgba(255, 255, 255, 0.16));
+    border-radius: 16px;
+    box-shadow: var(--g-panel-shadow);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-fake-target-overlay > .workspace-tabs {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0;
+    box-shadow: none !important;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-fake-target-overlay :is(.view-header, .goguryeo-pane-grip, .workspace-tab-header-container > :not(.workspace-tab-header-container-inner)) {
+    display: none !important;
+}
+
+/* Obsidian hides the real pane meanwhile (an inline opacity: 0), and the
+   path row pinned in it went too: it stays, the rest of the pane doesn't */
+body.is-grabbing:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs[style*="opacity: 0"] {
+    opacity: 1 !important;
+    visibility: hidden;
+}
+
+body.is-grabbing:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs[style*="opacity: 0"] .workspace-leaf.mod-active > .workspace-leaf-content > .view-header,
+body.is-grabbing:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs[style*="opacity: 0"] > .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    visibility: visible;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-drop-overlay::before {
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+    border: 1.5px solid hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7);
+    border-radius: 14px;
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-panel-shadow);
+    opacity: 1;
+}
+
 /* The other panes make room while it's dragged: the companion pins each
    card at the box the move would give it, and the cards glide there */
 body.goguryeo-pane-preview .mod-root .workspace-tabs {
