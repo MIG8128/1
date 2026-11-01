@@ -1600,6 +1600,32 @@ body.goguryeo-split .mod-root .workspace-tabs.goguryeo-pane-lifted .workspace-le
     transition: opacity 0.2s ease;
 }
 
+/* The frosted band behind the top rows, in the card layout too: each card's
+   own band starts at the card, below the rows, so the rows floated over
+   the bare background (a new window, without cards, had it). One band
+   across the note area, under the rows and the cards, fading out where
+   the cards begin; it goes with the rows in full screen. */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    content: "";
+    position: fixed;
+    z-index: 0;
+    top: var(--g-root-top, 0px);
+    left: var(--g-root-left, 0px);
+    right: var(--g-root-right, 0px);
+    height: calc(var(--g-split-top) + 6px);
+    background-color: color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+body.goguryeo-top-hidden:not(.goguryeo-top-peek).goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    opacity: 0;
+}
+
 /* Obsidian's own tab drag (a tab dropped on a pane's edge splits it): it
    previews the target pane, shrunk, in .workspace-fake-target-overlay, a
    copy that keeps the cards' classes. The overlay has a transform, so the
