@@ -1575,10 +1575,140 @@ body.is-tablet .mod-root .workspace-tabs > .goguryeo-pane-grip {
     background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.75);
 }
 
-.goguryeo-pane-grip.is-held .goguryeo-pane-grip-bar {
+.goguryeo-pane-grip:is(.is-held, .is-open) .goguryeo-pane-grip-bar {
     width: 52px;
     opacity: 1;
     background-color: var(--interactive-accent);
+}
+
+/* A tap on the grip: the pane's menu, a glass panel under it (design B on
+   the canvas): Own tab · Swap · Move · Close, and below them the places
+   to move to or the panes to swap with (companion: openGripMenu) */
+.goguryeo-grip-menu {
+    position: fixed;
+    z-index: var(--layer-menu);
+    width: min(340px, calc(100vw - 16px));
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 18px;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-shadow, var(--g-panel-shadow));
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    transform-origin: 50% 0;
+}
+
+.goguryeo-grip-menu-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.goguryeo-grip-menu :where(button) {
+    all: unset;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile {
+    height: 68px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 12px;
+    background-color: color-mix(in srgb, var(--text-normal) 8%, transparent);
+    transition: background-color 0.15s ease, scale 0.2s cubic-bezier(0.3, 1.3, 0.4, 1);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile:hover,
+.goguryeo-grip-menu .goguryeo-grip-tile.is-on {
+    background-color: color-mix(in srgb, var(--text-normal) 15%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile:active {
+    scale: 0.94;
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.is-on {
+    color: var(--text-accent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.mod-danger {
+    color: var(--text-error);
+    background-color: color-mix(in srgb, var(--text-error) 14%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.mod-danger:hover {
+    background-color: color-mix(in srgb, var(--text-error) 22%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.is-disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.goguryeo-grip-tile-icon .svg-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.goguryeo-grip-menu-extra:not(:empty) {
+    margin-top: 8px;
+    padding: 6px 4px 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.goguryeo-grip-menu-hint {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.goguryeo-grip-menu-places,
+.goguryeo-grip-menu-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.goguryeo-grip-menu .goguryeo-grip-place {
+    width: 38px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--text-normal) 7%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-place:hover {
+    background-color: color-mix(in srgb, var(--text-normal) 15%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-place.is-here {
+    color: var(--text-accent);
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.16);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-chip {
+    max-width: 140px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background-color: color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-chip:hover {
+    background-color: color-mix(in srgb, var(--text-normal) 15%, transparent);
 }
 
 body.goguryeo-pane-dragging,

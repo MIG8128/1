@@ -48,6 +48,7 @@ const SOLO_OFF_CLASS = "goguryeo-solo-off";
 const FOLDED_CLASS = "goguryeo-folded"; // body: some panes are folded away (a lone tab, or another split on screen) // a pane or split folded away for it
 const MEMBERS_KEY = "goguryeo-split-members"; // the split's page in each pane, by leaf id
 const GRIP_CLASS = "goguryeo-pane-grip"; // the bar on top of each split pane, to drag the pane elsewhere
+const GRIP_MENU_CLASS = "goguryeo-grip-menu"; // a tap on the grip: own tab, swap, move, close (canvas: grip menu B)
 const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane previews its move, the cards glide to their new boxes
 const NEW_PANE = Object.freeze({ newPane: true }); // previewPanes: a pane not made yet (a tab dropped on an edge)
 const PANE_PREVIEW_MS = 320; // that glide (the theme's transition)
@@ -2271,6 +2272,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         // Dropped: the real layout takes over where the preview left the
         // cards; otherwise they glide back
         this.clearPanePreview(toPane);
+        // A tap, not a drag: the pane's menu
+        if (!cancelled && !d.moving) return this.openGripMenu(d.pane, d.grip);
         if (cancelled || !d.moving || !d.target) return;
         try {
             if (toBar) this.unsplitPage(this.splitPages?.get(d.pane), d.target.index);
@@ -2980,6 +2983,14 @@ module.exports = class GoguryeoCompanion extends Plugin {
                     of.set(pane, id);
                 }
             }
+            // a split found with one pane only is no split
+            const found = new Map();
+            for (const id of of.values()) found.set(id, (found.get(id) ?? 0) + 1);
+            for (const [pane, id] of [...of]) {
+                if (found.get(id) > 1) continue;
+                of.delete(pane);
+                pages.delete(pane);
+            }
             if (!of.size) {
                 // nothing saved (or nothing found): every pane in one split
                 const id = this.splitSeq++;
@@ -3488,7 +3499,156 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.applyFold([], null);
     }
 
+    // ---- Split screen: the grip's menu (a tap on the bar on top of a pane) ----
+
+    // A glass panel under the grip, design B on the canvas: four tiles,
+    // Own tab (the page leaves the split as a normal tab), Swap (with the
+    // other pane; with 3+ panes, pick which from their names), Move (left,
+    // right, top or bottom of the split; where it is now is green) and
+    // Close (the page). Esc, a tap outside or a done action closes it.
+    openGripMenu(pane, grip) {
+        this.closeGripMenu(true);
+        const page = this.splitPages?.get(pane);
+        if (!page || !grip?.isConnected) return;
+        const id = this.splitOf?.get(pane);
+        const mates = this.splitPanes(id).filter((p) => p !== pane && !p.containerEl.hasClass(SOLO_OFF_CLASS));
+        const menu = document.body.createDiv(GRIP_MENU_CLASS);
+        grip.addClass("is-open");
+        const tiles = menu.createDiv("goguryeo-grip-menu-tiles");
+        const extra = menu.createDiv("goguryeo-grip-menu-extra");
+        const tile = (icon, label, cls, run) => {
+            const b = tiles.createEl("button", { cls: "goguryeo-grip-tile" + (cls ? " " + cls : ""), attr: { "aria-label": label } });
+            setIcon(b.createDiv("goguryeo-grip-tile-icon"), icon);
+            b.createDiv({ cls: "goguryeo-grip-tile-label", text: label });
+            b.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.haptic();
+                run(b);
+            });
+            return b;
+        };
+        const done = (action) => {
+            this.closeGripMenu();
+            try {
+                action();
+            } catch (err) {
+                console.error("Goguryeo: grip menu", err);
+            }
+        };
+        const show = (b, fill) => {
+            const open = !b.hasClass("is-on");
+            tiles.querySelectorAll(".is-on").forEach((el) => el.removeClass("is-on"));
+            extra.empty();
+            if (open) {
+                b.addClass("is-on");
+                fill();
+            }
+            this.placeGripMenu();
+        };
+        tile("lucide-square-arrow-out-up-right", "Own tab", "", () => done(() => {
+            const tabs = this.barTabs();
+            const at = tabs.indexOf(this.splitTabs?.get(id));
+            this.unsplitPage(page, at < 0 ? tabs.length : at + 1);
+        }));
+        tile("lucide-arrow-left-right", "Swap", mates.length ? "" : "is-disabled", (b) => {
+            if (!mates.length) return;
+            if (mates.length === 1) return done(() => this.movePane(pane, mates[0], "center"));
+            show(b, () => {
+                extra.createDiv({ cls: "goguryeo-grip-menu-hint", text: "Swap with" });
+                const row = extra.createDiv("goguryeo-grip-menu-chips");
+                for (const mate of mates) {
+                    const other = this.splitPages.get(mate);
+                    const chip = row.createEl("button", { cls: "goguryeo-grip-chip", text: other?.getDisplayText() ?? "" });
+                    chip.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        this.haptic();
+                        done(() => this.movePane(pane, mate, "center"));
+                    });
+                }
+            });
+        });
+        tile("lucide-move", "Move", mates.length ? "" : "is-disabled", (b) => {
+            if (!mates.length) return;
+            show(b, () => {
+                extra.createDiv({ cls: "goguryeo-grip-menu-hint", text: "Move to" });
+                const row = extra.createDiv("goguryeo-grip-menu-places");
+                const r = pane.containerEl.getBoundingClientRect();
+                const boxes = mates.map((m) => [m, m.containerEl.getBoundingClientRect()]);
+                const edge = {
+                    left: (q) => q.left, right: (q) => -q.right, top: (q) => q.top, bottom: (q) => -q.bottom,
+                };
+                // where it is now: no other pane further that way
+                const now = (side) => boxes.every(([, q]) => edge[side](r) <= edge[side](q) + 2);
+                for (const [side, icon, label] of [
+                    ["left", "lucide-panel-left", "Left"], ["right", "lucide-panel-right", "Right"],
+                    ["top", "lucide-panel-top", "Top"], ["bottom", "lucide-panel-bottom", "Bottom"],
+                ]) {
+                    const here = now(side) && boxes.some(([, q]) => (side === "left" || side === "right"
+                        ? q.top < r.bottom && q.bottom > r.top : q.left < r.right && q.right > r.left));
+                    const b2 = row.createEl("button", { cls: "goguryeo-grip-place" + (here ? " is-here" : ""), attr: { "aria-label": label } });
+                    setIcon(b2, icon);
+                    b2.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        this.haptic();
+                        if (here) return this.closeGripMenu();
+                        // beside the pane furthest that way
+                        const [target] = boxes.slice().sort((a, c) => edge[side](a[1]) - edge[side](c[1]))[0];
+                        done(() => this.movePane(pane, target, side));
+                    });
+                }
+            });
+        });
+        tile("lucide-x", "Close", "mod-danger", () => done(() => page.detach()));
+
+        const off = (e) => {
+            if (e.type === "keydown") {
+                if (e.key !== "Escape") return;
+                e.preventDefault();
+                e.stopPropagation();
+            } else if (menu.contains(e.target) || grip.contains(e.target)) return;
+            this.closeGripMenu();
+        };
+        window.addEventListener("pointerdown", off, true);
+        window.addEventListener("keydown", off, true);
+        this.gripMenu = {
+            menu, grip, pane,
+            off: () => {
+                window.removeEventListener("pointerdown", off, true);
+                window.removeEventListener("keydown", off, true);
+            },
+        };
+        this.placeGripMenu();
+        if (!this.reducedMotion()) {
+            menu.animate([{ opacity: 0, scale: "0.9", translate: "0 -6px" }, { opacity: 1, scale: "1", translate: "0 0" }],
+                { duration: 260, easing: "cubic-bezier(0.3, 1.3, 0.4, 1)" });
+        }
+    }
+
+    // Under the grip, centred on it, inside the window
+    placeGripMenu() {
+        const m = this.gripMenu;
+        if (!m) return;
+        const g = m.grip.getBoundingClientRect();
+        const w = m.menu.offsetWidth;
+        const left = Math.min(Math.max(8, g.left + g.width / 2 - w / 2), window.innerWidth - w - 8);
+        m.menu.style.left = left + "px";
+        m.menu.style.top = (g.bottom + 10) + "px";
+    }
+
+    closeGripMenu(now = false) {
+        const m = this.gripMenu;
+        if (!m) return;
+        this.gripMenu = null;
+        m.off();
+        m.grip.removeClass("is-open");
+        if (now || this.reducedMotion()) return m.menu.remove();
+        m.menu.style.pointerEvents = "none";
+        m.menu.animate([{ opacity: 1, scale: "1" }, { opacity: 0, scale: "0.94" }], { duration: 150, easing: "ease-in", fill: "forwards" })
+            .finished.catch(() => {}).finally(() => m.menu.remove());
+    }
+
     clearSplit() {
+        this.closeGripMenu(true);
         const body = document.body;
         if (this.paneDrag) this.endPaneDrag(null, true);
         this.clearPanePreview(true);
