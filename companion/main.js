@@ -889,8 +889,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
     patchRibbonIsShown() {
         const ribbon = this.app.workspace.leftRibbon?.containerEl;
         if (!ribbon) return;
+        const app = this.app;
+        // Floating exactly when theme section 8 makes it fixed. Read from the
+        // classes, not getComputedStyle: Obsidian asks in the middle of its
+        // layout pass, and computing styles there cost every tab switch a
+        // whole extra style pass (measured)
         ribbon.isShown = function () {
-            return getComputedStyle(this).position !== "fixed" && HTMLElement.prototype.isShown.call(this);
+            const body = document.body;
+            const floats = app.customCss?.theme === "Goguryeo"
+                && !body.hasClass("is-mobile") && !body.hasClass("goguryeo-ribbon-static");
+            return !floats && HTMLElement.prototype.isShown.call(this);
         };
         this.register(() => {
             delete ribbon.isShown;
