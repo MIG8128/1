@@ -275,6 +275,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
         this.app.workspace.onLayoutReady(() => this.setupPopouts());
         if (Platform.isDesktopApp) this.app.workspace.onLayoutReady(() => this.setupWebPinch());
+        if (Platform.isDesktopApp) this.app.workspace.onLayoutReady(() => this.setupTrackpadSwipe());
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.patchSelectTab());
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
@@ -322,7 +323,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         // The picture is drawn from where the page is scrolled to, and the
         // page's own scrollbars are left alone. Pinched back to 1x it's as
         // it was.
-        const listen = `if (!window.__goguryeoZoom4) { window.__goguryeoZoom4 = true;
+        const listen = `if (!window.__goguryeoZoom6) { window.__goguryeoZoom6 = true;
             let mag = 1, ox = 0, oy = 0, saved = null;
             const html = document.documentElement;
             const apply = () => {
@@ -358,7 +359,20 @@ module.exports = class GoguryeoCompanion extends Plugin {
                     clamp(); apply();
                     return;
                 }
-                if (mag === 1) return;
+                if (mag === 1) {
+                    // sideways, and nothing here scrolls that way: a swipe for the plugin
+                    const dx = e.deltaX * unit;
+                    if (!dx || Math.abs(dx) < Math.abs(e.deltaY * unit) * 1.2) return;
+                    for (let el = e.target; el && el.nodeType === 1; el = el.parentElement) {
+                        if (el.scrollWidth <= el.clientWidth + 1) continue;
+                        const o = getComputedStyle(el).overflowX;
+                        if (el !== document.scrollingElement && o !== "auto" && o !== "scroll") continue;
+                        if (dx < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth - 1) return;
+                    }
+                    e.preventDefault(); // not Chromium's own swipe back, without the slide
+                    console.debug("${MARK}swipe:" + dx + ":" + e.deltaY * unit);
+                    return;
+                }
                 const bx = ox, by = oy;
                 ox += e.deltaX * unit; oy += e.deltaY * unit;
                 clamp(); apply();
@@ -374,6 +388,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
             } catch (e) { /* not attached yet: dom-ready calls again */ }
         };
         const onMessage = (webview, message) => {
+            if (message?.startsWith(MARK + "swipe:")) {
+                const [dx, dy] = message.slice(MARK.length + 6).split(":").map(Number);
+                let leaf = null;
+                this.app.workspace.iterateAllLeaves((l) => { if (l.view?.webview === webview) leaf = l; });
+                if (leaf) this.onSwipeWheel({ deltaX: dx, deltaY: dy, deltaMode: 0, ctrlKey: false }, leaf);
+                return;
+            }
             if (!message?.startsWith(MARK + "zoom:")) return;
             const dir = -Math.sign(parseFloat(message.slice(MARK.length + 5)) || 0); // wheel up: in
             if (!dir) return;
@@ -392,11 +413,21 @@ module.exports = class GoguryeoCompanion extends Plugin {
             wired.add(webview);
             const onReady = () => ready(webview); // each page it loads
             const onConsole = (e) => onMessage(webview, e.message);
+            // a picture of each page once it has loaded, for the swipe back
+            // to it (taken as the page is left, it could be the next one)
+            let shotTimer = 0;
+            const onLoaded = () => {
+                window.clearTimeout(shotTimer);
+                shotTimer = window.setTimeout(() => this.keepWebShot(webview), 400);
+            };
             webview.addEventListener("dom-ready", onReady);
             webview.addEventListener("console-message", onConsole);
+            webview.addEventListener("did-stop-loading", onLoaded);
             webview.gGoguryeoOff = () => {
+                window.clearTimeout(shotTimer);
                 webview.removeEventListener("dom-ready", onReady);
                 webview.removeEventListener("console-message", onConsole);
+                webview.removeEventListener("did-stop-loading", onLoaded);
             };
             ready(webview);
         });
@@ -409,6 +440,23 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 try { webview.setVisualZoomLevelLimits?.(1, 1); } catch (e) { /* gone */ }
             }
         });
+    }
+
+    // The last picture of each web page, by address (a few dozen kept)
+    keepWebShot(webview) {
+        let url = null;
+        try {
+            url = webview.getURL();
+            if (!url || webview.isLoading()) return;
+        } catch (e) {
+            return;
+        }
+        webview.capturePage?.().then((image) => {
+            const shots = (this.webShots ??= new Map());
+            shots.delete(url);
+            shots.set(url, image.toDataURL());
+            while (shots.size > 40) shots.delete(shots.keys().next().value);
+        }).catch(() => {});
     }
 
     // ---- New windows (popouts) ----
@@ -1934,6 +1982,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // page, so that is when the copy is taken. It is kept with that state,
     // which is the very object that goes into the back/forward lists.
     setupEdgeSwipe() {
+        this.patchSnapshots();
+        this.registerDomEvent(document, "touchstart", (e) => this.onEdgeStart(e), { passive: true, capture: true });
+        this.registerDomEvent(document, "touchmove", (e) => this.onEdgeMove(e), { passive: false, capture: true });
+        this.registerDomEvent(document, "touchend", (e) => this.onEdgeEnd(e, true), { passive: true, capture: true });
+        this.registerDomEvent(document, "touchcancel", (e) => this.onEdgeEnd(e, false), { passive: true, capture: true });
+    }
+
+    // The copies of the pages left behind, for the swipes
+    patchSnapshots() {
+        if (this.snapshots) return;
         this.snapshots = new WeakMap();
         this.edgeSwipe = null;
         const proto = WorkspaceLeaf.prototype;
@@ -1957,10 +2015,99 @@ module.exports = class GoguryeoCompanion extends Plugin {
             else delete proto.getHistoryState;
         });
         this.register(() => this.endPageSwipe());
-        this.registerDomEvent(document, "touchstart", (e) => this.onEdgeStart(e), { passive: true, capture: true });
-        this.registerDomEvent(document, "touchmove", (e) => this.onEdgeMove(e), { passive: false, capture: true });
-        this.registerDomEvent(document, "touchend", (e) => this.onEdgeEnd(e, true), { passive: true, capture: true });
-        this.registerDomEvent(document, "touchcancel", (e) => this.onEdgeEnd(e, false), { passive: true, capture: true });
+    }
+
+    // ---- Desktop: two fingers sideways on a trackpad go back / forward ----
+
+    // As on the iPad's edge swipe, Safari style: two fingers moving right
+    // pull the page right to go back, moving left bring the next page in
+    // to go forward; the page follows the fingers over a copy of the one
+    // it goes to. A trackpad's two-finger scroll comes as wheel events, so
+    // a sideways one that nothing under the pointer can scroll that way
+    // (a wide table, a code block) starts it, when the pane has somewhere
+    // to go. It ends when the wheel stops (a fling carries it on): past
+    // EDGE_SWIPE_AT of the width it goes there, else it springs back. In a
+    // web viewer the page's listener passes its sideways wheel on.
+    setupTrackpadSwipe() {
+        this.patchSnapshots();
+        this.registerDomEvent(document, "wheel", (e) => this.onSwipeWheel(e), { passive: false, capture: true });
+        this.register(() => window.clearTimeout(this.edgeSwipe?.idle));
+    }
+
+    // Can the element at (or above) `el` scroll sideways in `dx`'s direction?
+    scrollsSideways(el, dx) {
+        for (; el && el !== document.body; el = el.parentElement) {
+            if (el.scrollWidth <= el.clientWidth + 1) continue;
+            const o = getComputedStyle(el).overflowX;
+            if (o !== "auto" && o !== "scroll") continue;
+            if (dx < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth - 1) return true;
+        }
+        return false;
+    }
+
+    // e: a wheel event, or one passed on by a web viewer's page (leaf set)
+    onSwipeWheel(e, fromLeaf = null) {
+        if (e.ctrlKey) return;
+        const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
+        const dx = e.deltaX * unit;
+        const dy = e.deltaY * unit;
+        const now = performance.now();
+        let s = this.edgeSwipe;
+        if (s && !s.wheel) return; // a finger's swipe
+        if (s?.settling || now < (this.swipeQuietUntil ?? 0)) {
+            // the fling of a swipe that's done: not a new one
+            if (Math.abs(dx) > Math.abs(dy)) e.preventDefault?.();
+            this.swipeQuietUntil = now + 160;
+            return;
+        }
+        if (!s) {
+            if (!dx || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+            if (now < (this.wheelScrollUntil ?? 0)) { // a sideways scroll going on
+                this.wheelScrollUntil = now + 160;
+                return;
+            }
+            let leaf = fromLeaf;
+            if (!leaf) {
+                const el = e.target?.closest?.(".mod-root .workspace-leaf");
+                if (!el) return;
+                this.app.workspace.iterateRootLeaves((l) => { if (l.containerEl === el) leaf = l; });
+                if (!leaf || this.scrollsSideways(e.target, dx)) {
+                    this.wheelScrollUntil = now + 160;
+                    return;
+                }
+            }
+            const type = leaf?.view?.getViewType?.();
+            if (!leaf?.view?.contentEl || ["canvas", "graph", "localgraph", "excalidraw"].includes(type)) return;
+            if (document.querySelector(".modal-container, .menu")) return;
+            const dir = dx < 0 ? -1 : 1; // fingers right: back
+            const steps = dir < 0 ? leaf.history?.backHistory : leaf.history?.forwardHistory;
+            if (!steps?.length) return;
+            s = this.edgeSwipe = { wheel: true, dir, leaf, entry: steps[steps.length - 1], locked: false, sum: 0, v: 0, t: now };
+        }
+        s.sum = Math.max(0, s.sum + dx * s.dir);
+        const dt = now - s.t;
+        if (dt > 0) s.v = 0.7 * ((dx * s.dir) / dt) + 0.3 * s.v;
+        s.t = now;
+        if (!s.locked && s.sum > LOCK_AT) {
+            s.locked = true;
+            this.startPageSwipe(s);
+        }
+        if (s.locked) {
+            e.preventDefault?.();
+            this.setPageSwipe(s, Math.min(s.width, s.sum));
+        }
+        window.clearTimeout(s.idle);
+        s.idle = window.setTimeout(() => this.endWheelSwipe(s), 120);
+    }
+
+    endWheelSwipe(s) {
+        if (this.edgeSwipe !== s || s.settling) return;
+        if (!s.locked) {
+            this.edgeSwipe = null;
+            return;
+        }
+        this.swipeQuietUntil = performance.now() + 400;
+        this.settlePageSwipe(s, s.pulled >= s.width * EDGE_SWIPE_AT);
     }
 
     // A still copy of a leaf's page: its content inside a bare copy of the
@@ -1971,6 +2118,20 @@ module.exports = class GoguryeoCompanion extends Plugin {
     snapshotPage(leaf, anyView = false) {
         const content = leaf.view?.contentEl;
         if (!content || (!anyView && !leaf.view.navigation) || !content.isConnected) return null;
+        const webview = leaf.view.getViewType?.() === "webviewer" ? leaf.view.webview : null;
+        if (webview || content.querySelector("webview")) {
+            // A web page can't be cloned (a copy of a <webview> loads the
+            // page anew): a picture of it, which comes a moment later
+            const frame = leaf.view.containerEl.cloneNode(false);
+            frame.classList.remove("goguryeo-swiping");
+            frame.appendChild(content.cloneNode(false)).createEl("img", { cls: "goguryeo-swipe-shot" });
+            let ready = null;
+            try {
+                ready = webview?.capturePage?.().then((image) => image.toDataURL()).catch(() => null) ?? null;
+            } catch (e) { /* not attached */ }
+            ready?.then((src) => { if (src) frame.querySelector(".goguryeo-swipe-shot").src = src; });
+            return { frame, scrolls: [], ready };
+        }
         const scrolls = [];
         const walk = (el, path) => {
             if (el.scrollTop || el.scrollLeft) scrolls.push([path, el.scrollTop, el.scrollLeft]);
@@ -1990,6 +2151,14 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const page = createDiv("goguryeo-swipe-page");
         if (snapshot) {
             page.appendChild(snapshot.frame.cloneNode(true));
+            // a web page's picture, if it wasn't there yet
+            snapshot.ready?.then((src) => {
+                const img = page.querySelector(".goguryeo-swipe-shot");
+                if (src && img && !img.src) img.src = src;
+            });
+        } else if (this.webShots?.get(entry?.state?.state?.url)) {
+            const img = page.createEl("img", { cls: "goguryeo-swipe-shot" });
+            img.src = this.webShots.get(entry.state.state.url);
         } else {
             const blank = page.createDiv("goguryeo-swipe-blank");
             if (entry?.icon) setIcon(blank.createDiv("goguryeo-swipe-blank-icon"), entry.icon);
@@ -2100,7 +2269,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const { leaf, entry, dir } = s;
         const frame = leaf.view.containerEl;
         const current = this.snapshotPage(leaf);
-        const target = this.snapshots.get(entry);
+        const web = leaf.view?.getViewType?.() === "webviewer" && this.webShots?.get(entry?.state?.state?.url);
+        const target = web ? null : this.snapshots.get(entry);
         const currentPage = this.makeSwipePage(current, null);
         const targetPage = this.makeSwipePage(target, entry);
         const stage = createDiv("goguryeo-swipe-stage");

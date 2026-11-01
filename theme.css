@@ -2889,6 +2889,17 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
     transition: background-color 0.28s ease-out;
 }
 
+/* A web viewer's page is a picture of it (a <webview> can't be copied) */
+.goguryeo-swipe-page .goguryeo-swipe-shot {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top left;
+    background-color: var(--background-primary);
+}
+
 /* No copy of that page yet (e.g. right after starting Obsidian): its
    name and icon instead */
 .goguryeo-swipe-blank {
