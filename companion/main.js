@@ -29,7 +29,7 @@
 
 const {
     Plugin, Platform, Menu, setIcon, normalizePath,
-    FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, WorkspaceLeaf,
+    FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, TFolder, WorkspaceLeaf, Keymap,
 } = require("obsidian");
 
 const EDGE = 40; // px from the window's left edge where a swipe may start
@@ -78,6 +78,8 @@ const PEEK_REACH = 16; // px past the sidebar the pointer may wander without clo
 const TOP_OPTION_CLASS = "goguryeo-fullscreen-autohide"; // the theme's "Hide the top rows in full screen" option
 const TOP_HIDDEN_CLASS = "goguryeo-top-hidden"; // body: full screen, the path and tab rows slid away
 const TOP_PEEK_CLASS = "goguryeo-top-peek"; // body: and brought back over the note by the pointer
+const FOLDER_NOTES_CLASS = "goguryeo-folder-notes"; // body: the built-in folder notes are on
+const FOLDER_NOTES_PLUGIN = "folder-notes"; // the community Folder notes plugin: while it's on, ours stays off
 const PEEK_TOP = 40; // px at the top where the window edges belong to the title bar
 const OMNI_CLASS = "goguryeo-omnibox"; // the quick switcher docked on the path capsule
 const OMNI_MIN_WIDTH = 420; // px it takes at least (the iPhone folder pill is small)
@@ -138,6 +140,7 @@ class GoguryeoSettingTab extends PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
+        this.folderNotesSection();
         const manager = this.app.plugins.plugins["obsidian-style-settings"]?.settingsManager;
         const config = manager?.config?.goguryeo;
         if (!config) {
@@ -223,6 +226,26 @@ class GoguryeoSettingTab extends PluginSettingTab {
         }
     }
 
+    // The companion's own folder notes. Saved in the plugin's data, so they
+    // follow the vault to every device.
+    folderNotesSection() {
+        const plugin = this.plugin;
+        new Setting(this.containerEl).setName("Folder notes").setHeading();
+        const other = plugin.otherFolderNotesOn();
+        new Setting(this.containerEl)
+            .setName("Folder notes")
+            .setDesc(other
+                ? "The Folder notes plugin is on. Turn it off in Community plugins to use these instead."
+                : "A note named like its folder, inside it (Novel/Novel.md), is the folder's note. Clicking the folder opens it, the note itself is hidden from the file list, and renaming the folder renames the note. Right-click a folder to make one, or a note to turn it into one.")
+            .addToggle((t) => t.setValue(plugin.folderNoteSettings.enabled).setDisabled(other)
+                .onChange(async (v) => {
+                    plugin.folderNoteSettings.enabled = v;
+                    await plugin.saveData(plugin.folderNoteSettings);
+                    plugin.refreshFolderNotes();
+                }));
+        new Setting(this.containerEl).setName("Theme").setHeading();
+    }
+
     // Per device, so it stays out of Style Settings (which syncs with the vault)
     androidNavPicker() {
         new Setting(this.containerEl)
@@ -287,6 +310,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
         if (Platform.isMobile) this.setupHaptics();
         if (!Platform.isPhone) this.setupTabOverview(); // after the haptics, so ⧉ ticks once
+        this.setupFolderNotes(); // after the haptics: a folder click in the file list ticks there
 
         if (!Platform.isDesktopApp) return;
 
@@ -505,6 +529,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     onunload() {
         document.body.removeClass(OPEN_CLASS);
+        document.body.removeClass(FOLDER_NOTES_CLASS);
+        this.folderNoteStyle?.remove();
         document.body.style.removeProperty("--g-bg-url");
         const ribbon = this.getRibbon();
         if (ribbon) this.clearInline(ribbon);
@@ -1212,6 +1238,222 @@ module.exports = class GoguryeoCompanion extends Plugin {
         ).finished.then(remove, remove);
     }
 
+    // ---- Folder notes ----
+
+    // A note named like its folder and kept inside it (Novel/Novel.md) is the
+    // folder's note, the same files the Folder notes plugin uses, so existing
+    // ones keep working. In the file list a click on the folder's name opens
+    // its note (Ctrl/Cmd + click: in a new tab) and opens the folder too; the
+    // arrow still folds it. The note's own row is hidden, and while it's open
+    // the folder row shows as the current one. In the path a folder with a
+    // note is a link to it (has-folder-note, which the iPhone capsule reads).
+    // Renaming a folder renames its note. Right click: a folder makes or opens
+    // its note, a note turns into a folder note (a folder of its name made
+    // around it). It all stays off while the Folder notes plugin is on.
+    setupFolderNotes() {
+        this.folderNoteSettings = { enabled: true };
+        this.folderNotePaths = new Set(); // paths of every folder note
+        this.folderNoteStyle = document.head.createEl("style", { attr: { id: "goguryeo-folder-notes" } });
+        this.app.workspace.onLayoutReady(async () => {
+            this.folderNoteSettings = { enabled: true, ...(await this.loadData()) };
+            this.refreshFolderNotes();
+            const later = () => this.scheduleFolderNotes();
+            this.registerEvent(this.app.vault.on("create", later));
+            this.registerEvent(this.app.vault.on("delete", later));
+            this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+                this.followFolderRename(file, oldPath);
+                later();
+            }));
+            for (const name of ["file-open", "layout-change", "active-leaf-change"]) {
+                this.registerEvent(this.app.workspace.on(name, () => this.scheduleCrumbs()));
+            }
+            // Turning the Folder notes plugin on or off
+            for (const name of ["enablePlugin", "disablePlugin"]) {
+                const plugins = this.app.plugins;
+                const original = plugins[name];
+                if (typeof original !== "function") continue;
+                plugins[name] = function (...args) {
+                    const result = original.apply(this, args);
+                    Promise.resolve(result).then(later, later);
+                    return result;
+                };
+                this.register(() => { if (plugins[name] !== original) plugins[name] = original; });
+            }
+        });
+
+        this.registerDomEvent(document, "click", (e) => this.onFolderClick(e), { capture: true });
+
+        this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+            if (!this.folderNotesOn()) return;
+            if (file instanceof TFolder && !file.isRoot()) {
+                const note = this.folderNoteOf(file.path);
+                if (note) {
+                    menu.addItem((item) => item.setTitle("Open folder note").setIcon("file-text")
+                        .setSection("open").onClick(() => this.openFolderNote(note)));
+                } else {
+                    menu.addItem((item) => item.setTitle("Create folder note").setIcon("file-plus")
+                        .setSection("action").onClick(() => this.createFolderNote(file)));
+                }
+            } else if (file instanceof TFile && file.extension === "md" && !this.isFolderNote(file)) {
+                menu.addItem((item) => item.setTitle("Turn into folder note").setIcon("folder-input")
+                    .setSection("action").onClick(() => this.turnIntoFolderNote(file)));
+            }
+        }));
+    }
+
+    otherFolderNotesOn() {
+        return !!this.app.plugins.enabledPlugins?.has(FOLDER_NOTES_PLUGIN);
+    }
+
+    folderNotesOn() {
+        return !!this.folderNoteSettings?.enabled && !this.otherFolderNotesOn();
+    }
+
+    folderNotePath(folder) {
+        return normalizePath(`${folder.path}/${folder.name}.md`);
+    }
+
+    // The folder note of the folder at this path, if it has one
+    folderNoteOf(path) {
+        const folder = path && this.app.vault.getFolderByPath?.(path);
+        if (!folder || folder.isRoot()) return null;
+        return this.app.vault.getFileByPath(this.folderNotePath(folder));
+    }
+
+    isFolderNote(file) {
+        return file instanceof TFile && !!file.parent && !file.parent.isRoot()
+            && file.extension === "md" && file.basename === file.parent.name;
+    }
+
+    scheduleFolderNotes() {
+        clearTimeout(this.folderNoteTimer);
+        this.folderNoteTimer = window.setTimeout(() => this.refreshFolderNotes(), 50);
+    }
+
+    // The file list is redrawn often, so the marks are CSS rules by path,
+    // not classes on its rows
+    refreshFolderNotes() {
+        const on = this.folderNotesOn();
+        document.body.toggleClass(FOLDER_NOTES_CLASS, on);
+        this.folderNotePaths = new Set();
+        if (on) {
+            for (const f of this.app.vault.getAllLoadedFiles()) {
+                if (this.isFolderNote(f)) this.folderNotePaths.add(f.path);
+            }
+        }
+        const q = (p) => `[data-path="${CSS.escape(p)}"]`;
+        const notes = [...this.folderNotePaths];
+        const list = ".nav-files-container";
+        this.folderNoteStyle.textContent = notes.length ? [
+            notes.map((p) => `${list} .tree-item.nav-file:has(> .nav-file-title${q(p)})`).join(",\n") + " { display: none; }",
+            // the folder's name: a link to its note
+            notes.map((p) => `${list} .nav-folder-title${q(p.slice(0, p.lastIndexOf("/")))} .nav-folder-title-content`).join(",\n")
+                + " { text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; cursor: pointer; }",
+            // and the current row while its note is open
+            notes.map((p) => `${list} .nav-folder:has(> .nav-folder-children .nav-file-title.is-active${q(p)}) > .nav-folder-title`).join(",\n")
+                + " { background-color: var(--nav-item-background-active); color: var(--nav-item-color-active); font-weight: var(--nav-item-weight-active); }",
+        ].join("\n") : "";
+        this.markCrumbs();
+    }
+
+    scheduleCrumbs() {
+        clearTimeout(this.crumbTimer);
+        this.crumbTimer = window.setTimeout(() => this.markCrumbs(), 0);
+    }
+
+    // The path above a note (its folders, one breadcrumb each, outermost
+    // first): a folder with a note is a link, and a folder note's own title
+    // says so. The same classes as the Folder notes plugin's, which the theme
+    // already styles.
+    markCrumbs() {
+        if (this.otherFolderNotesOn()) return; // its own marks
+        const on = this.folderNotesOn();
+        this.app.workspace.iterateAllLeaves((leaf) => {
+            const view = leaf.view;
+            const header = view?.containerEl?.querySelector(":scope > .view-header");
+            if (!header) return;
+            const crumbs = [...header.querySelectorAll(".view-header-title-parent > .view-header-breadcrumb")];
+            const file = view.file;
+            const folders = [];
+            for (let f = file?.parent; f && !f.isRoot(); f = f.parent) folders.unshift(f);
+            const match = on && crumbs.length === folders.length;
+            crumbs.forEach((crumb, i) => {
+                const folder = match ? folders[i] : null;
+                const has = !!folder && this.folderNotePaths.has(this.folderNotePath(folder));
+                crumb.toggleClass("has-folder-note", has);
+                if (has) crumb.dataset.goguryeoFolder = folder.path;
+                else delete crumb.dataset.goguryeoFolder;
+            });
+            header.querySelector(".view-header-title")
+                ?.toggleClass("path-is-folder-note", on && !!file && this.folderNotePaths.has(file.path));
+        });
+    }
+
+    // A click on a folder's name in the file list opens its note
+    onFolderClick(e) {
+        if (e.button !== 0 || e.shiftKey || e.altKey || !this.folderNotesOn()) return;
+        const title = e.target.closest?.(".nav-files-container .nav-folder-title");
+        if (!title || e.target.closest(".collapse-icon, [contenteditable=true], input")) return;
+        if (title.closest(".is-being-renamed")) return;
+        const note = this.folderNoteOf(title.dataset.path);
+        if (!note) return;
+        // stopPropagation, not stopImmediatePropagation: the haptics
+        // listener on the document still ticks
+        e.preventDefault();
+        e.stopPropagation();
+        this.openFolderNote(note, e);
+        // Opens the folder too, never folds it
+        const item = this.app.workspace.getLeavesOfType("file-explorer")[0]?.view?.fileItems?.[title.dataset.path];
+        if (item?.collapsed && typeof item.setCollapsed === "function") item.setCollapsed(false, true);
+        else if (title.parentElement?.hasClass("is-collapsed")) title.querySelector(".collapse-icon")?.click();
+    }
+
+    openFolderNote(note, e = null) {
+        const leaf = this.app.workspace.getLeaf(e ? Keymap.isModEvent(e) : false);
+        leaf.openFile(note);
+        if (Platform.isPhone && e?.target?.closest?.(".workspace-drawer")) this.app.workspace.leftSplit?.collapse?.();
+    }
+
+    async createFolderNote(folder) {
+        const path = this.folderNotePath(folder);
+        const note = this.app.vault.getFileByPath(path) ?? await this.app.vault.create(path, "");
+        this.openFolderNote(note);
+    }
+
+    // Folder/Note.md → Folder/Note/Note.md, links kept (fileManager)
+    async turnIntoFolderNote(file) {
+        const parent = file.parent?.isRoot() ? "" : `${file.parent.path}/`;
+        const folderPath = normalizePath(`${parent}${file.basename}`);
+        const target = normalizePath(`${folderPath}/${file.name}`);
+        if (this.app.vault.getAbstractFileByPath(target)) {
+            new Notice(`"${target}" already exists.`);
+            return;
+        }
+        const existing = this.app.vault.getAbstractFileByPath(folderPath);
+        if (existing && !(existing instanceof TFolder)) {
+            new Notice(`"${folderPath}" already exists.`);
+            return;
+        }
+        if (!existing) await this.app.vault.createFolder(folderPath);
+        await this.app.fileManager.renameFile(file, target);
+    }
+
+    // A renamed folder takes its note's name along (links kept)
+    followFolderRename(file, oldPath) {
+        if (!this.folderNotesOn() || !(file instanceof TFolder)) return;
+        const oldName = oldPath.slice(oldPath.lastIndexOf("/") + 1);
+        if (oldName === file.name) return; // only moved
+        const note = this.app.vault.getFileByPath(normalizePath(`${file.path}/${oldName}.md`));
+        const target = this.folderNotePath(file);
+        if (!note || this.app.vault.getAbstractFileByPath(target)) return;
+        // after Obsidian has finished moving the folder's files
+        window.setTimeout(() => {
+            if (note.parent === file && !this.app.vault.getAbstractFileByPath(target)) {
+                this.app.fileManager.renameFile(note, target);
+            }
+        }, 0);
+    }
+
     // ---- The path capsule opens the quick switcher ----
 
     // Like a browser's address bar: tapping the path (row 1 on desktop and
@@ -1231,10 +1473,17 @@ module.exports = class GoguryeoCompanion extends Plugin {
             // The web viewer turns the capsule into its own address field:
             // a click there edits the web address
             if (e.target.closest(".webviewer-address-container")) return;
-            // A folder with a folder note is a link: the Folder notes plugin
-            // marks it and opens the note
-            if (e.target.closest(".view-header-breadcrumb.has-folder-note")) {
+            // A folder with a folder note is a link: it opens the note (ours,
+            // or the Folder notes plugin's, which marks it and opens it itself)
+            const crumb = e.target.closest(".view-header-breadcrumb.has-folder-note");
+            if (crumb) {
                 this.haptic();
+                const note = this.folderNotesOn() && this.folderNoteOf(crumb.dataset.goguryeoFolder);
+                if (note) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    this.openFolderNote(note, e);
+                }
                 return;
             }
             e.preventDefault();
