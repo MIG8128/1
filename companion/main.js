@@ -50,7 +50,8 @@ const MEMBERS_KEY = "goguryeo-split-members"; // the split's page in each pane, 
 const GRIP_CLASS = "goguryeo-pane-grip"; // the bar on top of each split pane, to drag the pane elsewhere
 const GRIP_MENU_CLASS = "goguryeo-grip-menu"; // a tap on the grip: own tab, swap, move, close (canvas: grip menu B)
 const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane previews its move, the cards glide to their new boxes
-const WEB_ZOOM_MAX = 5; // a trackpad pinch zooms a web viewer page up to 5x, as in Chrome
+const WEB_ZOOM_MAX = 5; // a trackpad pinch magnifies a web viewer page up to 5x, as in Chrome
+const WEB_ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]; // Ctrl + wheel, Chrome's levels
 const NEW_PANE = Object.freeze({ newPane: true }); // previewPanes: a pane not made yet (a tab dropped on an edge)
 const PANE_PREVIEW_MS = 320; // that glide (the theme's transition)
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
@@ -299,31 +300,44 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // ---- Web viewer: a trackpad pinch zooms the page ----
 
-    // A pinch on a web viewer's page did nothing: Electron keeps a
-    // <webview>'s pinch-zoom off, and a Windows trackpad's pinch reaches
-    // the page as Ctrl + wheel, which a web viewer ignores. Its visual zoom
-    // may now go up to WEB_ZOOM_MAX, and a small listener put in each page
-    // it loads takes Ctrl + wheel there (the page doesn't scroll) and tells
-    // the plugin through the page's console; the plugin zooms the page,
-    // smoothly with the pinch, from 50% to WEB_ZOOM_MAX, like Chrome. A
-    // note isn't touched (a pinch there stays Obsidian's).
+    // Zoom on a web viewer's page, as in Chrome. A trackpad pinch magnifies
+    // the spot under the fingers without reflowing the page: Chromium's own
+    // pinch-zoom, which Electron keeps off in a <webview> until its visual
+    // zoom may go past 1x (up to WEB_ZOOM_MAX). Ctrl + mouse wheel steps the
+    // page zoom through Chrome's levels (WEB_ZOOM_STEPS), text and layout
+    // growing: a small listener put in each page it loads takes that wheel
+    // (a notch is ~100; a pinch sends a few units at a time and is left to
+    // Chromium) and tells the plugin through the page's console. A note
+    // isn't touched.
     setupWebPinch() {
         const MARK = "\u2063goguryeo:";
-        const listen = `if (!window.__goguryeoZoom) { window.__goguryeoZoom = true;
-            addEventListener("wheel", (e) => { if (!e.ctrlKey) return; e.preventDefault();
-                console.debug("${MARK}zoom:" + (e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1))); },
+        const listen = `if (!window.__goguryeoZoom2) { window.__goguryeoZoom2 = true;
+            addEventListener("wheel", (e) => {
+                // the page sees the wheel divided by its zoom: undo that
+                const raw = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1) * (window.__goguryeoZoomF || 1);
+                if (!e.ctrlKey || Math.abs(raw) < 40) return; // a pinch: Chromium's
+                e.preventDefault();
+                console.debug("${MARK}zoom:" + Math.sign(e.deltaY)); },
                 { passive: false, capture: true }); }`;
+        const tell = (webview) => webview.executeJavaScript(`window.__goguryeoZoomF = ${webview.getZoomFactor()}`).catch(() => {});
         const ready = (webview) => {
             try {
                 webview.setVisualZoomLevelLimits?.(1, WEB_ZOOM_MAX);
                 webview.executeJavaScript(listen).catch(() => {});
+                tell(webview);
             } catch (e) { /* not attached yet: dom-ready calls again */ }
         };
         const onMessage = (webview, message) => {
             if (!message?.startsWith(MARK + "zoom:")) return;
-            const dy = parseFloat(message.slice(MARK.length + 5)) || 0;
-            const factor = webview.getZoomFactor() * Math.exp(-dy / 500);
-            webview.setZoomFactor(Math.min(WEB_ZOOM_MAX, Math.max(0.5, factor)));
+            const dir = -Math.sign(parseFloat(message.slice(MARK.length + 5)) || 0); // wheel up: in
+            if (!dir) return;
+            const now = webview.getZoomFactor();
+            const next = dir > 0
+                ? WEB_ZOOM_STEPS.find((z) => z > now + 0.001)
+                : [...WEB_ZOOM_STEPS].reverse().find((z) => z < now - 0.001);
+            if (!next) return;
+            webview.setZoomFactor(next);
+            tell(webview);
         };
         const wired = new Set();
         const scan = () => this.app.workspace.iterateAllLeaves((leaf) => {
