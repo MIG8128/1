@@ -2058,13 +2058,15 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 { duration: ZOOM_MS, delay: 60, easing: ZOOM_EASE, fill: "backwards" });
         }
         const thumb = card?.querySelector(".goguryeo-tab-card-thumb");
-        const page = card && this.overviewPageRect(card, current);
+        let page = card && this.overviewPageRect(card, current);
         if (!thumb || !page) return;
+        const at = thumb.getBoundingClientRect();
+        if (!card.hasClass("is-split")) page = this.alignPage(page, current, thumb, at);
         card.querySelector(".goguryeo-tab-card-label")?.animate([{ opacity: 0 }, { opacity: 1 }],
             { duration: ZOOM_MS * 0.5, delay: ZOOM_MS * 0.5, easing: "ease-out", fill: "backwards" });
         const copy = this.cardCopy(thumb);
         thumb.style.visibility = "hidden";
-        this.zoomCopy(copy, page, thumb.getBoundingClientRect(), true)
+        this.zoomCopy(copy, page, at, true)
             .then(() => thumb.style.removeProperty("visibility"));
     }
 
@@ -2079,6 +2081,25 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         const r = leaf?.view?.containerEl.getBoundingClientRect();
         return r && r.width > 0 && r.height > 0 ? r : null;
+    }
+
+    // The page's copy in a card is laid out without the theme's room for
+    // the rows above the note (that padding only applies in the workspace),
+    // so its text sits higher than on the page. Shift the page's box so the
+    // note's own content lines up with its copy (thumb: the card's picture,
+    // at card).
+    alignPage(page, leaf, thumb, card) {
+        // the note's title, else the start of its text, else the view's own
+        const pick = [".inline-title", ".cm-sizer", ".markdown-preview-sizer", ".view-content > *"]
+            .find((sel) => leaf?.view?.containerEl.querySelector(sel) && thumb.querySelector(sel));
+        if (!pick) return page;
+        const real = leaf.view.containerEl.querySelector(pick).getBoundingClientRect();
+        const copy = thumb.querySelector(pick).getBoundingClientRect();
+        if (!real || !copy || !real.width || !copy.width) return page;
+        const k = page.width / card.width;
+        const dx = real.left - (page.left + (copy.left - card.left) * k);
+        const dy = real.top - (page.top + (copy.top - card.top) * k);
+        return { left: page.left + dx, top: page.top + dy, width: page.width, height: page.height };
     }
 
     // A card's picture, lifted out of the sheet so it can fly over it. Its
@@ -2112,6 +2133,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
             small = { left: px(card.left), top: px(card.top), width: px(card.width), height: px(card.height), borderRadius: px(radius) };
             Object.assign(copy.style, opening ? big : small);
         }
+        // At the page's end the copy cross-fades with the page itself (a page
+        // over a background is see-through, a card is solid), on its own
+        // clock: the curve has nearly arrived halfway through
+        copy.animate(opening ? [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 1 }]
+            : [{ opacity: 1 }, { opacity: 1, offset: 0.55 }, { opacity: 0 }], { duration: ZOOM_MS, fill: "forwards" });
         return copy.animate(opening ? [big, small] : [small, big], { duration: ZOOM_MS, easing: ZOOM_EASE, fill: "forwards" })
             .finished.catch(() => {}).finally(() => copy.remove());
     }
@@ -2458,7 +2484,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         document.body.appendChild(copy);
         // The page it goes to settles first (a split folding in or out)
         window.requestAnimationFrame(() => {
-            const page = this.overviewPageRect(card, leaf);
+            let page = this.overviewPageRect(card, leaf);
+            if (page && !card.hasClass("is-split")) page = this.alignPage(page, leaf, thumb, from);
             if (page) this.zoomCopy(copy, page, from, false);
             else copy.remove();
         });
