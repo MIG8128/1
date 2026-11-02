@@ -1588,38 +1588,6 @@ body.is-tablet .mod-root .workspace-tabs > .goguryeo-pane-grip {
     background-color: var(--interactive-accent);
 }
 
-/* Desktop: the bar stays out of sight until the pointer comes to it (the
-   user's ask; on the iPad it stays, for the finger). A wider zone than
-   the bar itself brings it, and it stays while held or its menu is open. */
-@media (hover: hover) {
-    body:not(.is-mobile) .mod-root .workspace-tabs > .goguryeo-pane-grip::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 50%;
-        width: 180px;
-        height: 26px;
-        translate: -50% 0;
-    }
-
-    body:not(.is-mobile) .goguryeo-pane-grip .goguryeo-pane-grip-bar {
-        opacity: 0;
-        transition: width 0.25s var(--g-spring), opacity 0.18s ease 0.12s, background-color 0.2s ease;
-    }
-
-    body:not(.is-mobile) .goguryeo-pane-grip:is(:hover, .is-held, .is-open) .goguryeo-pane-grip-bar {
-        transition-delay: 0s;
-    }
-
-    body:not(.is-mobile) .goguryeo-pane-grip:hover .goguryeo-pane-grip-bar {
-        opacity: 0.9;
-    }
-
-    body:not(.is-mobile) .goguryeo-pane-grip:is(.is-held, .is-open) .goguryeo-pane-grip-bar {
-        opacity: 1;
-    }
-}
-
 /* A tap on the grip: the pane's menu, a glass panel under it (design B on
    the canvas): Own tab · Swap · Move · Close, and below them the places
    to move to or the panes to swap with (companion: openGripMenu) */
