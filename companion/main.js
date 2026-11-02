@@ -39,6 +39,16 @@ const OPEN_CLASS = "goguryeo-touch-active";
 const THUMB_CLASS = "goguryeo-glass-thumbs";
 const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
+// A closed tab leaves in two plain steps so the eye can follow it: first it
+// fades out where it stands (shrinking only a little, no swell), then its
+// room closes and the neighbours slide together. `open` / `shut` are the
+// size properties of the element (flex-grow, width or max-width).
+const LEAVE_TIMING = { duration: 420, fill: "forwards" };
+const LEAVE_FRAMES = (open, shut) => [
+    { ...open, opacity: 1, scale: "1", easing: "ease-out" },
+    { ...open, opacity: 0, scale: "0.92", offset: 0.4, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+    { ...shut, opacity: 0, scale: "0.92" },
+];
 const SPLIT_CLASS = "goguryeo-split";
 const ONE_PANE_CLASS = "goguryeo-one-pane";
 const SHARED_TABS_CLASS = "goguryeo-shared-tabs"; // body: 2+ panes share one tab row
@@ -3696,7 +3706,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return tab;
     }
 
-    // ---- Tabs coming and going (exaggerated on purpose: the user's ask) ----
+    // ---- Tabs coming and going (a new tab's pop is exaggerated on purpose,
+    // the user's ask; a closed tab leaves calmly, see LEAVE_FRAMES) ----
 
     reducedMotion() {
         return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -3716,20 +3727,17 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.followBar(600);
     }
 
-    // A closed tab: it swells for a beat, then shrinks to nothing in its place
+    // A closed tab, kept calm so it reads (the user found the swell-and-
+    // shrink too much): it fades out where it stands, then the gap closes
     leaveTab(tab) {
         tab.addClass("is-leaving");
         tab.removeClass("is-active", "is-focused");
         if (this.reducedMotion()) return tab.remove();
         tab.style.minWidth = "0px";
         tab.style.pointerEvents = "none";
-        tab.animate([
-            { flexGrow: 1, opacity: 1, scale: "1" },
-            { flexGrow: 1, opacity: 1, scale: "1.1", offset: 0.22 },
-            { flexGrow: 0, opacity: 0, scale: "0.3" },
-        ], { duration: 360, easing: "ease-in", fill: "forwards" })
+        tab.animate(LEAVE_FRAMES({ flexGrow: 1 }, { flexGrow: 0 }), LEAVE_TIMING)
             .finished.catch(() => {}).finally(() => tab.remove());
-        this.followBar(400);
+        this.followBar(LEAVE_TIMING.duration + 40);
     }
 
     // The same for a page's name inside the joined split tab
@@ -3749,13 +3757,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const w = part.offsetWidth;
         part.style.overflow = "hidden";
         part.style.pointerEvents = "none";
-        part.animate([
-            { maxWidth: w + "px", opacity: 1, scale: "1", paddingLeft: "9px", paddingRight: "9px" },
-            { maxWidth: w + "px", opacity: 1, scale: "1.12", paddingLeft: "9px", paddingRight: "9px", offset: 0.22 },
-            { maxWidth: "0px", opacity: 0, scale: "0.3", paddingLeft: "0px", paddingRight: "0px" },
-        ], { duration: 340, easing: "ease-in", fill: "forwards" })
+        const open = { maxWidth: w + "px", paddingLeft: "9px", paddingRight: "9px" };
+        part.animate(LEAVE_FRAMES(open, { maxWidth: "0px", paddingLeft: "0px", paddingRight: "0px" }), LEAVE_TIMING)
             .finished.catch(() => {}).finally(() => part.remove());
-        this.followBar(380);
+        this.followBar(LEAVE_TIMING.duration + 40);
     }
 
     // Obsidian's own tab rows (one pane, or each card): Obsidian grows a new
@@ -3808,11 +3813,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 const next = m.nextSibling?.parentNode === strip ? m.nextSibling : null;
                 strip.insertBefore(ghost, next);
                 const w = ghost.getBoundingClientRect().width;
-                ghost.animate([
-                    { width: w + "px", opacity: 1, scale: "1" },
-                    { width: w + "px", opacity: 1, scale: "1.1", offset: 0.22 },
-                    { width: "0px", opacity: 0, scale: "0.3" },
-                ], { duration: 360, easing: "ease-in", fill: "forwards" })
+                ghost.animate(LEAVE_FRAMES({ width: w + "px" }, { width: "0px" }), LEAVE_TIMING)
                     .finished.catch(() => {}).finally(() => ghost.remove());
             }
         }
