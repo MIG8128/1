@@ -1739,9 +1739,11 @@ body.goguryeo-split .mod-root .workspace-tabs.goguryeo-pane-lifted .workspace-le
 
 /* The frosted band behind the top rows, in the card layout too: each card's
    own band starts at the card, below the rows, so the rows floated over
-   the bare background (a new window, without cards, had it). One band
-   across the note area, under the rows and the cards, fading out where
-   the cards begin; it goes with the rows in full screen. */
+   the bare background (a new window, without cards, had it). One panel
+   across the note area behind the path row and the tab row, square at the
+   top and ending just above the cards with lightly rounded corners (the
+   user's ask, 2026-11-02; it used to fade out); it goes with the rows in
+   full screen. */
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
     content: "";
     position: fixed;
@@ -1749,12 +1751,11 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .wo
     top: var(--g-root-top, 0px);
     left: var(--g-root-left, 0px);
     right: var(--g-root-right, 0px);
-    height: calc(var(--g-split-top) + 6px);
+    height: calc(var(--g-split-top) - 4px);
+    border-radius: 0 0 12px 12px;
     background-color: color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
     pointer-events: none;
     transition: opacity 0.25s ease;
 }
@@ -3709,6 +3710,17 @@ body.goguryeo-bg-color {
 
 body:is(.goguryeo-bg-color, .goguryeo-bg-image) {
     --g-note-bg: color-mix(in srgb, var(--background-primary) var(--g-note-tint), transparent);
+}
+
+/* Plain and Color: the sidebars wear the note card's own color, not the
+   lighter sidebar gray, which looked off beside it (the user's ask,
+   2026-11-02). Over an image they stay glass. */
+body:is(.theme-dark, .theme-light):not(.goguryeo-bg-color):not(.goguryeo-bg-image) {
+    --glass-sidebar: var(--background-primary);
+}
+
+body:is(.theme-dark, .theme-light).goguryeo-bg-color {
+    --glass-sidebar: var(--g-note-bg);
 }
 
 body.goguryeo-bg-color .app-container {
