@@ -3495,9 +3495,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
         collect(rootSplit);
         const panes = groups.map((g) => g.containerEl);
         const body = document.body;
-        // Over a background, a lone pane is a card too
-        const hasBackground = body.hasClass("goguryeo-bg-color") || body.hasClass("goguryeo-bg-image");
-        if (!(Platform.isDesktopApp || Platform.isTablet) || panes.length < (hasBackground ? 1 : 2)) {
+        // A lone pane is a card too, with the shared tab row, whatever the
+        // background: Obsidian's own row in its place was a second, older
+        // UI (its drag and drop, no tab slide) the user ran into whenever
+        // no split was open
+        if (!(Platform.isDesktopApp || Platform.isTablet) || panes.length < 1) {
             this.clearSplit();
             return;
         }
