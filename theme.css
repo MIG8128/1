@@ -234,7 +234,14 @@ body {
     --g-gap: 10px;
     --g-radius-card: 14px;
     --g-radius-panel: 18px;
-    --g-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    /* Motion: one set of curves and times for everything that moves (section
+       13, the tab glass, the cards), the same the companion uses (EASE, DUR) */
+    --g-ease: cubic-bezier(0.2, 0.8, 0.2, 1); /* settling: slides and fades in */
+    --g-spring: cubic-bezier(0.3, 1.3, 0.4, 1); /* menus and panels opening, the tab glass */
+    --g-spring-soft: cubic-bezier(0.3, 1.15, 0.4, 1); /* gliding to a new place, making room */
+    --g-spring-bounce: cubic-bezier(0.3, 1.5, 0.4, 1); /* tabs and slots growing in */
+    --g-dur-in: 0.24s; /* menus, panels, dialogs coming in */
+    --g-dur-out: 0.15s; /* anything going away */
 
     --font-interface-theme: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", "Apple SD Gothic Neo",
         "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
@@ -1563,7 +1570,7 @@ body.is-tablet .mod-root .workspace-tabs > .goguryeo-pane-grip {
     border-radius: 3px;
     background-color: var(--text-faint);
     opacity: 0.5;
-    transition: width 0.25s cubic-bezier(0.3, 1.3, 0.4, 1), opacity 0.2s ease, background-color 0.2s ease;
+    transition: width 0.25s var(--g-spring), opacity 0.2s ease, background-color 0.2s ease;
 }
 
 .goguryeo-pane-grip:hover .goguryeo-pane-grip-bar {
@@ -1621,7 +1628,7 @@ body.is-tablet .mod-root .workspace-tabs > .goguryeo-pane-grip {
     gap: 6px;
     border-radius: 12px;
     background-color: color-mix(in srgb, var(--text-normal) 8%, transparent);
-    transition: background-color 0.15s ease, scale 0.2s cubic-bezier(0.3, 1.3, 0.4, 1);
+    transition: background-color 0.15s ease, scale 0.2s var(--g-spring);
 }
 
 .goguryeo-grip-menu .goguryeo-grip-tile:hover,
@@ -1809,13 +1816,13 @@ body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-drop-ov
 /* The other panes make room while it's dragged: the companion pins each
    card at the box the move would give it, and the cards glide there */
 body.goguryeo-pane-preview .mod-root .workspace-tabs {
-    transition: left 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), top 0.32s cubic-bezier(0.3, 1.1, 0.4, 1),
-        width 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), height 0.32s cubic-bezier(0.3, 1.1, 0.4, 1);
+    transition: left 0.32s var(--g-spring-soft), top 0.32s var(--g-spring-soft),
+        width 0.32s var(--g-spring-soft), height 0.32s var(--g-spring-soft);
 }
 
 body.goguryeo-pane-preview .goguryeo-pane-drop {
-    transition: left 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), top 0.32s cubic-bezier(0.3, 1.1, 0.4, 1),
-        width 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), height 0.32s cubic-bezier(0.3, 1.1, 0.4, 1);
+    transition: left 0.32s var(--g-spring-soft), top 0.32s var(--g-spring-soft),
+        width 0.32s var(--g-spring-soft), height 0.32s var(--g-spring-soft);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1838,8 +1845,8 @@ body.goguryeo-pane-preview .goguryeo-pane-drop {
     box-shadow: var(--g-panel-shadow);
     opacity: 0;
     pointer-events: none;
-    transition: left 0.3s cubic-bezier(0.3, 1.15, 0.4, 1), top 0.3s cubic-bezier(0.3, 1.15, 0.4, 1),
-        width 0.3s cubic-bezier(0.3, 1.15, 0.4, 1), height 0.3s cubic-bezier(0.3, 1.15, 0.4, 1), opacity 0.15s ease;
+    transition: left 0.3s var(--g-spring-soft), top 0.3s var(--g-spring-soft),
+        width 0.3s var(--g-spring-soft), height 0.3s var(--g-spring-soft), opacity 0.15s ease;
 }
 
 .goguryeo-pane-drop.is-shown {
@@ -1876,7 +1883,7 @@ body.goguryeo-pane-preview .goguryeo-pane-drop {
     font-size: var(--font-ui-small);
     white-space: nowrap;
     pointer-events: none;
-    transition: scale 0.35s cubic-bezier(0.3, 1.5, 0.4, 1), rotate 0.35s cubic-bezier(0.3, 1.5, 0.4, 1);
+    transition: scale 0.35s var(--g-spring-bounce), rotate 0.35s var(--g-spring-bounce);
 }
 
 .goguryeo-stab-ghost.is-lifted {
@@ -1903,7 +1910,7 @@ body.goguryeo-pane-preview .goguryeo-pane-drop {
 }
 
 .goguryeo-shared-tabs-bar > .goguryeo-stab {
-    transition: flex-grow 0.32s cubic-bezier(0.3, 1.1, 0.4, 1), opacity 0.2s ease;
+    transition: flex-grow 0.32s var(--g-spring-soft), opacity 0.2s ease;
 }
 
 .goguryeo-shared-tabs-bar > .goguryeo-stab.is-placeholder {
@@ -2129,7 +2136,7 @@ body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .work
 body.goguryeo-top-hidden:not(.goguryeo-split):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
 body.goguryeo-top-hidden.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
     translate: 0 var(--g-top-shift);
-    transition: translate 0.32s cubic-bezier(0.3, 1.15, 0.4, 1);
+    transition: translate 0.32s var(--g-spring-soft);
 }
 
 body.goguryeo-top-hidden.goguryeo-top-peek:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header,
@@ -2150,7 +2157,7 @@ body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-shared-tabs.goguryeo-split:n
 
 body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar,
 body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar::before {
-    transition: top 0.32s cubic-bezier(0.3, 1.15, 0.4, 1);
+    transition: top 0.32s var(--g-spring-soft);
 }
 
 /* The panes' move bars would show through the rows */
@@ -2204,7 +2211,7 @@ body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-shared-tabs.goguryeo-split:n
 }
 
 body.goguryeo-top-hidden.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top {
-    transition: margin-top 0.32s cubic-bezier(0.3, 1.15, 0.4, 1);
+    transition: margin-top 0.32s var(--g-spring-soft);
 }
 
 
@@ -2280,7 +2287,7 @@ body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-head
     backdrop-filter: blur(calc(var(--g-blur) * 0.625)) saturate(1.8);
     transform: translate(var(--g-thumb-x), var(--g-thumb-y));
     pointer-events: none;
-    transition: transform 0.42s cubic-bezier(0.3, 1.3, 0.4, 1), width 0.42s cubic-bezier(0.3, 1.3, 0.4, 1),
+    transition: transform 0.42s var(--g-spring), width 0.42s var(--g-spring),
         scale 0.2s ease;
 }
 
@@ -2895,19 +2902,67 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
     box-shadow: -10px 0 28px rgba(0, 0, 0, 0.3);
 }
 
-.goguryeo-swipe-page.is-under::after {
-    content: "";
+.goguryeo-swipe-dim {
     position: absolute;
     inset: 0;
-    background-color: rgba(0, 0, 0, var(--g-swipe-dim, 0));
+    background-color: rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    pointer-events: none;
 }
 
 .goguryeo-swipe-stage.is-settling > .goguryeo-swipe-page {
-    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1), clip-path 0.28s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: transform 0.28s var(--g-ease), clip-path 0.28s var(--g-ease);
 }
 
-.goguryeo-swipe-stage.is-settling > .goguryeo-swipe-page.is-under::after {
-    transition: background-color 0.28s ease-out;
+/* Chrome-style trackpad swipe (companion option): a round glass arrow
+   comes in from the side; filled once letting go would go */
+.goguryeo-swipe-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: var(--layer-popover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-top: -22px;
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    background-color: var(--glass-bg-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+    color: var(--text-muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+
+.goguryeo-swipe-arrow.is-back {
+    left: 0;
+}
+
+.goguryeo-swipe-arrow.is-forward {
+    right: 0;
+}
+
+.goguryeo-swipe-arrow.is-armed {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.goguryeo-swipe-arrow.is-settling {
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
+/* A web page's picture fades off it once the page has loaded again */
+.goguryeo-swipe-stage.is-lifting {
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+}
+
+.goguryeo-swipe-stage.is-settling .goguryeo-swipe-dim {
+    transition: opacity 0.28s ease-out;
 }
 
 /* A web viewer's page is a picture of it (a <webview> can't be copied) */
@@ -3597,6 +3652,12 @@ body.goguryeo-bg-image .app-container::before {
     pointer-events: none;
 }
 
+/* ...shown once the companion has loaded it (it then fades in, section 13);
+   until then the plain dark (or light) base, which the glass matches */
+body.goguryeo-bg-image:not(.goguryeo-bg-shown) .app-container::before {
+    opacity: 0;
+}
+
 /* Mobile keyboard: Obsidian shortens the app to end above it, but the
    keyboard's rounded corners show what's below. The picture (with its dim
    and blur) already spans the screen, as the app box is not positioned;
@@ -3652,6 +3713,57 @@ body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .works
     -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     pointer-events: none;
+}
+
+/* The big glass over a still background doesn't blur live. A live blur
+   (backdrop-filter) is worked out again on every frame anything under or
+   over it changes (typing, scrolling, switching tabs), and over the note
+   area and the sidebars that tripled the time of each frame (measured).
+   Over a plain color there is nothing to blur: off. Over a picture, on
+   desktop, the companion blurs the picture once as the glass would
+   (goguryeo-glass-baked, --g-bg-glass: the glass's blur and saturation,
+   the background's own blur and dim), and these panels show that copy
+   fixed to the window, under their usual tint: the same look. Only while
+   they sit over nothing but the background: a sidebar floating over the
+   note, the ribbon, menus and the bars over scrolling text keep the live
+   blur, and so do iPad and iPhone (Safari ignores fixed backgrounds). */
+body.goguryeo-bg-color .workspace-split.mod-root .workspace-leaf::before {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-bg-image.goguryeo-glass-baked .workspace-split.mod-root .workspace-leaf::before {
+    background: linear-gradient(var(--g-note-bg), var(--g-note-bg)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ...the docked sidebars and the vault card under the left one */
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .mod-left-split .workspace-tabs,
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-right):not(.goguryeo-peek-right) .mod-right-split .workspace-tabs,
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .mod-left-split .workspace-tabs,
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-right):not(.goguryeo-peek-right) .mod-right-split .workspace-tabs,
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
+    background: linear-gradient(var(--glass-sidebar), var(--glass-sidebar)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ...and the frosted band behind the top rows in the card layout */
+body.goguryeo-split:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-split.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    background: linear-gradient(color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent), color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 /* Views paint their own --background-primary (Day Planner Pro, Dayloom and
@@ -3735,8 +3847,127 @@ body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-
    13. Motion
    ------------------------------------------------------------------------- */
 
+/* Startup. Obsidian draws the workspace before the plugins are done, so it
+   used to rebuild before your eyes: the plain dark look, then the
+   background, then the floating card. The panes now stay hidden until the
+   companion has laid them out (body.goguryeo-ready), fade in once, and
+   then the background picture fades in under the glass (goguryeo-bg-shown,
+   once it has loaded; section 12 keeps it hidden until then). Without the
+   companion they show anyway after 1.6s. Fill "backwards" only: once done,
+   the animations leave the elements' own opacity alone. */
+@keyframes goguryeo-startup-hold {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes goguryeo-startup-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+body:not(.goguryeo-ready) :is(.workspace, .status-bar, .mobile-navbar) {
+    animation: goguryeo-startup-hold 0.3s ease-out 1.6s backwards;
+}
+
+body.goguryeo-ready :is(.workspace, .status-bar, .mobile-navbar) {
+    animation: goguryeo-startup-in 0.32s ease-out backwards;
+}
+
+@keyframes goguryeo-bg-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+body.goguryeo-bg-image.goguryeo-bg-shown .app-container::before {
+    animation: goguryeo-bg-in 0.6s ease-out backwards;
+}
+
+/* Floating glass comes in instead of popping up: menus, the command
+   palette and quick switcher, dialogs, link previews, suggestions, notices
+   and tooltips grow out of a slightly smaller, see-through self with a
+   small spring (iOS 26). The individual scale / translate properties add
+   to what the theme already places with transform (Find in note). Only in
+   (Obsidian removes them at once when they close). The iPhone keeps
+   Obsidian's own sheets. */
+body {
+    --g-pop: var(--g-spring);
+}
+
+@keyframes goguryeo-pop-in {
+    from { opacity: 0; scale: 0.94; }
+}
+
+@keyframes goguryeo-drop-in {
+    from { opacity: 0; scale: 0.97; translate: 0 -6px; }
+}
+
+@keyframes goguryeo-rise-in {
+    from { opacity: 0; scale: 0.97; translate: 0 8px; }
+}
+
+@keyframes goguryeo-slide-in {
+    from { opacity: 0; translate: 24px 0; }
+}
+
+@keyframes goguryeo-fade-in {
+    from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    /* menus open from the corner at the pointer */
+    body:not(.is-phone) .menu {
+        transform-origin: top left;
+        animation: goguryeo-pop-in var(--g-dur-in) var(--g-pop);
+    }
+
+    /* the command palette and quick switcher drop down (from the path
+       capsule when docked there) */
+    body:not(.is-phone) .modal-container .prompt {
+        transform-origin: top center;
+        animation: goguryeo-drop-in var(--g-dur-in) var(--g-pop);
+    }
+
+    body:not(.is-phone) .modal-container .modal {
+        animation: goguryeo-pop-in var(--g-dur-in) var(--g-pop);
+    }
+
+    .modal-container .modal-bg {
+        animation: goguryeo-fade-in 0.2s ease-out;
+    }
+
+    .popover.hover-popover,
+    .suggestion-container {
+        transform-origin: top left;
+        animation: goguryeo-pop-in 0.18s var(--g-pop);
+    }
+
+    .notice {
+        animation: goguryeo-slide-in 0.3s var(--g-pop);
+    }
+
+    /* on a phone notices come from the top */
+    body.is-phone .notice {
+        animation-name: goguryeo-drop-in;
+    }
+
+    .tooltip {
+        animation: goguryeo-fade-in 0.12s ease-out;
+    }
+
+    /* Find in note rises out of the bottom of the note */
+    body .workspace-leaf-content .document-search-container {
+        animation: goguryeo-rise-in var(--g-dur-in) var(--g-pop);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     body:not(.is-mobile) .workspace-ribbon.mod-primary {
         transition: none;
+    }
+
+    /* still in one piece, but at once */
+    body.goguryeo-ready :is(.workspace, .status-bar, .mobile-navbar),
+    body.goguryeo-bg-image.goguryeo-bg-shown .app-container::before {
+        animation-duration: 1ms;
     }
 }

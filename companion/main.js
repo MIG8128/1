@@ -29,7 +29,7 @@
 
 const {
     Plugin, Platform, Menu, setIcon, normalizePath,
-    FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, WorkspaceLeaf,
+    FuzzySuggestModal, Notice, PluginSettingTab, Setting, TFile, TFolder, WorkspaceLeaf, Keymap,
 } = require("obsidian");
 
 const EDGE = 40; // px from the window's left edge where a swipe may start
@@ -39,23 +39,6 @@ const OPEN_CLASS = "goguryeo-touch-active";
 const THUMB_CLASS = "goguryeo-glass-thumbs";
 const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
-// Tabs come and go quietly (the user found the springy pop and the
-// swell-and-shrink too much), in two plain steps so the eye can follow:
-// a new tab's room opens, then the tab fades in; a closed tab fades out
-// where it stands, then its room closes. `open` / `shut` are the size
-// properties of the element (flex-grow, width or max-width; {} for none).
-const ENTER_TIMING = { duration: 320 };
-const ENTER_FRAMES = (shut, open) => [
-    { ...shut, opacity: 0, scale: "0.96", easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
-    { ...open, opacity: 0, scale: "0.96", offset: 0.45, easing: "ease-out" },
-    { ...open, opacity: 1, scale: "1" },
-];
-const LEAVE_TIMING = { duration: 320, fill: "forwards" };
-const LEAVE_FRAMES = (open, shut) => [
-    { ...open, opacity: 1, scale: "1", easing: "ease-out" },
-    { ...open, opacity: 0, scale: "0.96", offset: 0.4, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
-    { ...shut, opacity: 0, scale: "0.96" },
-];
 const SPLIT_CLASS = "goguryeo-split";
 const ONE_PANE_CLASS = "goguryeo-one-pane";
 const SHARED_TABS_CLASS = "goguryeo-shared-tabs"; // body: 2+ panes share one tab row
@@ -69,6 +52,13 @@ const GRIP_MENU_CLASS = "goguryeo-grip-menu"; // a tap on the grip: own tab, swa
 const PANE_PREVIEW_CLASS = "goguryeo-pane-preview"; // while a dragged pane previews its move, the cards glide to their new boxes
 const WEB_ZOOM_MAX = 5; // a trackpad pinch magnifies a web viewer page up to 5x, as in Chrome
 const WEB_ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]; // Ctrl + wheel, Chrome's levels
+const WEB_SHOT_WIDTH = 1280; // px: web page pictures (swipe back, tab overview) are made no wider
+const SWIPE_STYLE_KEY = "goguryeo-swipe-style"; // "smooth" or "chrome": the trackpad swipe's look (this device)
+const WHEEL_GLIDE_STEPS = 4; // shrinking wheel steps in a row that mean the fingers have let go (the trackpad's glide)
+const ARROW_PULL = 400; // px of sideways wheel the Chrome-style arrow follows; past EDGE_SWIPE_AT of it, letting go goes
+const WEB_LOAD_MAX_MS = 4000; // most to keep a web page's picture over it while the page loads again
+const WEB_SETTLE_MS = 250; // after it has loaded, for its late parts to fall into place
+const WEB_SHOT_GAP_MS = 3000; // a page that keeps loading gets a new picture at most this often
 const NEW_PANE = Object.freeze({ newPane: true }); // previewPanes: a pane not made yet (a tab dropped on an edge)
 const PANE_PREVIEW_MS = 320; // that glide (the theme's transition)
 const SHARED_INNER = ":scope > .goguryeo-stab-inner";
@@ -95,25 +85,42 @@ const PEEK_REACH = 16; // px past the sidebar the pointer may wander without clo
 const TOP_OPTION_CLASS = "goguryeo-fullscreen-autohide"; // the theme's "Hide the top rows in full screen" option
 const TOP_HIDDEN_CLASS = "goguryeo-top-hidden"; // body: full screen, the path and tab rows slid away
 const TOP_PEEK_CLASS = "goguryeo-top-peek"; // body: and brought back over the note by the pointer
+const READY_CLASS = "goguryeo-ready"; // body: the UI has been laid out once; the theme fades it in (kept for good)
+const BG_SHOWN_CLASS = "goguryeo-bg-shown"; // body: the background picture has loaded and the UI is in; the theme fades it in
+const REVEAL_MS = 320; // the theme's fade-in of the UI, which the picture waits for
+const BAKED_CLASS = "goguryeo-glass-baked"; // body: the big glass shows a blurred copy of the picture (--g-bg-glass), no live blur
+const FOLDER_NOTES_CLASS = "goguryeo-folder-notes"; // body: the built-in folder notes are on
+const FOLDER_NOTES_PLUGIN = "folder-notes"; // the community Folder notes plugin: while it's on, ours stays off
 const PEEK_TOP = 40; // px at the top where the window edges belong to the title bar
 const OMNI_CLASS = "goguryeo-omnibox"; // the quick switcher docked on the path capsule
 const OMNI_MIN_WIDTH = 420; // px it takes at least (the iPhone folder pill is small)
 const OMNI_MARGIN = 8; // px it keeps from the window edges
+// Motion: every animation of the companion uses these curves and times, the
+// same ones theme section 13 names for CSS (--g-ease, --g-spring, ...), so
+// whatever moves, script or CSS, moves alike
+const EASE = {
+    out: "cubic-bezier(0.2, 0.8, 0.2, 1)", // settling: slides and fades in (--g-ease)
+    in: "cubic-bezier(0.4, 0, 1, 1)", // going away
+    spring: "cubic-bezier(0.3, 1.3, 0.4, 1)", // menus and panels opening, the tab glass (--g-spring)
+    soft: "cubic-bezier(0.3, 1.15, 0.4, 1)", // gliding to a new place, making room (--g-spring-soft)
+    bounce: "cubic-bezier(0.3, 1.5, 0.4, 1)", // tabs and slots growing in (--g-spring-bounce)
+    pop: "cubic-bezier(0.2, 0.8, 0.3, 1)", // keyframed pops: their overshoot is in the keyframes
+};
+const DUR = { in: 240, out: 150, fade: 200, glide: 280, pop: 540, leave: 350 }; // ms (in, out: --g-dur-in, --g-dur-out)
 const OMNI_MS = 320; // the list unrolling below the capsule
-const OMNI_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // a soft spring, settling past its spot and back
+const OMNI_EASE = EASE.soft;
 const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the end, so its shadow shows
 const OVERVIEW_CLASS = "goguryeo-tab-overview"; // the tab overview sheet (desktop and iPad)
 const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⧉, which the theme shows in place of ⌄
-const OVERVIEW_MS = 240; // the sheet fading in and out
 // Opening the tab overview zooms out of the page, as on iOS and Android: a
 // copy of the page shrinks from where the page is into its card, and the
 // card picked grows back into the page on the way out
 const ZOOM_MS = 400;
 const ZOOM_EASE = "cubic-bezier(0.32, 0.72, 0, 1)"; // iOS's sheet curve
-const TAB_SPRING = "cubic-bezier(0.3, 1.5, 0.4, 1)"; // tabs and slots growing in, with a bounce
+const TAB_SPRING = EASE.bounce; // tabs and slots growing in, with a bounce
 const CARD_HOLD_MS = 300; // a finger rests on a card this long before it lifts (a mouse drags at once)
 const CARD_SLOP = 6; // px a pointer may wander before it counts as a drag (or, for a finger, a scroll)
-const CARD_EASE = "cubic-bezier(0.3, 1.15, 0.4, 1)"; // the other cards making room, and the drop
+const CARD_EASE = EASE.soft; // the other cards making room, and the drop
 const SNAP ="transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
 
@@ -160,6 +167,7 @@ class GoguryeoSettingTab extends PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
+        this.folderNotesSection();
         const manager = this.app.plugins.plugins["obsidian-style-settings"]?.settingsManager;
         const config = manager?.config?.goguryeo;
         if (!config) {
@@ -245,6 +253,71 @@ class GoguryeoSettingTab extends PluginSettingTab {
         }
     }
 
+    // The companion's own folder notes. Saved in the plugin's data, so they
+    // follow the vault to every device.
+    folderNotesSection() {
+        const plugin = this.plugin;
+        new Setting(this.containerEl).setName("Folder notes").setHeading();
+        const other = plugin.otherFolderNotesOn();
+        if (!plugin.folderNoteSettings) plugin.folderNoteSettings = { enabled: true };
+        new Setting(this.containerEl)
+            .setName("Folder notes")
+            .setDesc(other
+                ? "The Folder notes plugin is on. Turn it off in Community plugins to use these instead."
+                : "A file named like its folder, inside it (Novel/Novel.md, .canvas, .base...), is the folder's note. Clicking the folder opens it, the note itself is hidden from the file list, and renaming the folder renames the note. Right-click a folder to make one, or a note to turn it into one.")
+            .addToggle((t) => t.setValue(plugin.folderNoteSettings.enabled).setDisabled(other)
+                .onChange(async (v) => {
+                    plugin.folderNoteSettings.enabled = v;
+                    await plugin.saveData(plugin.folderNoteSettings);
+                    plugin.refreshFolderNotes();
+                    this.display();
+                }));
+        new Setting(this.containerEl)
+            .setName("Underline folders that have a note")
+            .setDesc("A faint line under the folder's name in the file list.")
+            .addToggle((t) => t.setValue(!!plugin.folderNoteSettings.underline).setDisabled(other)
+                .onChange(async (v) => {
+                    plugin.folderNoteSettings.underline = v;
+                    await plugin.saveData(plugin.folderNoteSettings);
+                    plugin.refreshFolderNotes();
+                }));
+        // What it sees, to tell "not loaded" from "not found" from "not
+        // matched in the file list". Counts only, no names.
+        const st = plugin.folderNoteStatus();
+        new Setting(this.containerEl)
+            .setName("Status")
+            .setDesc(`Companion ${plugin.manifest.version} · ${st.on ? "on" : "off"} · ${st.found} folder notes found · file list: ${st.folders} folder rows, ${st.hidden} notes hidden, ${st.visible} still shown${st.error ? ` · error: ${st.error}` : ""}`)
+            .addExtraButton((b) => b.setIcon("refresh-cw").setTooltip("Check again").onClick(() => {
+                plugin.refreshFolderNotes();
+                this.display();
+            }));
+        new Setting(this.containerEl).setName("Tabs").setHeading();
+        new Setting(this.containerEl)
+            .setName("Opening and closing tabs")
+            .setDesc("How a tab comes and goes. Subtle: it fades in or out while its room opens or closes. Lively: it springs in past its size and swells before shrinking away. Off: at once.")
+            .addDropdown((d) => d
+                .addOption("subtle", "Subtle")
+                .addOption("lively", "Lively")
+                .addOption("off", "Off")
+                .setValue(plugin.tabMotion())
+                .onChange(async (v) => {
+                    plugin.folderNoteSettings.tabMotion = v;
+                    await plugin.saveData(plugin.folderNoteSettings);
+                }));
+        if (Platform.isDesktopApp) {
+            new Setting(this.containerEl).setName("Back and forward").setHeading();
+            new Setting(this.containerEl)
+                .setName("Trackpad swipe style (this device)")
+                .setDesc("Two fingers sideways go back or forward. Smooth: the page slides with your fingers over the one it goes to. Chrome: an arrow comes in from the side and the page changes at once; lighter, for a slower computer.")
+                .addDropdown((d) => d
+                    .addOption("smooth", "Smooth (sliding page)")
+                    .addOption("chrome", "Chrome (arrow)")
+                    .setValue(plugin.swipeStyle)
+                    .onChange((v) => plugin.setSwipeStyle(v)));
+        }
+        new Setting(this.containerEl).setName("Theme").setHeading();
+    }
+
     // Per device, so it stays out of Style Settings (which syncs with the vault)
     androidNavPicker() {
         new Setting(this.containerEl)
@@ -279,6 +352,7 @@ class GoguryeoSettingTab extends PluginSettingTab {
 
 module.exports = class GoguryeoCompanion extends Plugin {
     onload() {
+        this.setupLayoutHub(); // first: the parts below subscribe to it
         // Obsidian puts the left sidebar button inside the ribbon whenever the
         // ribbon "is shown" (has an offsetParent). The theme's floating ribbon
         // still has one, because Obsidian gives <body> `contain: strict`, so
@@ -289,10 +363,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.patchUpdateFrameless();
             this.refreshFrame();
         });
-        this.registerEvent(this.app.workspace.on("css-change", () => this.refreshFrame()));
+        this.onLayout(["css-change"], () => this.refreshFrame());
 
+        this.setupBakedGlass();
         this.app.workspace.onLayoutReady(() => this.updateBackground());
-        this.registerEvent(this.app.workspace.on("css-change", () => this.updateBackground()));
+        this.onLayout(["css-change"], () => this.updateBackground());
         this.setupBackgroundPickers();
 
         this.app.workspace.onLayoutReady(() => this.setupPopouts());
@@ -305,10 +380,14 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.app.workspace.onLayoutReady(() => this.setupTopPeek());
         this.app.workspace.onLayoutReady(() => this.setupPhoneBar());
         this.androidNav = this.app.loadLocalStorage(ANDROID_NAV_KEY) === "buttons" ? "buttons" : "gestures";
+        this.swipeStyle = this.app.loadLocalStorage(SWIPE_STYLE_KEY) === "chrome" ? "chrome" : "smooth";
         if (Platform.isMobile) this.setupEdgeSwipe();
         this.setupPathSwitcher(); // before the haptics, which it keeps from ticking twice
         if (Platform.isMobile) this.setupHaptics();
         if (!Platform.isPhone) this.setupTabOverview(); // after the haptics, so ⧉ ticks once
+        this.setupFolderNotes(); // after the haptics: a folder click in the file list ticks there
+        // last: after every other layout-ready step has laid the UI out
+        this.app.workspace.onLayoutReady(() => this.revealUI());
 
         if (!Platform.isDesktopApp) return;
 
@@ -319,6 +398,57 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.registerDomEvent(document, "touchend", () => this.onTouchEnd(), opts);
         this.registerDomEvent(document, "touchcancel", () => this.onTouchEnd(), opts);
         this.registerDomEvent(document, "click", (e) => this.onClick(e), { capture: true });
+    }
+
+    // ---- One place where the layout events come in ----
+
+    // Obsidian's layout events come in bursts: one tab switch fires
+    // active-leaf-change, layout-change and file-open, a window resize both
+    // the window's and the workspace's resize. Each part that keeps
+    // something in step with the layout subscribes here (onLayout) and runs
+    // once per frame, however many of its events came, in the order the
+    // parts subscribed, and an error in one doesn't stop the others. Work
+    // that must happen at the event itself (closing a menu) keeps its own
+    // listener. Events: Obsidian's layout-change, active-leaf-change,
+    // file-open, css-change, resize; the vault's rename; the window's
+    // resize as "window-resize".
+    setupLayoutHub() {
+        this.layoutSubs = [];
+        this.layoutPending = new Set();
+        this.layoutFrame = 0;
+        const fire = (name) => this.nudgeLayout(name);
+        for (const name of ["layout-change", "active-leaf-change", "file-open", "css-change", "resize"]) {
+            this.registerEvent(this.app.workspace.on(name, () => fire(name)));
+        }
+        this.registerEvent(this.app.vault.on("rename", () => fire("rename")));
+        this.registerDomEvent(window, "resize", () => fire("window-resize"));
+        this.register(() => window.cancelAnimationFrame(this.layoutFrame));
+    }
+
+    onLayout(names, fn) {
+        this.layoutSubs.push({ names, fn });
+    }
+
+    // An event for the hub's next frame; the parts also nudge it themselves
+    // (the tab glass: "thumbs", from its observers and its own changes)
+    nudgeLayout(name) {
+        this.layoutPending.add(name);
+        if (this.layoutFrame) return;
+        this.layoutFrame = window.requestAnimationFrame(() => this.runLayoutHub());
+    }
+
+    runLayoutHub() {
+        this.layoutFrame = 0;
+        const came = this.layoutPending;
+        this.layoutPending = new Set();
+        for (const { names, fn } of this.layoutSubs) {
+            if (!names.some((n) => came.has(n))) continue;
+            try {
+                fn(came);
+            } catch (e) {
+                console.error("Goguryeo:", e);
+            }
+        }
     }
 
     // ---- Web viewer: a trackpad pinch zooms the page ----
@@ -454,14 +584,26 @@ module.exports = class GoguryeoCompanion extends Plugin {
             ready(webview);
         });
         scan();
-        this.registerEvent(this.app.workspace.on("layout-change", scan));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", scan));
+        this.onLayout(["layout-change", "active-leaf-change"], scan);
         this.register(() => {
             for (const webview of wired) {
                 webview.gGoguryeoOff?.();
                 try { webview.setVisualZoomLevelLimits?.(1, 1); } catch (e) { /* gone */ }
             }
         });
+    }
+
+    // A web page's picture as a small JPEG: a full-size PNG took Obsidian's
+    // own thread long enough to stall it on every page load
+    webShotURL(image) {
+        try {
+            const { width } = image.getSize();
+            const small = width > WEB_SHOT_WIDTH ? image.resize({ width: WEB_SHOT_WIDTH, quality: "good" }) : image;
+            if (small.toJPEG) return "data:image/jpeg;base64," + small.toJPEG(80).toString("base64");
+            return small.toDataURL();
+        } catch (e) {
+            return null;
+        }
     }
 
     // The last picture of each web page, by address (a few dozen kept)
@@ -473,10 +615,20 @@ module.exports = class GoguryeoCompanion extends Plugin {
         } catch (e) {
             return;
         }
+        if (this.swipeStyle === "chrome") return; // pictures only for the sliding page
+        // only a page on screen; a page that loads again and again (ads,
+        // live pages) at most every few seconds
+        if (!webview.isConnected || !webview.offsetWidth) return;
+        const now = Date.now();
+        if (now - (this.webShotAt?.get(url) ?? 0) < WEB_SHOT_GAP_MS) return;
+        (this.webShotAt ??= new Map()).set(url, now);
+        if (this.webShotAt.size > 80) this.webShotAt.delete(this.webShotAt.keys().next().value);
         webview.capturePage?.().then((image) => {
+            const src = this.webShotURL(image);
+            if (!src) return;
             const shots = (this.webShots ??= new Map());
             shots.delete(url);
-            shots.set(url, image.toDataURL());
+            shots.set(url, src);
             while (shots.size > 40) shots.delete(shots.keys().next().value);
         }).catch(() => {});
     }
@@ -496,6 +648,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             FLOAT_LEFT_CLASS, FLOAT_RIGHT_CLASS, PEEK_CLASS.left, PEEK_CLASS.right,
             TOP_HIDDEN_CLASS, TOP_PEEK_CLASS, OPEN_CLASS, OVERVIEW_CLASS + "-open",
             "goguryeo-pane-dragging", "goguryeo-phone-menu-open",
+            BAKED_CLASS, // the copy fits the main window's size
         ];
         const vars = ["--g-root-top", "--g-root-left", "--g-root-right"];
         const strip = (body) => {
@@ -527,11 +680,45 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     onunload() {
         document.body.removeClass(OPEN_CLASS);
+        document.body.removeClass(FOLDER_NOTES_CLASS);
+        this.folderNoteStyle?.remove();
         document.body.style.removeProperty("--g-bg-url");
+        document.body.removeClass(BG_SHOWN_CLASS); // READY_CLASS stays: removing it would hide the UI again
         const ribbon = this.getRibbon();
         if (ribbon) this.clearInline(ribbon);
     }
 
+    // ---- Startup: the UI comes in once, laid out, then the picture ----
+
+    // Obsidian draws the workspace before the plugins have finished: first
+    // the plain dark look, then Style Settings' options (the background),
+    // then the companion's layout (the floating card, the sidebar buttons),
+    // each a jump. The theme keeps the panes hidden until this runs, after
+    // every other layout-ready step and the frame that lays the cards out;
+    // they fade in, then the background picture fades in under the glass
+    // (only after: while the panes fade, their glass can't blur what's
+    // behind them, and would sharpen at the end).
+    revealUI() {
+        const body = document.body;
+        if (body.hasClass(READY_CLASS)) { // the plugin reloaded
+            this.uiShown = true;
+            this.showBackground();
+            return;
+        }
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+            body.addClass(READY_CLASS);
+            this.uiShownTimer = window.setTimeout(() => {
+                this.uiShown = true;
+                this.showBackground();
+            }, this.reducedMotion() ? 0 : REVEAL_MS);
+        }));
+        this.register(() => window.clearTimeout(this.uiShownTimer));
+    }
+
+    // The picture behind everything. Loaded and decoded before it's used,
+    // so it never shows half-drawn: at startup it then fades in (the theme,
+    // once BG_SHOWN_CLASS is on), and a new picture replaces the old one
+    // only once it's ready.
     updateBackground() {
         const body = document.body;
         const raw = getComputedStyle(body).getPropertyValue("--g-bg-image").trim()
@@ -539,15 +726,173 @@ module.exports = class GoguryeoCompanion extends Plugin {
             .replace(/^!?\[\[([^|\]]+).*\]\]$/, "$1")
             .trim();
         let url = "";
+        let file = null;
         if (/^[a-z][a-z0-9+.-]+:/i.test(raw)) {
             url = raw;
         } else if (raw) {
-            const file = this.app.metadataCache.getFirstLinkpathDest(raw, "")
+            file = this.app.metadataCache.getFirstLinkpathDest(raw, "")
                 ?? this.app.vault.getFileByPath(normalizePath(raw));
             if (file) url = this.app.vault.getResourcePath(file);
         }
-        if (url) body.style.setProperty("--g-bg-url", `url("${url.replace(/"/g, "%22")}")`);
-        else body.style.removeProperty("--g-bg-url");
+        const value = url ? `url("${url.replace(/"/g, "%22")}")` : "";
+        if (value === this.bgValue) {
+            this.showBackground();
+            this.scheduleBake(); // the glass options may have changed
+            return;
+        }
+        this.bgValue = value;
+        this.bgSource = value ? { file, url } : null;
+        if (!value) {
+            body.style.removeProperty("--g-bg-url");
+            this.scheduleBake();
+            return;
+        }
+        const done = () => {
+            if (this.bgValue !== value) return; // a newer one came meanwhile
+            body.style.setProperty("--g-bg-url", value);
+            this.bgReady = true;
+            this.showBackground();
+            this.scheduleBake();
+        };
+        const img = new Image();
+        img.src = url;
+        img.decode().then(done, done); // a broken link still gets its dim veil
+    }
+
+    showBackground() {
+        if (this.uiShown && this.bgReady) document.body.addClass(BG_SHOWN_CLASS);
+    }
+
+    // ---- Baked glass: the big panels don't blur live ----
+
+    // The note area and the docked sidebars sit over nothing but the
+    // background picture, which never moves, yet a live blur
+    // (backdrop-filter) is worked out again on every frame anything under
+    // or over it changes: typing, scrolling, switching tabs. Measured in the
+    // test Obsidian, that tripled the time of every frame. So on desktop the
+    // picture is blurred once, as the glass would see it (its blur, dim and
+    // veil, then the glass's own blur and saturation), at a quarter size,
+    // and those panels show that copy, fixed to the window so it lines up
+    // (theme section 12). Small glass (bars, buttons, menus) and anything
+    // over moving content still blurs live. Again whenever the picture, the
+    // window size or a glass option changes; until then, or if the picture
+    // can't be read (a web picture without permission), the live blur stays.
+    // Not on iPad and iPhone: Safari ignores fixed backgrounds, and their
+    // GPUs blur well.
+    setupBakedGlass() {
+        if (!Platform.isDesktopApp) return;
+        this.registerDomEvent(window, "resize", () => this.scheduleBake(250));
+        this.register(() => {
+            window.clearTimeout(this.bakeTimer);
+            document.body.removeClass(BAKED_CLASS);
+            document.body.style.removeProperty("--g-bg-glass");
+            if (this.bakedUrl) URL.revokeObjectURL(this.bakedUrl);
+        });
+    }
+
+    // A moment later, never in the middle of a css-change: Style Settings
+    // takes its option classes off and puts them back around one, so the
+    // background would look switched off right then
+    scheduleBake(ms = 60) {
+        if (!Platform.isDesktopApp) return;
+        window.clearTimeout(this.bakeTimer);
+        this.bakeTimer = window.setTimeout(() => this.bakeGlass(), ms);
+    }
+
+    async bakeGlass() {
+        if (!Platform.isDesktopApp) return;
+        const body = document.body;
+        const source = this.bgSource;
+        const cs = getComputedStyle(body);
+        const px = (v) => parseFloat(v) || 0;
+        const gm = cs.getPropertyValue("--glass-blur").match(/blur\(([\d.]+)px\)(?:\s*saturate\(([\d.]+)(%?)\))?/);
+        const opts = {
+            w: window.innerWidth,
+            h: window.innerHeight,
+            bgBlur: px(cs.getPropertyValue("--g-bg-blur")),
+            blur: gm ? Number(gm[1]) : 0,
+            sat: gm?.[2] ? Number(gm[2]) / (gm[3] ? 100 : 1) : 1,
+            dim: px(cs.getPropertyValue("--g-bg-dim")) / 100,
+            veil: cs.getPropertyValue("--g-bg-veil").trim() || "#000",
+        };
+        // only for the picture background (the glass over a color has nothing to blur)
+        const key = source && body.hasClass("goguryeo-bg-image") ? JSON.stringify([this.bgValue, opts]) : "";
+        if (key === this.bakedKey) return;
+        this.bakedKey = key;
+        if (!key) {
+            this.dropBakedGlass();
+            return;
+        }
+        try {
+            const bitmap = await this.readBackground(source);
+            if (key !== this.bakedKey) return; // a newer one started
+            const blob = await this.renderBakedGlass(bitmap, opts);
+            bitmap.close?.();
+            if (key !== this.bakedKey) return;
+            const old = this.bakedUrl;
+            this.bakedUrl = URL.createObjectURL(blob);
+            body.style.setProperty("--g-bg-glass", `url("${this.bakedUrl}")`);
+            body.addClass(BAKED_CLASS);
+            // the old copy goes once the new one is drawn
+            if (old) window.setTimeout(() => URL.revokeObjectURL(old), 1000);
+        } catch (e) {
+            // can't read the picture (a web one without permission): live blur
+            if (key === this.bakedKey) this.dropBakedGlass();
+        }
+    }
+
+    dropBakedGlass() {
+        document.body.removeClass(BAKED_CLASS);
+        document.body.style.removeProperty("--g-bg-glass");
+    }
+
+    // The picture's own bytes: an <img> of it would make the canvas
+    // unreadable (app:// and web pictures count as another site)
+    async readBackground({ file, url }) {
+        const data = file ? new Blob([await this.app.vault.readBinary(file)])
+            : await (await fetch(url, { mode: "cors" })).blob();
+        return createImageBitmap(data);
+    }
+
+    // The picture as the glass sees it: as section 12 paints it behind
+    // everything (cover, its own blur, the dim veil), mirrored past its edges
+    // so the blur has no dark rim, then the glass's blur and saturation
+    async renderBakedGlass(img, { w: W, h: H, bgBlur, blur, sat, dim, veil }) {
+        // blurred anyway: drawn small (the blur hides the scaling)
+        const S = blur >= 8 ? 0.25 : blur >= 4 ? 0.5 : 1;
+        const w = Math.max(1, Math.ceil(W * S));
+        const h = Math.max(1, Math.ceil(H * S));
+        const bg = new OffscreenCanvas(w, h);
+        const b = bg.getContext("2d");
+        const boxW = (W + 4 * bgBlur) * S;
+        const boxH = (H + 4 * bgBlur) * S;
+        const k = Math.max(boxW / img.width, boxH / img.height);
+        const dw = img.width * k;
+        const dh = img.height * k;
+        b.filter = bgBlur ? `blur(${bgBlur * S}px)` : "none";
+        b.drawImage(img, -2 * bgBlur * S + (boxW - dw) / 2, -2 * bgBlur * S + (boxH - dh) / 2, dw, dh);
+        b.filter = "none";
+        b.globalAlpha = dim;
+        b.fillStyle = veil;
+        b.fillRect(0, 0, w, h);
+        b.globalAlpha = 1;
+        const m = Math.ceil(blur * S * 3);
+        const pad = new OffscreenCanvas(w + 2 * m, h + 2 * m);
+        const p = pad.getContext("2d");
+        for (let sx = -1; sx <= 1; sx++) {
+            for (let sy = -1; sy <= 1; sy++) {
+                p.save();
+                p.translate(m + w / 2 + sx * w, m + h / 2 + sy * h);
+                p.scale(sx ? -1 : 1, sy ? -1 : 1);
+                p.drawImage(bg, -w / 2, -h / 2);
+                p.restore();
+            }
+        }
+        const out = new OffscreenCanvas(w, h);
+        const o = out.getContext("2d");
+        o.filter = `blur(${blur * S}px) saturate(${sat})`;
+        o.drawImage(pad, -m, -m);
+        return out.convertToBlob({ type: "image/png" });
     }
 
     // ---- Background image pickers ----
@@ -624,8 +969,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
     patchRibbonIsShown() {
         const ribbon = this.app.workspace.leftRibbon?.containerEl;
         if (!ribbon) return;
+        const app = this.app;
+        // Floating exactly when theme section 8 makes it fixed. Read from the
+        // classes, not getComputedStyle: Obsidian asks in the middle of its
+        // layout pass, and computing styles there cost every tab switch a
+        // whole extra style pass (measured)
         ribbon.isShown = function () {
-            return getComputedStyle(this).position !== "fixed" && HTMLElement.prototype.isShown.call(this);
+            const body = document.body;
+            const floats = app.customCss?.theme === "Goguryeo"
+                && !body.hasClass("is-mobile") && !body.hasClass("goguryeo-ribbon-static");
+            return !floats && HTMLElement.prototype.isShown.call(this);
         };
         this.register(() => {
             delete ribbon.isShown;
@@ -689,10 +1042,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // opening one never makes the other jump.
     setupFloatingSidebars() {
         if (!Platform.isDesktopApp) return;
-        this.registerDomEvent(window, "resize", () => this.updateFloatingSidebars());
-        for (const name of ["layout-change", "resize", "css-change"]) {
-            this.registerEvent(this.app.workspace.on(name, () => this.updateFloatingSidebars()));
-        }
+        this.onLayout(["window-resize", "layout-change", "resize", "css-change"], () => this.updateFloatingSidebars());
         this.registerDomEvent(document, "pointerdown", (e) => this.onFloatingDismiss(e), { capture: true });
         this.register(() => {
             document.body.removeClass(FLOAT_LEFT_CLASS, FLOAT_RIGHT_CLASS);
@@ -809,7 +1159,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.peekTimers = { left: null, right: null };
         this.peekFrames = { left: 0, right: 0 };
         this.updatePeekZone();
-        this.registerEvent(this.app.workspace.on("css-change", () => this.updatePeekZone()));
+        this.onLayout(["css-change"], () => this.updatePeekZone());
         this.registerDomEvent(document, "pointermove", (e) => this.onPeekMove(e), { passive: true });
         this.registerDomEvent(document.documentElement, "pointerleave", (e) => this.onPeekMove(e, true));
         this.register(() => {
@@ -1031,11 +1381,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         };
         paint();
         this.phoneMenu = null;
-        this.registerEvent(this.app.workspace.on("layout-change", paint));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
-            paint();
-            this.closePhoneMenu();
-        }));
+        this.onLayout(["layout-change", "active-leaf-change"], paint);
+        this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.closePhoneMenu()));
         this.register(() => {
             const el = iconEl();
             if (el) setIcon(el, "menu");
@@ -1150,12 +1497,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
         }
 
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        panel.animate(
-            [{ opacity: 0, transform: "translateY(16px) scale(0.96)" }, { opacity: 1, transform: "none" }],
-            { duration: 280, easing: "cubic-bezier(0.3, 1.3, 0.4, 1)" },
-        );
-        bg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });
+        this.enter(panel, { scale: 0.96, y: 16 });
+        this.fadeIn(bg);
     }
 
     // The items of the menu Obsidian's own ⋯ (more options) opens, built the
@@ -1219,20 +1562,272 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (!menu) return;
         this.phoneMenu = null;
         document.body.removeClass("goguryeo-phone-menu-open");
-        const remove = () => {
+        if (now) {
             menu.bg.remove();
             menu.panel.remove();
-        };
-        if (now || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-            remove();
             return;
         }
-        menu.bg.style.pointerEvents = menu.panel.style.pointerEvents = "none";
-        menu.bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "ease-in", fill: "forwards" });
-        menu.panel.animate(
-            [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.92)" }],
-            { duration: 150, easing: "ease-in", fill: "forwards" },
-        ).finished.then(remove, remove);
+        this.fadeOut(menu.bg);
+        this.leave(menu.panel, { scale: 0.92 });
+    }
+
+    // ---- Folder notes ----
+
+    // A note named like its folder and kept inside it (Novel/Novel.md) is the
+    // folder's note, the same files the Folder notes plugin uses, so existing
+    // ones keep working. In the file list a click on the folder's name opens
+    // its note (Ctrl/Cmd + click: in a new tab) and opens the folder too; the
+    // arrow still folds it. The note's own row is hidden, and while it's open
+    // the folder row shows as the current one. In the path a folder with a
+    // note is a link to it (has-folder-note, which the iPhone capsule reads).
+    // Renaming a folder renames its note. Right click: a folder makes or opens
+    // its note, a note turns into a folder note (a folder of its name made
+    // around it). It all stays off while the Folder notes plugin is on.
+    setupFolderNotes() {
+        this.folderNoteSettings = { enabled: true };
+        this.folderNotePaths = new Set(); // paths of every folder note
+        this.folderNoteStyle = document.head.createEl("style", { attr: { id: "goguryeo-folder-notes" } });
+        this.app.workspace.onLayoutReady(async () => {
+            this.folderNoteSettings = { enabled: true, ...(await this.loadData()) };
+            this.refreshFolderNotes();
+            const later = () => this.scheduleFolderNotes();
+            this.registerEvent(this.app.vault.on("create", later));
+            this.registerEvent(this.app.vault.on("delete", later));
+            this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+                this.followFolderRename(file, oldPath);
+                later();
+            }));
+            this.onLayout(["file-open", "layout-change", "active-leaf-change"], () => this.markCrumbs());
+            // Turning the Folder notes plugin on or off
+            for (const name of ["enablePlugin", "disablePlugin"]) {
+                const plugins = this.app.plugins;
+                const original = plugins[name];
+                if (typeof original !== "function") continue;
+                plugins[name] = function (...args) {
+                    const result = original.apply(this, args);
+                    Promise.resolve(result).then(later, later);
+                    return result;
+                };
+                this.register(() => { if (plugins[name] !== original) plugins[name] = original; });
+            }
+        });
+
+        this.registerDomEvent(document, "click", (e) => this.onFolderClick(e), { capture: true });
+
+        this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+            if (!this.folderNotesOn()) return;
+            if (file instanceof TFolder && !file.isRoot()) {
+                const note = this.folderNoteOf(file.path);
+                if (note) {
+                    menu.addItem((item) => item.setTitle("Open folder note").setIcon("file-text")
+                        .setSection("open").onClick(() => this.openFolderNote(note)));
+                } else {
+                    menu.addItem((item) => item.setTitle("Create folder note").setIcon("file-plus")
+                        .setSection("action").onClick(() => this.createFolderNote(file)));
+                }
+            } else if (file instanceof TFile && !this.isFolderNote(file)) {
+                menu.addItem((item) => item.setTitle("Turn into folder note").setIcon("folder-input")
+                    .setSection("action").onClick(() => this.turnIntoFolderNote(file)));
+            }
+        }));
+    }
+
+    otherFolderNotesOn() {
+        return !!this.app.plugins.enabledPlugins?.has(FOLDER_NOTES_PLUGIN);
+    }
+
+    folderNotesOn() {
+        return !!this.folderNoteSettings?.enabled && !this.otherFolderNotesOn();
+    }
+
+    folderNotePath(folder) {
+        return normalizePath(`${folder.path}/${folder.name}.md`);
+    }
+
+    // A file's name without its extensions: Novel.md, Novel.canvas,
+    // Novel.base and Novel.excalidraw.md are all "Novel"
+    folderNoteName(file) {
+        return file.basename.replace(/\.excalidraw$/i, "");
+    }
+
+    // The note of a folder (or of the folder at this path), if it has one: a
+    // file inside it named like it, any extension (the Folder notes plugin
+    // allows md, canvas, base, excalidraw...). If several, a plain .md first,
+    // then canvas, then base, then the rest.
+    folderNoteOf(folder) {
+        if (typeof folder === "string") folder = this.app.vault.getAbstractFileByPath(folder);
+        if (!(folder instanceof TFolder) || folder.isRoot()) return null;
+        const rank = (f) => {
+            const i = ["md", "canvas", "base"].indexOf(f.extension.toLowerCase());
+            return (i < 0 ? 3 : i) + (f.basename === folder.name ? 0 : 0.5);
+        };
+        let best = null;
+        for (const f of folder.children) {
+            if (!(f instanceof TFile) || this.folderNoteName(f) !== folder.name) continue;
+            if (!best || rank(f) < rank(best)) best = f;
+        }
+        return best;
+    }
+
+    isFolderNote(file) {
+        return file instanceof TFile && !!file.parent && this.folderNoteOf(file.parent) === file;
+    }
+
+    folderNoteStatus() {
+        const rows = [...document.querySelectorAll(".nav-files-container .nav-file-title")]
+            .filter((r) => this.folderNotePaths?.has(r.dataset.path));
+        const hidden = rows.filter((r) => !r.offsetParent || r.getBoundingClientRect().height === 0).length;
+        return {
+            on: this.folderNotesOn(),
+            found: this.folderNotePaths?.size ?? 0,
+            folders: document.querySelectorAll(".nav-files-container .nav-folder-title").length,
+            hidden,
+            visible: rows.length - hidden,
+            error: this.folderNoteError ?? "",
+        };
+    }
+
+    scheduleFolderNotes() {
+        clearTimeout(this.folderNoteTimer);
+        this.folderNoteTimer = window.setTimeout(() => this.refreshFolderNotes(), 50);
+    }
+
+    // The file list is redrawn often, so the marks are CSS rules by path,
+    // not classes on its rows
+    refreshFolderNotes() {
+        try {
+            this.folderNoteError = "";
+            this.drawFolderNotes();
+        } catch (err) {
+            this.folderNoteError = String(err?.message ?? err);
+            console.error("Goguryeo folder notes", err);
+        }
+    }
+
+    drawFolderNotes() {
+        const on = this.folderNotesOn();
+        document.body.toggleClass(FOLDER_NOTES_CLASS, on);
+        this.folderNotePaths = new Set();
+        if (on) {
+            for (const f of this.app.vault.getAllLoadedFiles()) {
+                const note = f instanceof TFolder && this.folderNoteOf(f);
+                if (note) this.folderNotePaths.add(note.path);
+            }
+        }
+        const q = (p) => `[data-path="${CSS.escape(p)}"]`;
+        const notes = [...this.folderNotePaths];
+        const list = ".nav-files-container";
+        this.folderNoteStyle.textContent = notes.length ? [
+            notes.map((p) => `${list} .tree-item.nav-file:has(> .nav-file-title${q(p)})`).join(",\n") + " { display: none; }",
+            // the folder's name: a link to its note
+            notes.map((p) => `${list} .nav-folder-title${q(p.slice(0, p.lastIndexOf("/")))} .nav-folder-title-content`).join(",\n")
+                + (this.folderNoteSettings.underline
+                    ? " { text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; cursor: pointer; }"
+                    : " { cursor: pointer; }"),
+            // and the current row while its note is open
+            notes.map((p) => `${list} .nav-folder:has(> .nav-folder-children .nav-file-title.is-active${q(p)}) > .nav-folder-title`).join(",\n")
+                + " { background-color: var(--nav-item-background-active); color: var(--nav-item-color-active); font-weight: var(--nav-item-weight-active); }",
+        ].join("\n") : "";
+        this.markCrumbs();
+    }
+
+    // The path above a note (its folders, one breadcrumb each, outermost
+    // first): a folder with a note is a link, and a folder note's own title
+    // says so. The same classes as the Folder notes plugin's, which the theme
+    // already styles.
+    markCrumbs() {
+        if (this.otherFolderNotesOn()) return; // its own marks
+        const on = this.folderNotesOn();
+        this.app.workspace.iterateAllLeaves((leaf) => {
+            const view = leaf.view;
+            const header = view?.containerEl?.querySelector(":scope > .view-header");
+            if (!header) return;
+            const crumbs = [...header.querySelectorAll(".view-header-title-parent > .view-header-breadcrumb")];
+            const file = view.file;
+            const folders = [];
+            for (let f = file?.parent; f && !f.isRoot(); f = f.parent) folders.unshift(f);
+            const match = on && crumbs.length === folders.length;
+            crumbs.forEach((crumb, i) => {
+                const folder = match ? folders[i] : null;
+                const has = !!folder && !!this.folderNoteOf(folder);
+                crumb.toggleClass("has-folder-note", has);
+                if (has) crumb.dataset.goguryeoFolder = folder.path;
+                else delete crumb.dataset.goguryeoFolder;
+            });
+            header.querySelector(".view-header-title")
+                ?.toggleClass("path-is-folder-note", on && !!file && this.folderNotePaths.has(file.path));
+        });
+    }
+
+    // A click on a folder's name in the file list opens its note
+    onFolderClick(e) {
+        if (e.button !== 0 || e.shiftKey || e.altKey || !this.folderNotesOn()) return;
+        const title = e.target.closest?.(".nav-files-container .nav-folder-title");
+        if (!title || e.target.closest(".collapse-icon, [contenteditable=true], input")) return;
+        if (title.closest(".is-being-renamed")) return;
+        const note = this.folderNoteOf(title.dataset.path);
+        if (!note) return;
+        // stopPropagation, not stopImmediatePropagation: the haptics
+        // listener on the document still ticks
+        e.preventDefault();
+        e.stopPropagation();
+        // The first touch opens the note and unfolds the folder; touching it
+        // again while its note is open folds and unfolds it, like a plain folder
+        const shown = this.app.workspace.getActiveFile() === note;
+        if (!shown || Keymap.isModEvent(e)) this.openFolderNote(note, e);
+        const collapsed = !!title.parentElement?.hasClass("is-collapsed");
+        if (!shown && !collapsed) return;
+        const item = this.app.workspace.getLeavesOfType("file-explorer")[0]?.view?.fileItems?.[title.dataset.path];
+        if (typeof item?.setCollapsed === "function") item.setCollapsed(!collapsed, true);
+        else title.querySelector(".collapse-icon")?.click(); // left to Obsidian (onFolderClick skips the arrow)
+    }
+
+    openFolderNote(note, e = null) {
+        const leaf = this.app.workspace.getLeaf(e ? Keymap.isModEvent(e) : false);
+        leaf.openFile(note);
+        if (Platform.isPhone && e?.target?.closest?.(".workspace-drawer")) this.app.workspace.leftSplit?.collapse?.();
+    }
+
+    async createFolderNote(folder) {
+        const path = this.folderNotePath(folder);
+        const note = this.app.vault.getFileByPath(path) ?? await this.app.vault.create(path, "");
+        this.openFolderNote(note);
+    }
+
+    // Folder/Note.md → Folder/Note/Note.md, links kept (fileManager)
+    async turnIntoFolderNote(file) {
+        const parent = file.parent?.isRoot() ? "" : `${file.parent.path}/`;
+        const folderPath = normalizePath(`${parent}${this.folderNoteName(file)}`);
+        const target = normalizePath(`${folderPath}/${file.name}`);
+        if (this.app.vault.getAbstractFileByPath(target)) {
+            new Notice(`"${target}" already exists.`);
+            return;
+        }
+        const existing = this.app.vault.getAbstractFileByPath(folderPath);
+        if (existing && !(existing instanceof TFolder)) {
+            new Notice(`"${folderPath}" already exists.`);
+            return;
+        }
+        if (!existing) await this.app.vault.createFolder(folderPath);
+        await this.app.fileManager.renameFile(file, target);
+    }
+
+    // A renamed folder takes its note's name along (links kept)
+    followFolderRename(file, oldPath) {
+        if (!this.folderNotesOn() || !(file instanceof TFolder)) return;
+        const oldName = oldPath.slice(oldPath.lastIndexOf("/") + 1);
+        if (oldName === file.name) return; // only moved
+        // the note under its old name, any extension; it keeps its extension
+        const note = file.children.find((f) => f instanceof TFile && this.folderNoteName(f) === oldName);
+        if (!note) return;
+        const target = normalizePath(`${file.path}/${note.name.replace(oldName, file.name)}`);
+        if (this.app.vault.getAbstractFileByPath(target)) return;
+        // after Obsidian has finished moving the folder's files
+        window.setTimeout(() => {
+            if (note.parent === file && !this.app.vault.getAbstractFileByPath(target)) {
+                this.app.fileManager.renameFile(note, target);
+            }
+        }, 0);
     }
 
     // ---- The path capsule opens the quick switcher ----
@@ -1246,42 +1841,31 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // field opens in the capsule and the list drops down right below it; on
     // iPhone it stays Obsidian's own sheet, its field already at the bottom.
     setupPathSwitcher() {
-        const path = Platform.isPhone
-            ? ".mod-root .view-header-title-parent"
-            : ".mod-root .view-header-title-container";
         this.registerDomEvent(document, "click", (e) => {
-            if (!e.target.closest?.(path)) return;
-            // The web viewer turns the capsule into its own address field:
-            // a click there edits the web address
-            if (e.target.closest(".webviewer-address-container")) return;
-            // A folder with a folder note is a link: the Folder notes plugin
-            // marks it and opens the note
-            if (e.target.closest(".view-header-breadcrumb.has-folder-note")) {
+            const tap = this.pathTapAt(e);
+            if (!tap) return;
+            // Through the iPhone bar onto a folder with a note: the click on
+            // the folder itself ticks and opens it (below)
+            if (tap.viaBar && tap.crumb) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                tap.crumb.click();
+                return;
+            }
+            // A folder with a folder note is a link to it: ours opens here;
+            // the Folder notes plugin's opens from its own listener, and the
+            // haptics listener ticks for it
+            if (tap.crumb) {
+                const note = this.folderNotesOn() && this.folderNoteOf(tap.crumb.dataset.goguryeoFolder);
+                if (!note) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
                 this.haptic();
+                this.openFolderNote(note, e);
                 return;
             }
             e.preventDefault();
             e.stopImmediatePropagation();
-            this.haptic();
-            this.app.commands.executeCommandById("switcher:open");
-        }, { capture: true });
-
-        // Phone: the capsule sits over Obsidian's tabs button (the bar is a
-        // layer above the note), so a tap on it would open all tabs. Like on
-        // desktop, it opens the quick switcher holding the note's path, all
-        // selected; a folder with a folder note still opens that note. A drag
-        // on the pill still swallows its click (and drag up = all tabs).
-        if (Platform.isPhone) this.registerDomEvent(document, "click", (e) => {
-            if (Date.now() <= (this.suppressClickUntil ?? 0)) return;
-            if (!e.target.closest?.(".mobile-navbar-action-tabs")) return;
-            if (!this.capsuleAt(e.clientX, e.clientY)) return;
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            const folder = this.capsuleFolderAt(e.clientX, e.clientY);
-            if (folder?.matches(".has-folder-note")) {
-                folder.click(); // ticks in the handler above
-                return;
-            }
             this.haptic();
             this.app.commands.executeCommandById("switcher:open");
         }, { capture: true });
@@ -1300,6 +1884,26 @@ module.exports = class GoguryeoCompanion extends Plugin {
             };
             this.register(() => { command.callback = callback; });
         });
+    }
+
+    // What a click means for the path, on every platform alike: null (not
+    // the path), else { crumb } (a folder with a folder note, or null: the
+    // rest of the path, which opens the quick switcher) and viaBar.
+    // Desktop and iPad: the path capsule. iPhone: its folder pill, and the
+    // capsule itself, which sits over Obsidian's tabs button (the bar is a
+    // layer above the note), so the click lands on the button and is matched
+    // by position; a drag on the pill swallows its click.
+    pathTapAt(e) {
+        const path = Platform.isPhone ? ".mod-root .view-header-title-parent" : ".mod-root .view-header-title-container";
+        if (e.target.closest?.(path)) {
+            // the web viewer's capsule is its own address field
+            if (e.target.closest(".webviewer-address-container")) return null;
+            return { crumb: e.target.closest(".view-header-breadcrumb.has-folder-note"), viaBar: false };
+        }
+        if (!Platform.isPhone || Date.now() <= (this.suppressClickUntil ?? 0)) return null;
+        if (!e.target.closest?.(".mobile-navbar-action-tabs") || !this.capsuleAt(e.clientX, e.clientY)) return null;
+        const folder = this.capsuleFolderAt(e.clientX, e.clientY);
+        return { crumb: folder?.matches(".has-folder-note") ? folder : null, viaBar: true };
     }
 
     // Phone: the bottom capsule, if (x, y) is over it
@@ -1365,16 +1969,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
         container.style.setProperty("--g-omni-height", `${c.height}px`);
         container.style.setProperty("--g-omni-radius", radius);
 
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        if (this.reducedMotion()) return;
         const p = prompt.getBoundingClientRect();
         const start = `inset(0 ${Math.max(0, p.right - c.right)}px ${Math.max(0, p.height - c.height)}px ${Math.max(0, c.left - p.left)}px round ${radius})`;
         const end = parseFloat(getComputedStyle(prompt).borderTopLeftRadius) + SHADOW_ROOM;
-        prompt.animate(
-            [{ clipPath: start }, { clipPath: `inset(-${SHADOW_ROOM}px round ${end}px)` }],
-            { duration: OMNI_MS, easing: OMNI_EASE },
-        );
+        this.play(prompt, [{ clipPath: start }, { clipPath: `inset(-${SHADOW_ROOM}px round ${end}px)` }], { duration: OMNI_MS, easing: OMNI_EASE });
         const dim = container.querySelector(".modal-bg");
-        if (dim) dim.animate([{ opacity: 0 }, { opacity: getComputedStyle(dim).opacity }], { duration: OMNI_MS, easing: "ease-out" });
+        this.fadeIn(dim, { duration: OMNI_MS });
     }
 
     // ---- Desktop and iPad: the tab overview, Safari style ----
@@ -1393,10 +1994,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
             });
         };
         this.app.workspace.onLayoutReady(addIcons);
-        this.registerEvent(this.app.workspace.on("layout-change", () => {
+        this.onLayout(["layout-change"], () => {
             addIcons();
             if (this.overview) this.renderOverview();
-        }));
+        });
         this.register(() => {
             this.closeOverview(true);
             document.querySelectorAll(`.${OVERVIEW_ICON_CLASS}`).forEach((el) => el.remove());
@@ -1415,7 +2016,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             e.stopImmediatePropagation();
             this.closeOverview();
         }, { capture: true });
-        this.registerDomEvent(window, "resize", () => this.overview && this.renderOverview());
+        this.onLayout(["window-resize"], () => this.overview && this.renderOverview());
         this.registerDomEvent(window, "pointermove", (e) => this.onCardMove(e));
         this.registerDomEvent(window, "pointerup", (e) => this.onCardUp(e));
         this.registerDomEvent(window, "pointercancel", (e) => this.onCardUp(e, true));
@@ -1765,7 +2366,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const now = drag.slots.get(el);
             const dx = was.left - now.left;
             const dy = was.top - now.top;
-            if (dx || dy) el.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 260, easing: CARD_EASE });
+            this.glide(el, dx, dy);
         }
     }
 
@@ -1795,11 +2396,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const from = ghost.getBoundingClientRect();
         const to = card.getBoundingClientRect();
         ghost.removeClass("is-lifted");
-        const land = ghost.animate([
+        this.play(ghost, [
             { translate: "0 0", scale: "1" },
             { translate: `${to.left - from.left}px ${to.top - from.top}px`, scale: `${to.width / (from.width || 1)}` },
-        ], { duration: 260, easing: CARD_EASE, fill: "forwards" });
-        land.finished.catch(() => {}).finally(() => {
+        ], { duration: DUR.glide, easing: EASE.soft, fill: "forwards" }).then(() => {
             ghost.remove();
             card.removeClass("is-placeholder");
             if (cancelled || !pane || !leaf.parent || this.overview !== o) return; // closed meanwhile
@@ -1836,7 +2436,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (!o) return;
         this.overview = null;
         document.body.removeClass(OVERVIEW_CLASS + "-open");
-        if (now || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        if (now) {
             o.sheet.remove();
             return;
         }
@@ -2096,16 +2696,11 @@ module.exports = class GoguryeoCompanion extends Plugin {
             pill.style.transition = pill.style.translate = pill.style.opacity = "";
             const target = d.target === NEW_TAB ? this.app.workspace.getLeaf("tab") : d.target;
             this.app.workspace.setActiveLeaf(target, { focus: true });
-            const easing = "cubic-bezier(0.25, 0.8, 0.25, 1)";
+            // the new tab's name and page come in from the side it was pulled from
             const from = -toward;
-            target.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container")?.animate(
-                [{ translate: `${from * 40}px 0`, opacity: 0 }, { translate: "0 0", opacity: 1 }],
-                { duration: 260, easing },
-            );
-            target.view?.contentEl?.animate(
-                [{ transform: `translateX(${from * 48}px)`, opacity: 0.4 }, { transform: "none", opacity: 1 }],
-                { duration: 260, easing },
-            );
+            const slide = { scale: 1, duration: DUR.in, easing: EASE.out };
+            this.enter(target.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container"), { ...slide, x: from * 40 });
+            this.enter(target.view?.contentEl, { ...slide, x: from * 48, opacity: 0.4 });
         }, 140);
     }
 
@@ -2143,13 +2738,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 capsule.style.setProperty("--g-capsule-name-w", `${Math.ceil(ctx.measureText(title.textContent).width)}px`);
             });
         };
-        const later = () => window.setTimeout(measure, 0);
-        this.app.workspace.onLayoutReady(later);
-        this.registerEvent(this.app.workspace.on("layout-change", later));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", later));
-        this.registerEvent(this.app.workspace.on("file-open", later));
-        this.registerEvent(this.app.workspace.on("css-change", later));
-        this.registerEvent(this.app.vault.on("rename", later));
+        this.app.workspace.onLayoutReady(() => window.setTimeout(measure, 0));
+        this.onLayout(["layout-change", "active-leaf-change", "file-open", "css-change", "rename"], measure);
         this.register(() => document.querySelectorAll(".view-header-title-container")
             .forEach((el) => el.style.removeProperty("--g-capsule-name-w")));
     }
@@ -2186,8 +2776,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const plugin = this;
         const patched = function (...args) {
             const state = original.apply(this, args);
+            if (Platform.isDesktopApp && plugin.swipeStyle === "chrome") return state; // no copies wanted
             try {
-                const snapshot = plugin.snapshotPage(this);
+                // a swipe away from this page already copied it
+                const reuse = plugin.leavingSnapshot?.leaf === this ? plugin.leavingSnapshot.snapshot : null;
+                if (reuse) plugin.leavingSnapshot = null;
+                const snapshot = reuse ?? plugin.snapshotPage(this);
                 if (snapshot && state && typeof state === "object") plugin.snapshots.set(state, snapshot);
             } catch (e) {
                 console.error("Goguryeo: page snapshot failed", e);
@@ -2266,21 +2860,32 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (!leaf?.view?.contentEl || ["canvas", "graph", "localgraph", "excalidraw"].includes(type)) return;
             if (document.querySelector(".modal-container, .menu")) return;
             const dir = dx < 0 ? -1 : 1; // fingers right: back
-            const steps = dir < 0 ? leaf.history?.backHistory : leaf.history?.forwardHistory;
-            if (!steps?.length) return;
-            s = this.edgeSwipe = { wheel: true, dir, leaf, entry: steps[steps.length - 1], locked: false, sum: 0, v: 0, t: now };
+            s = this.beginSwipe(leaf, dir, { wheel: true, sum: 0, t: now });
+            if (!s) return;
         }
         s.sum = Math.max(0, s.sum + dx * s.dir);
         const dt = now - s.t;
         if (dt > 0) s.v = 0.7 * ((dx * s.dir) / dt) + 0.3 * s.v;
         s.t = now;
-        if (!s.locked && s.sum > LOCK_AT) {
-            s.locked = true;
-            this.startPageSwipe(s);
+        if (this.pullSwipe(s, s.sum)) e.preventDefault?.();
+        // Past the go point, the fingers letting go: a trackpad keeps
+        // sending its glide, each step no bigger than the last, together
+        // down by a sixth or more. Go now, as a button would, not once the
+        // glide has died away (half a second and more); the rest of the
+        // glide is swallowed (swipeQuietUntil).
+        const step = Math.abs(dx);
+        if (dx * s.dir > 0 && step <= (s.lastStep ?? 0)) {
+            s.glide ??= { from: s.lastStep, n: 0 };
+            s.glide.n++;
+        } else {
+            s.glide = null;
         }
-        if (s.locked) {
-            e.preventDefault?.();
-            this.setPageSwipe(s, Math.min(s.width, s.sum));
+        s.lastStep = step;
+        if (s.locked && s.glide && s.glide.n >= WHEEL_GLIDE_STEPS && step <= s.glide.from * 0.85
+            && s.pulled >= s.width * EDGE_SWIPE_AT) {
+            window.clearTimeout(s.idle);
+            this.endWheelSwipe(s);
+            return;
         }
         window.clearTimeout(s.idle);
         s.idle = window.setTimeout(() => this.endWheelSwipe(s), 120);
@@ -2293,7 +2898,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return;
         }
         this.swipeQuietUntil = performance.now() + 400;
-        this.settlePageSwipe(s, s.pulled >= s.width * EDGE_SWIPE_AT);
+        this.releaseSwipe(s, s.pulled >= s.width * EDGE_SWIPE_AT);
     }
 
     // A still copy of a leaf's page: its content inside a bare copy of the
@@ -2313,14 +2918,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
             frame.appendChild(content.cloneNode(false)).createEl("img", { cls: "goguryeo-swipe-shot" });
             let ready = null;
             try {
-                ready = webview?.capturePage?.().then((image) => image.toDataURL()).catch(() => null) ?? null;
+                ready = webview?.capturePage?.().then((image) => this.webShotURL(image)).catch(() => null) ?? null;
             } catch (e) { /* not attached */ }
             ready?.then((src) => { if (src) frame.querySelector(".goguryeo-swipe-shot").src = src; });
             return { frame, scrolls: [], ready };
         }
         const scrolls = [];
+        // The text inside an editor or a reading view doesn't scroll on its
+        // own: not walked, which in a long note is most of the page
+        const deep = ".cm-content, .cm-gutters, .markdown-preview-sizer, svg";
         const walk = (el, path) => {
             if (el.scrollTop || el.scrollLeft) scrolls.push([path, el.scrollTop, el.scrollLeft]);
+            if (el.matches(deep)) return;
             const kids = el.children;
             for (let i = 0; i < kids.length; i++) walk(kids[i], path.concat(i));
         };
@@ -2332,11 +2941,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
     }
 
     // A page for the swipe stage: the snapshot, or failing that a plain page
-    // with the entry's name
-    makeSwipePage(snapshot, entry) {
+    // with the entry's name. fresh: a snapshot made for this page alone,
+    // used as it is (a long note's copy isn't copied once more)
+    makeSwipePage(snapshot, entry, fresh = false) {
         const page = createDiv("goguryeo-swipe-page");
         if (snapshot) {
-            page.appendChild(snapshot.frame.cloneNode(true));
+            page.appendChild(fresh ? snapshot.frame : snapshot.frame.cloneNode(true));
             // a web page's picture, if it wasn't there yet
             snapshot.ready?.then((src) => {
                 const img = page.querySelector(".goguryeo-swipe-shot");
@@ -2397,13 +3007,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const dir = t.clientX <= EDGE_SWIPE_ZONE ? -1 : t.clientX >= window.innerWidth - EDGE_SWIPE_ZONE ? 1 : 0;
         if (!dir) return;
         const leaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
-        const history = leaf?.history;
-        const steps = dir < 0 ? history?.backHistory : history?.forwardHistory;
-        if (!steps?.length || !leaf.view?.contentEl) return;
-        this.edgeSwipe = {
-            dir, leaf, entry: steps[steps.length - 1],
-            x0: t.clientX, y0: t.clientY, locked: false, x: t.clientX, t: e.timeStamp, v: 0,
-        };
+        this.beginSwipe(leaf, dir, { x0: t.clientX, y0: t.clientY, x: t.clientX, t: e.timeStamp });
     }
 
     onEdgeMove(e) {
@@ -2412,38 +3016,63 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const t = e.touches[0];
         const dx = (t.clientX - s.x0) * -s.dir; // distance pulled inwards
         const dy = t.clientY - s.y0;
-        if (!s.locked) {
-            if (Math.abs(dy) > LOCK_AT && Math.abs(dy) > Math.abs(dx)) {
-                this.edgeSwipe = null; // a scroll, not a swipe
-                return;
-            }
-            if (dx < LOCK_AT) return;
-            s.locked = true;
-            this.startPageSwipe(s);
+        if (!s.locked && Math.abs(dy) > LOCK_AT && Math.abs(dy) > Math.abs(dx)) {
+            this.edgeSwipe = null; // a scroll, not a swipe
+            return;
         }
-        e.preventDefault();
         const dt = e.timeStamp - s.t;
         if (dt > 0) s.v = 0.8 * ((t.clientX - s.x) / dt) + 0.2 * s.v;
         s.x = t.clientX;
         s.t = e.timeStamp;
-        this.setPageSwipe(s, Math.max(0, Math.min(s.width, dx)));
-        // A tick each time the swipe crosses the point where letting go goes
-        const armed = s.pulled >= s.width * EDGE_SWIPE_AT;
-        if (armed !== !!s.armed) this.haptic();
-        s.armed = armed;
+        if (this.pullSwipe(s, dx)) e.preventDefault();
     }
 
     onEdgeEnd(e, finished) {
         const s = this.edgeSwipe;
         if (!s || s.settling) return;
-        if (!s.locked) {
-            this.edgeSwipe = null;
-            return;
-        }
         // A flick inwards goes even when short; a flick back cancels
         const v = s.v * -s.dir; // px/ms, inwards
-        const go = finished && (v > 0.35 || (s.pulled >= s.width * EDGE_SWIPE_AT && v > -0.2));
-        this.settlePageSwipe(s, go);
+        this.releaseSwipe(s, finished && (v > 0.35 || (s.pulled >= s.width * EDGE_SWIPE_AT && v > -0.2)));
+    }
+
+    // ---- Back / forward swipes: one core for the finger and the trackpad ----
+
+    // A swipe follows a pull toward going back (dir -1) or forward (1): a
+    // finger from the screen's edge (iPad, iPhone: onEdge*) or two fingers on
+    // a trackpad (desktop: onSwipeWheel). The drivers only measure and
+    // decide; the core shows it: the first LOCK_AT px decide nothing, then
+    // the page stage (or the Chrome-style arrow, trackpad only) follows the
+    // pull, drawn once a frame, with a tick each time it crosses the point
+    // where letting go goes; let go, it goes or springs back.
+    beginSwipe(leaf, dir, extra = {}) {
+        const steps = dir < 0 ? leaf?.history?.backHistory : leaf?.history?.forwardHistory;
+        if (!steps?.length || !leaf.view?.contentEl) return null;
+        return this.edgeSwipe = { dir, leaf, entry: steps[steps.length - 1], locked: false, pulled: 0, v: 0, ...extra };
+    }
+
+    // The pull so far, in px inwards. True once the swipe has taken over
+    // (the driver then keeps the page from scrolling).
+    pullSwipe(s, distance) {
+        if (!s.locked) {
+            if (distance <= LOCK_AT) return false;
+            s.locked = true;
+            if (s.wheel && this.swipeStyle === "chrome") this.startArrowSwipe(s);
+            else this.startPageSwipe(s);
+        }
+        this.queuePageSwipe(s, Math.max(0, Math.min(s.width, distance)));
+        const armed = s.pulled >= s.width * EDGE_SWIPE_AT;
+        if (armed !== !!s.armed && !s.wheel) this.haptic(); // a finger feels it; a trackpad has its arrow
+        s.armed = armed;
+        return true;
+    }
+
+    releaseSwipe(s, go) {
+        if (!s.locked) {
+            if (this.edgeSwipe === s) this.edgeSwipe = null;
+            return;
+        }
+        if (s.arrow) this.settleArrowSwipe(s, go);
+        else this.settlePageSwipe(s, go);
     }
 
     // The stage covers the leaf's page: the page underneath (clipped to the
@@ -2457,7 +3086,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const current = this.snapshotPage(leaf);
         const web = leaf.view?.getViewType?.() === "webviewer" && this.webShots?.get(entry?.state?.state?.url);
         const target = web ? null : this.snapshots.get(entry);
-        const currentPage = this.makeSwipePage(current, null);
+        const currentPage = this.makeSwipePage(current, null, true);
+        s.current = current; // kept for coming back, if the swipe goes
         const targetPage = this.makeSwipePage(target, entry);
         const stage = createDiv("goguryeo-swipe-stage");
         stage.setAttr("inert", "");
@@ -2465,6 +3095,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         s.over = dir < 0 ? currentPage : targetPage;
         s.under.addClass("is-under");
         s.over.addClass("is-over");
+        // its own layer: a variable on the page would restyle the whole copy each frame
+        s.dim = s.under.createDiv("goguryeo-swipe-dim");
         stage.append(s.under, s.over);
         frame.appendChild(stage);
         frame.addClass("goguryeo-swiping");
@@ -2485,30 +3117,167 @@ module.exports = class GoguryeoCompanion extends Plugin {
         s.over.style.transform = `translateX(${edge}px)`;
         s.under.style.transform = `translateX(${underX}px)`;
         s.under.style.clipPath = `inset(0 ${w - edge + underX}px 0 ${-underX}px)`;
-        s.under.style.setProperty("--g-swipe-dim", String(0.18 * (1 - edge / w)));
+        if (s.dim) s.dim.style.opacity = String(1 - edge / w);
+    }
+
+    // From wheel and touch moves, which come faster than the screen draws:
+    // the newest place is drawn once a frame
+    queuePageSwipe(s, pulled) {
+        s.pulled = pulled;
+        if (s.raf) return;
+        s.raf = window.requestAnimationFrame(() => {
+            s.raf = 0;
+            if (s.settling) return;
+            if (s.arrow) this.setArrowSwipe(s, s.pulled);
+            else if (s.stage) this.setPageSwipe(s, s.pulled);
+        });
+    }
+
+    // ---- Chrome style: an arrow at the edge instead of the sliding page ----
+
+    // For a slow computer (the user's choice, per device): no copies of
+    // pages at all. Two fingers sideways bring a round glass arrow in from
+    // the side the page would go to; past the go point it fills, and
+    // letting go there goes back or forward at once, like Chrome.
+    startArrowSwipe(s) {
+        const arrow = createDiv("goguryeo-swipe-arrow");
+        arrow.addClass(s.dir < 0 ? "is-back" : "is-forward");
+        arrow.setAttr("inert", "");
+        setIcon(arrow, s.dir < 0 ? "arrow-left" : "arrow-right");
+        s.leaf.containerEl.appendChild(arrow);
+        s.arrow = arrow;
+        s.width = ARROW_PULL;
+        this.setArrowSwipe(s, 0);
+    }
+
+    setArrowSwipe(s, pulled) {
+        s.pulled = pulled;
+        const p = Math.min(1, pulled / (s.width * EDGE_SWIPE_AT));
+        const x = (-56 + 76 * p) * (s.dir < 0 ? 1 : -1); // from out of sight to 20px in
+        s.arrow.style.transform = `translateX(${x}px) scale(${0.7 + 0.3 * p})`;
+        s.arrow.style.opacity = String(Math.min(1, p * 1.5));
+        const armed = p >= 1;
+        if (armed !== s.arrow.hasClass("is-armed")) s.arrow.toggleClass("is-armed", armed);
+    }
+
+    settleArrowSwipe(s, go) {
+        s.settling = true;
+        if (s.raf) window.cancelAnimationFrame(s.raf);
+        s.raf = 0;
+        const arrow = s.arrow;
+        arrow.addClass("is-settling");
+        arrow.style.opacity = "0";
+        if (!go) this.setArrowSwipe(s, 0);
+        window.setTimeout(() => arrow.remove(), 200);
+        if (this.edgeSwipe === s) this.edgeSwipe = null;
+        if (!go) return;
+        Promise.resolve(s.leaf.history.go(s.dir))
+            .then(() => this.focusNote(s.leaf))
+            .catch((e) => console.error("Goguryeo: swipe navigation failed", e));
+    }
+
+    setSwipeStyle(value) {
+        this.swipeStyle = value;
+        this.app.saveLocalStorage(SWIPE_STYLE_KEY, value);
     }
 
     settlePageSwipe(s, go) {
         s.settling = true;
+        if (s.raf) window.cancelAnimationFrame(s.raf);
+        s.raf = 0;
         s.stage.addClass("is-settling");
         this.setPageSwipe(s, go ? s.width : 0);
+        // Going: the page changes at once, as with Obsidian's own back
+        // button, and the slide plays out over it, so the new page is ready
+        // underneath when it ends. Only within the same view (note to note,
+        // web page to web page): another kind of page replaces the view, and
+        // the stage with it, so that one changes after the slide, as before.
+        const sleep = (ms) => new Promise((r) => window.setTimeout(r, ms));
+        let drawn = null; // the new page in, plus a moment to draw it
+        let loaded = null;
+        const navigate = () => {
+            const webview = s.leaf.view?.getViewType?.() === "webviewer" ? s.leaf.view.webview : null;
+            loaded = webview ? this.webPageLoaded(webview) : null;
+            // The page being left was just copied for the stage: that copy
+            // is the one kept for coming back (getHistoryState), not a new one
+            if (s.current) this.leavingSnapshot = { leaf: s.leaf, snapshot: s.current };
+            drawn = Promise.resolve(s.leaf.history.go(s.dir))
+                .catch((e) => console.error("Goguryeo: swipe navigation failed", e))
+                .finally(() => { this.leavingSnapshot = null; })
+                .then(() => sleep(80));
+        };
+        if (go && s.entry?.state?.type && s.entry.state.type === s.leaf.view?.getViewType?.()) navigate();
         window.setTimeout(async () => {
             if (go) {
+                if (!drawn) navigate();
                 // Let the new page draw before the copy lifts off it, but
                 // don't hold the screen if Obsidian takes its time
-                const sleep = (ms) => new Promise((r) => window.setTimeout(r, ms));
-                const nav = Promise.resolve(s.leaf.history.go(s.dir)).catch((e) => {
-                    console.error("Goguryeo: swipe navigation failed", e);
-                });
-                await Promise.race([nav.then(() => sleep(80)), sleep(SWIPE_DRAW_MS)]);
+                await Promise.race([drawn, sleep(SWIPE_DRAW_MS)]);
+                // A web page loads anew when gone back to (the web viewer
+                // doesn't keep it as a browser does) and shuffles about
+                // while it does: its picture stays over it until it's done
+                if (loaded) {
+                    await loaded;
+                    if (this.edgeSwipe === s) await this.liftPageSwipe(s);
+                }
             }
             if (this.edgeSwipe === s) this.endPageSwipe();
+            // A trackpad swipe to a note: ready to type in it, as after a
+            // click (not after a finger's swipe: on iPad that would bring
+            // up the keyboard)
+            if (go && s.wheel) this.focusNote(s.leaf);
         }, SWIPE_SETTLE_MS);
+    }
+
+    focusNote(leaf) {
+        const view = leaf?.view;
+        if (view?.getViewType?.() !== "markdown" || view.getMode?.() !== "source") return;
+        if (document.querySelector(".modal-container, .menu")) return;
+        this.app.workspace.setActiveLeaf(leaf, { focus: true });
+        view.editor?.focus();
+    }
+
+    // Resolves once a web viewer's page that's about to load has loaded and
+    // settled, or soon if it doesn't start loading, or at WEB_LOAD_MAX_MS
+    webPageLoaded(webview) {
+        return new Promise((resolve) => {
+            let timer = 0;
+            const off = () => {
+                window.clearTimeout(timer);
+                webview.removeEventListener("did-start-loading", onStart);
+                webview.removeEventListener("did-stop-loading", onStop);
+                webview.removeEventListener("did-fail-load", onStop);
+            };
+            const done = () => { off(); resolve(); };
+            const onStop = () => { off(); window.setTimeout(resolve, WEB_SETTLE_MS); };
+            const onStart = () => {
+                window.clearTimeout(timer);
+                timer = window.setTimeout(done, WEB_LOAD_MAX_MS);
+            };
+            webview.addEventListener("did-start-loading", onStart);
+            webview.addEventListener("did-stop-loading", onStop);
+            webview.addEventListener("did-fail-load", onStop);
+            // not loading anything after all (a page it kept): don't wait
+            timer = window.setTimeout(() => {
+                let loading = false;
+                try { loading = webview.isLoading(); } catch (e) { /* gone */ }
+                if (loading) onStart();
+                else done();
+            }, SWIPE_DRAW_MS + 200);
+        });
+    }
+
+    // The copy fades off the new page instead of vanishing
+    liftPageSwipe(s) {
+        s.frame.removeClass("goguryeo-swiping"); // the page shows again under it
+        s.stage.addClass("is-lifting");
+        return new Promise((r) => window.setTimeout(r, 160));
     }
 
     endPageSwipe() {
         const s = this.edgeSwipe;
         this.edgeSwipe = null;
+        s?.arrow?.remove();
         if (!s?.stage) return;
         s.stage.remove();
         s.frame.removeClass("goguryeo-swiping");
@@ -2530,23 +3299,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.register(() => {
             this.mutationObserver.disconnect();
             this.resizeObserver.disconnect();
-            window.cancelAnimationFrame(this.thumbFrame);
             this.removeThumbs();
         });
-        for (const name of ["layout-change", "active-leaf-change", "css-change"]) {
-            this.registerEvent(this.app.workspace.on(name, () => this.scheduleThumbs()));
-        }
-        this.registerDomEvent(window, "resize", () => this.scheduleThumbs());
+        this.onLayout(["layout-change", "active-leaf-change", "css-change", "window-resize", "thumbs"], () => this.updateThumbs());
         if (this.app.workspace.rootSplit) this.resizeObserver.observe(this.app.workspace.rootSplit.containerEl);
         this.scheduleThumbs();
     }
 
+    // In the hub's next frame, with whatever else the layout needs
     scheduleThumbs() {
-        if (this.thumbFrame) return;
-        this.thumbFrame = window.requestAnimationFrame(() => {
-            this.thumbFrame = 0;
-            this.updateThumbs();
-        });
+        this.nudgeLayout("thumbs");
     }
 
     removeThumbs() {
@@ -2652,7 +3414,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const b = rects.get(el);
             if (!b.width || !b.height) continue; // folded away
             if (!a || !a.width || !a.height) {
-                el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+                this.fadeIn(el, { duration: DUR.glide });
                 continue;
             }
             const d = Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height);
@@ -3029,7 +3791,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const slot = this.barSlot = createDiv("goguryeo-stab-slot");
         slot.gIndex = index;
         this.placeBarSlot();
-        slot.animate([{ flexGrow: 0, opacity: 0 }, { flexGrow: 1, opacity: 1 }], { duration: 380, easing: TAB_SPRING });
+        this.play(slot, [{ flexGrow: 0, opacity: 0 }, { flexGrow: 1, opacity: 1 }], { duration: DUR.glide + 100, easing: EASE.bounce });
         this.followBar(420);
     }
 
@@ -3067,8 +3829,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.barSlot = null;
         if (!slot) return;
         if (now) return slot.remove();
-        slot.animate([{ flexGrow: 1, opacity: 1 }, { flexGrow: 0, opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" })
-            .finished.catch(() => {}).finally(() => slot.remove());
+        this.play(slot, [{ flexGrow: 1, opacity: 1 }, { flexGrow: 0, opacity: 0 }], { duration: DUR.fade, easing: EASE.in, fill: "forwards" })
+            .then(() => slot.remove());
         this.followBar(240);
     }
 
@@ -3818,7 +4580,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 if (from == null || el.getAnimations().length) continue;
                 const dx = from - el.getBoundingClientRect().left;
                 if (Math.abs(dx) < 2) continue;
-                el.animate([{ translate: `${dx}px 0` }, { translate: "0 0" }], { duration: 340, easing: TAB_SPRING });
+                this.glide(el, dx, 0, { easing: EASE.bounce });
                 slid = true;
             }
             if (slid) this.followBar(380);
@@ -3882,38 +4644,141 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return tab;
     }
 
-    // ---- Tabs coming and going (quietly, see ENTER_FRAMES / LEAVE_FRAMES) ----
+    // ---- Tabs coming and going (exaggerated on purpose: the user's ask) ----
 
     reducedMotion() {
         return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
 
-    // A new tab in the shared bar: its room opens, then it fades in
+    // ---- Motion: one set of moves for everything the companion animates ----
+
+    // Keyframes on an element, unless the user asked for less motion.
+    // Resolves once done (at once without motion); never throws.
+    play(el, keyframes, options) {
+        if (!el || this.reducedMotion()) return Promise.resolve();
+        try {
+            return el.animate(keyframes, options).finished.then(() => {}, () => {});
+        } catch (e) {
+            return Promise.resolve();
+        }
+    }
+
+    // A surface comes in, from a little smaller (or bigger), offset and
+    // see-through. The individual scale / translate properties add to any
+    // transform the theme gives it.
+    enter(el, { scale = 0.94, x = 0, y = 0, opacity = 0, duration = DUR.in, easing = EASE.spring } = {}) {
+        return this.play(el, [
+            { opacity, scale: String(scale), translate: `${x}px ${y}px` },
+            { opacity: 1, scale: "1", translate: "0 0" },
+        ], { duration, easing });
+    }
+
+    // ...and goes: it stops taking clicks at once, shrinks a little, fades,
+    // and is removed
+    leave(el, { scale = 0.94, x = 0, y = 0, duration = DUR.out, remove = true } = {}) {
+        if (!el) return Promise.resolve();
+        el.style.pointerEvents = "none";
+        return this.play(el, [
+            { opacity: 1, scale: "1", translate: "0 0" },
+            { opacity: 0, scale: String(scale), translate: `${x}px ${y}px` },
+        ], { duration, easing: EASE.in, fill: "forwards" }).then(() => { if (remove) el.remove(); });
+    }
+
+    // A dim or a sheet fading in to its own opacity, or out and removed
+    fadeIn(el, { duration = DUR.fade } = {}) {
+        if (!el) return Promise.resolve();
+        return this.play(el, [{ opacity: 0 }, { opacity: getComputedStyle(el).opacity }], { duration, easing: EASE.out });
+    }
+
+    fadeOut(el, { duration = DUR.out, remove = true } = {}) {
+        if (!el) return Promise.resolve();
+        el.style.pointerEvents = "none";
+        return this.play(el, [{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration, easing: EASE.in, fill: "forwards" })
+            .then(() => { if (remove) el.remove(); });
+    }
+
+    // From where it stood to where it is now (dx, dy: old place less new)
+    glide(el, dx, dy = 0, { duration = DUR.glide, easing = EASE.soft } = {}) {
+        if (!dx && !dy) return Promise.resolve();
+        return this.play(el, [{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration, easing });
+    }
+
+    // The settings tab's "Opening and closing tabs": subtle (default),
+    // lively (the old spring and swell) or off. Saved with the plugin's data.
+    tabMotion() {
+        const v = this.folderNoteSettings?.tabMotion;
+        return v === "lively" || v === "off" ? v : "subtle";
+    }
+
+    // A tab or a page's name comes in. Subtle: it fades in, a little smaller,
+    // while its room opens (grow: the property that opens it, flexGrow in a
+    // row). Lively: from small, past its size, back.
+    springIn(el, { grow = null, swell = 1.14, y = -10 } = {}) {
+        const style = this.tabMotion();
+        if (style === "off") return Promise.resolve();
+        const room = (v) => (grow ? { [grow]: v } : {});
+        if (style === "subtle") {
+            return this.play(el, [
+                { opacity: 0, scale: "0.94", ...room(0) },
+                { opacity: 1, scale: "1", ...room(1) },
+            ], { duration: DUR.in, easing: EASE.out });
+        }
+        const at = (opacity, scale, dy, r) => ({ opacity, scale: String(scale), translate: `0 ${dy}px`, ...room(r) });
+        return this.play(el, [
+            at(0, 0.3, y, 0),
+            { ...at(1, swell, 0, 1.2), offset: 0.6 },
+            at(1, 1, 0, 1),
+        ], { duration: DUR.pop, easing: EASE.pop });
+    }
+
+    // ...and one closing goes, its room closing with it (room: the
+    // properties at full size and at none), then is removed. Subtle: it fades
+    // out first, so the neighbours visibly slide into its place. Lively:
+    // it swells for a beat, then shrinks to nothing.
+    springOut(el, { room = [{}, {}], swell = 1.1 } = {}) {
+        el.style.pointerEvents = "none";
+        const style = this.tabMotion();
+        if (style === "off") {
+            el.remove();
+            return Promise.resolve();
+        }
+        const frames = style === "subtle" ? [
+            { ...room[0], opacity: 1, scale: "1" },
+            { ...room[0], opacity: 0, scale: "0.96", offset: 0.4 },
+            { ...room[1], opacity: 0, scale: "0.96" },
+        ] : [
+            { ...room[0], opacity: 1, scale: "1" },
+            { ...room[0], opacity: 1, scale: String(swell), offset: 0.22 },
+            { ...room[1], opacity: 0, scale: "0.3" },
+        ];
+        return this.play(el, frames, { duration: style === "subtle" ? DUR.glide : DUR.leave, easing: style === "subtle" ? EASE.out : EASE.in, fill: "forwards" })
+            .then(() => el.remove());
+    }
+
+    // A new tab in the shared bar: it springs up from nothing, overshoots
+    // and settles, pushing the others aside
     popTab(tab) {
         if (this.reducedMotion()) return;
         tab.style.minWidth = "0px";
-        tab.animate(ENTER_FRAMES({ flexGrow: 0 }, { flexGrow: 1 }), ENTER_TIMING)
-            .finished.catch(() => {}).finally(() => tab.style.removeProperty("min-width"));
-        this.followBar(ENTER_TIMING.duration + 40);
+        this.springIn(tab, { grow: "flexGrow" }).then(() => tab.style.removeProperty("min-width"));
+        this.followBar(DUR.pop + 40);
     }
 
-    // A closed tab: it fades out where it stands, then the gap closes
+    // A closed tab: it swells for a beat, then shrinks to nothing in its place
     leaveTab(tab) {
         tab.addClass("is-leaving");
         tab.removeClass("is-active", "is-focused");
         if (this.reducedMotion()) return tab.remove();
         tab.style.minWidth = "0px";
-        tab.style.pointerEvents = "none";
-        tab.animate(LEAVE_FRAMES({ flexGrow: 1 }, { flexGrow: 0 }), LEAVE_TIMING)
-            .finished.catch(() => {}).finally(() => tab.remove());
-        this.followBar(LEAVE_TIMING.duration + 40);
+        this.springOut(tab, { room: [{ flexGrow: 1 }, { flexGrow: 0 }] });
+        this.followBar(DUR.leave + 40);
     }
 
     // The same for a page's name inside the joined split tab
     popPart(part) {
         if (this.reducedMotion()) return;
-        part.animate(ENTER_FRAMES({}, {}), ENTER_TIMING);
-        this.followBar(ENTER_TIMING.duration + 40);
+        this.springIn(part, { swell: 1.18, y: 0 });
+        this.followBar(DUR.pop + 40);
     }
 
     leavePart(part) {
@@ -3921,16 +4786,19 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (this.reducedMotion()) return part.remove();
         const w = part.offsetWidth;
         part.style.overflow = "hidden";
-        part.style.pointerEvents = "none";
-        const open = { maxWidth: w + "px", paddingLeft: "9px", paddingRight: "9px" };
-        part.animate(LEAVE_FRAMES(open, { maxWidth: "0px", paddingLeft: "0px", paddingRight: "0px" }), LEAVE_TIMING)
-            .finished.catch(() => {}).finally(() => part.remove());
-        this.followBar(LEAVE_TIMING.duration + 40);
+        this.springOut(part, {
+            swell: 1.12,
+            room: [
+                { maxWidth: w + "px", paddingLeft: "9px", paddingRight: "9px" },
+                { maxWidth: "0px", paddingLeft: "0px", paddingRight: "0px" },
+            ],
+        });
+        this.followBar(DUR.leave + 40);
     }
 
     // Obsidian's own tab rows (one pane, or each card): Obsidian grows a new
-    // tab's width; the plugin fades its contents in. A closed
-    // tab Obsidian simply drops, so a copy of it takes its place and fades
+    // tab's width; the plugin adds the springy pop on its contents. A closed
+    // tab Obsidian simply drops, so a copy of it takes its place and shrinks
     // away. A tab only moved (re-appended, or dragged to another pane) does
     // neither.
     watchTabAnimations(strip) {
@@ -3963,8 +4831,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             for (const el of m.addedNodes) {
                 if (!isTab(el) || this.tabSeen.has(el)) continue;
                 this.tabSeen.add(el);
-                // Obsidian grows the header's width; its contents fade in
-                el.querySelector(".workspace-tab-header-inner")?.animate(ENTER_FRAMES({}, {}), ENTER_TIMING);
+                this.springIn(el.querySelector(".workspace-tab-header-inner"));
             }
             const strip = m.target;
             for (const el of m.removedNodes) {
@@ -3975,8 +4842,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 const next = m.nextSibling?.parentNode === strip ? m.nextSibling : null;
                 strip.insertBefore(ghost, next);
                 const w = ghost.getBoundingClientRect().width;
-                ghost.animate(LEAVE_FRAMES({ width: w + "px" }, { width: "0px" }), LEAVE_TIMING)
-                    .finished.catch(() => {}).finally(() => ghost.remove());
+                this.springOut(ghost, { room: [{ width: w + "px" }, { width: "0px" }] });
             }
         }
     }
@@ -4169,10 +5035,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             },
         };
         this.placeGripMenu();
-        if (!this.reducedMotion()) {
-            menu.animate([{ opacity: 0, scale: "0.9", translate: "0 -6px" }, { opacity: 1, scale: "1", translate: "0 0" }],
-                { duration: 260, easing: "cubic-bezier(0.3, 1.3, 0.4, 1)" });
-        }
+        this.enter(menu, { scale: 0.9, y: -6 });
     }
 
     // Under the grip, centred on it, inside the window
@@ -4192,10 +5055,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.gripMenu = null;
         m.off();
         m.grip.removeClass("is-open");
-        if (now || this.reducedMotion()) return m.menu.remove();
-        m.menu.style.pointerEvents = "none";
-        m.menu.animate([{ opacity: 1, scale: "1" }, { opacity: 0, scale: "0.94" }], { duration: 150, easing: "ease-in", fill: "forwards" })
-            .finished.catch(() => {}).finally(() => m.menu.remove());
+        if (now) return m.menu.remove();
+        this.leave(m.menu);
     }
 
     clearSplit() {
