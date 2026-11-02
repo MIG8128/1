@@ -117,6 +117,7 @@ const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⧉, which the theme sh
 // card picked grows back into the page on the way out
 const ZOOM_MS = 400;
 const ZOOM_EASE = "cubic-bezier(0.32, 0.72, 0, 1)"; // iOS's sheet curve
+const TAB_SLIDE_MS = 380; // desktop and iPad: a tab switch pushes the page aside
 const TAB_SPRING = EASE.bounce; // tabs and slots growing in, with a bounce
 const CARD_HOLD_MS = 300; // a finger rests on a card this long before it lifts (a mouse drags at once)
 const CARD_SLOP = 6; // px a pointer may wander before it counts as a drag (or, for a finger, a scroll)
@@ -2470,6 +2471,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return;
         }
         o.sheet.style.pointerEvents = "none";
+        this.overviewClosingUntil = Date.now() + ZOOM_MS; // its zoom, not a slide
         const { workspace } = this.app;
         leaf ??= workspace.getMostRecentLeaf(workspace.rootSplit);
         const card = [...(o.grid?.children ?? [])].find((c) => c.gLeaves?.includes(leaf));
@@ -4493,10 +4495,15 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const own = Object.prototype.hasOwnProperty.call(proto, "selectTabIndex");
         const original = proto.selectTabIndex;
         const patched = function (index, ...rest) {
+            const before = this.children?.[this.currentTab];
             try {
                 plugin.keepSplitPage(this, this.children?.[index]);
             } catch (e) { /* never block a tab switch */ }
-            return original.call(this, index, ...rest);
+            const result = original.call(this, index, ...rest);
+            try {
+                plugin.slideTabs(this, before, this.children?.[this.currentTab]);
+            } catch (e) { /* the slide is only a nicety */ }
+            return result;
         };
         proto.selectTabIndex = patched;
         this.register(() => {
@@ -4504,6 +4511,39 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (own) proto.selectTabIndex = original;
             else delete proto.selectTabIndex;
         });
+    }
+
+    // Desktop and iPad: switching tabs in a pane pushes the page aside, like
+    // a carousel. The tab left behind stays on screen for the slide (body of
+    // the pane, under the new one; Obsidian hid it with display: none) and
+    // both pages' contents slide: the new one in from the side its tab is
+    // on, the old one out the other way. Only the contents move, so the rows
+    // above stay put, and each is clipped by its own view.
+    slideTabs(pane, from, to) {
+        if (!from || !to || from === to || Platform.isPhone || pane.isStacked) return;
+        if (this.overview || Date.now() < (this.overviewClosingUntil ?? 0)) return; // the overview zooms instead
+        if (this.reducedMotion() || this.tabMotion?.() === "off") return;
+        const children = pane.children ?? [];
+        const a = children.indexOf(from), b = children.indexOf(to);
+        if (a < 0 || b < 0 || !pane.containerEl?.isConnected || !from.containerEl?.isConnected) return;
+        if (pane.containerEl.closest(`.${SOLO_OFF_CLASS}`)) return;
+        const width = to.containerEl.getBoundingClientRect().width;
+        if (!width) return;
+        const dir = b > a ? 1 : -1; // the new page comes in from the right when its tab is to the right
+        this.pageSlide?.finish();
+        const out = from.containerEl;
+        out.addClass("goguryeo-page-out");
+        const move = (leaf, x0, x1) => [...(leaf.view?.contentEl?.children ?? [])].map((el) =>
+            el.animate([{ translate: `${x0}px 0` }, { translate: `${x1}px 0` }], { duration: TAB_SLIDE_MS, easing: ZOOM_EASE }));
+        const anims = [...move(from, 0, -dir * width), ...move(to, dir * width, 0)];
+        const done = () => out.removeClass("goguryeo-page-out");
+        if (!anims.length) return done();
+        this.pageSlide = { finish: () => { anims.forEach((x) => x.finish()); done(); } };
+        Promise.all(anims.map((x) => x.finished.catch(() => {}))).then(() => {
+            done();
+            if (this.pageSlide?.anims === anims) this.pageSlide = null;
+        });
+        this.pageSlide.anims = anims;
     }
 
     keepSplitPage(pane, next) {

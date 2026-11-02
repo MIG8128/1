@@ -2534,6 +2534,39 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     pointer-events: none;
 }
 
+/* Switching tabs (desktop and iPad, companion: slideTabs): the tab left
+   behind stays on screen for the slide, under the new one, see-through so
+   the new page shows where the old one has moved away from. Its own rows
+   (the path row) stay hidden, the new tab's are the ones in place. */
+.mod-root .workspace-tab-container:has(> .workspace-leaf.goguryeo-page-out) {
+    position: relative;
+}
+
+.mod-root .workspace-leaf.goguryeo-page-out {
+    display: flex !important;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.mod-root .workspace-leaf.goguryeo-page-out :is(.workspace-leaf-content, .view-content) {
+    background: transparent !important;
+}
+
+/* ...and without its glass (the card behind the note, the blur behind the
+   rows): over the new page it would blur it away */
+.mod-root .workspace-leaf.goguryeo-page-out::before,
+.mod-root .workspace-leaf.goguryeo-page-out::after,
+.mod-root .workspace-leaf.goguryeo-page-out .workspace-leaf-content::before,
+.mod-root .workspace-leaf.goguryeo-page-out .workspace-leaf-content::after {
+    display: none !important;
+}
+
+.mod-root .workspace-leaf.goguryeo-page-out .view-header {
+    visibility: hidden;
+}
+
 /* One grid of every tab, in the tab row's order */
 .goguryeo-tab-overview-panes {
     position: relative;
