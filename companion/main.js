@@ -286,6 +286,19 @@ class GoguryeoSettingTab extends PluginSettingTab {
                 plugin.refreshFolderNotes();
                 this.display();
             }));
+        new Setting(this.containerEl).setName("Tabs").setHeading();
+        new Setting(this.containerEl)
+            .setName("Opening and closing tabs")
+            .setDesc("How a tab comes and goes. Subtle: it fades in or out while its room opens or closes. Lively: it springs in past its size and swells before shrinking away. Off: at once.")
+            .addDropdown((d) => d
+                .addOption("subtle", "Subtle")
+                .addOption("lively", "Lively")
+                .addOption("off", "Off")
+                .setValue(plugin.tabMotion())
+                .onChange(async (v) => {
+                    plugin.folderNoteSettings.tabMotion = v;
+                    await plugin.saveData(plugin.folderNoteSettings);
+                }));
         if (Platform.isDesktopApp) {
             new Setting(this.containerEl).setName("Back and forward").setHeading();
             new Setting(this.containerEl)
@@ -4518,29 +4531,56 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return this.play(el, [{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration, easing });
     }
 
-    // A tab or a page's name springs in: from small, past its size, back.
-    // grow: the property that opens its room with it (flexGrow in a row)
-    springIn(el, { grow = null, swell = 1.14, y = -10, duration = DUR.pop } = {}) {
-        const at = (opacity, scale, dy, room) => ({
-            opacity, scale: String(scale), translate: `0 ${dy}px`, ...(grow ? { [grow]: room } : {}),
-        });
+    // The settings tab's "Opening and closing tabs": subtle (default),
+    // lively (the old spring and swell) or off. Saved with the plugin's data.
+    tabMotion() {
+        const v = this.folderNoteSettings?.tabMotion;
+        return v === "lively" || v === "off" ? v : "subtle";
+    }
+
+    // A tab or a page's name comes in. Subtle: it fades in, a little smaller,
+    // while its room opens (grow: the property that opens it, flexGrow in a
+    // row). Lively: from small, past its size, back.
+    springIn(el, { grow = null, swell = 1.14, y = -10 } = {}) {
+        const style = this.tabMotion();
+        if (style === "off") return Promise.resolve();
+        const room = (v) => (grow ? { [grow]: v } : {});
+        if (style === "subtle") {
+            return this.play(el, [
+                { opacity: 0, scale: "0.94", ...room(0) },
+                { opacity: 1, scale: "1", ...room(1) },
+            ], { duration: DUR.in, easing: EASE.out });
+        }
+        const at = (opacity, scale, dy, r) => ({ opacity, scale: String(scale), translate: `0 ${dy}px`, ...room(r) });
         return this.play(el, [
             at(0, 0.3, y, 0),
             { ...at(1, swell, 0, 1.2), offset: 0.6 },
             at(1, 1, 0, 1),
-        ], { duration, easing: EASE.pop });
+        ], { duration: DUR.pop, easing: EASE.pop });
     }
 
-    // ...and one closing swells for a beat, then shrinks to nothing, its
-    // room closing with it (room: the properties at full size and at none),
-    // and is removed
-    springOut(el, { room = [{}, {}], swell = 1.1, duration = DUR.leave } = {}) {
+    // ...and one closing goes, its room closing with it (room: the
+    // properties at full size and at none), then is removed. Subtle: it fades
+    // out first, so the neighbours visibly slide into its place. Lively:
+    // it swells for a beat, then shrinks to nothing.
+    springOut(el, { room = [{}, {}], swell = 1.1 } = {}) {
         el.style.pointerEvents = "none";
-        return this.play(el, [
+        const style = this.tabMotion();
+        if (style === "off") {
+            el.remove();
+            return Promise.resolve();
+        }
+        const frames = style === "subtle" ? [
+            { ...room[0], opacity: 1, scale: "1" },
+            { ...room[0], opacity: 0, scale: "0.96", offset: 0.4 },
+            { ...room[1], opacity: 0, scale: "0.96" },
+        ] : [
             { ...room[0], opacity: 1, scale: "1" },
             { ...room[0], opacity: 1, scale: String(swell), offset: 0.22 },
             { ...room[1], opacity: 0, scale: "0.3" },
-        ], { duration, easing: EASE.in, fill: "forwards" }).then(() => el.remove());
+        ];
+        return this.play(el, frames, { duration: style === "subtle" ? DUR.glide : DUR.leave, easing: style === "subtle" ? EASE.out : EASE.in, fill: "forwards" })
+            .then(() => el.remove());
     }
 
     // A new tab in the shared bar: it springs up from nothing, overshoots
