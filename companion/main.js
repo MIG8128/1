@@ -39,15 +39,22 @@ const OPEN_CLASS = "goguryeo-touch-active";
 const THUMB_CLASS = "goguryeo-glass-thumbs";
 const SLIDE_MS = 440; // the theme's 0.42s glide, plus a little
 const SWELL_MS = 320; // how long the glass stays swollen while it travels
-// A closed tab leaves in two plain steps so the eye can follow it: first it
-// fades out where it stands (shrinking only a little, no swell), then its
-// room closes and the neighbours slide together. `open` / `shut` are the
-// size properties of the element (flex-grow, width or max-width).
-const LEAVE_TIMING = { duration: 420, fill: "forwards" };
+// Tabs come and go quietly (the user found the springy pop and the
+// swell-and-shrink too much), in two plain steps so the eye can follow:
+// a new tab's room opens, then the tab fades in; a closed tab fades out
+// where it stands, then its room closes. `open` / `shut` are the size
+// properties of the element (flex-grow, width or max-width; {} for none).
+const ENTER_TIMING = { duration: 320 };
+const ENTER_FRAMES = (shut, open) => [
+    { ...shut, opacity: 0, scale: "0.96", easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+    { ...open, opacity: 0, scale: "0.96", offset: 0.45, easing: "ease-out" },
+    { ...open, opacity: 1, scale: "1" },
+];
+const LEAVE_TIMING = { duration: 320, fill: "forwards" };
 const LEAVE_FRAMES = (open, shut) => [
     { ...open, opacity: 1, scale: "1", easing: "ease-out" },
-    { ...open, opacity: 0, scale: "0.92", offset: 0.4, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
-    { ...shut, opacity: 0, scale: "0.92" },
+    { ...open, opacity: 0, scale: "0.96", offset: 0.4, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+    { ...shut, opacity: 0, scale: "0.96" },
 ];
 const SPLIT_CLASS = "goguryeo-split";
 const ONE_PANE_CLASS = "goguryeo-one-pane";
@@ -3706,29 +3713,22 @@ module.exports = class GoguryeoCompanion extends Plugin {
         return tab;
     }
 
-    // ---- Tabs coming and going (a new tab's pop is exaggerated on purpose,
-    // the user's ask; a closed tab leaves calmly, see LEAVE_FRAMES) ----
+    // ---- Tabs coming and going (quietly, see ENTER_FRAMES / LEAVE_FRAMES) ----
 
     reducedMotion() {
         return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
 
-    // A new tab in the shared bar: it springs up from nothing, overshoots
-    // and settles, pushing the others aside
+    // A new tab in the shared bar: its room opens, then it fades in
     popTab(tab) {
         if (this.reducedMotion()) return;
         tab.style.minWidth = "0px";
-        tab.animate([
-            { flexGrow: 0, opacity: 0, scale: "0.3", translate: "0 -10px" },
-            { flexGrow: 1.2, opacity: 1, scale: "1.14", translate: "0 0", offset: 0.6 },
-            { flexGrow: 1, opacity: 1, scale: "1", translate: "0 0" },
-        ], { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" })
+        tab.animate(ENTER_FRAMES({ flexGrow: 0 }, { flexGrow: 1 }), ENTER_TIMING)
             .finished.catch(() => {}).finally(() => tab.style.removeProperty("min-width"));
-        this.followBar(600);
+        this.followBar(ENTER_TIMING.duration + 40);
     }
 
-    // A closed tab, kept calm so it reads (the user found the swell-and-
-    // shrink too much): it fades out where it stands, then the gap closes
+    // A closed tab: it fades out where it stands, then the gap closes
     leaveTab(tab) {
         tab.addClass("is-leaving");
         tab.removeClass("is-active", "is-focused");
@@ -3743,12 +3743,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // The same for a page's name inside the joined split tab
     popPart(part) {
         if (this.reducedMotion()) return;
-        part.animate([
-            { opacity: 0, scale: "0.3" },
-            { opacity: 1, scale: "1.18", offset: 0.6 },
-            { opacity: 1, scale: "1" },
-        ], { duration: 520, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" });
-        this.followBar(560);
+        part.animate(ENTER_FRAMES({}, {}), ENTER_TIMING);
+        this.followBar(ENTER_TIMING.duration + 40);
     }
 
     leavePart(part) {
@@ -3764,8 +3760,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
     }
 
     // Obsidian's own tab rows (one pane, or each card): Obsidian grows a new
-    // tab's width; the plugin adds the springy pop on its contents. A closed
-    // tab Obsidian simply drops, so a copy of it takes its place and shrinks
+    // tab's width; the plugin fades its contents in. A closed
+    // tab Obsidian simply drops, so a copy of it takes its place and fades
     // away. A tab only moved (re-appended, or dragged to another pane) does
     // neither.
     watchTabAnimations(strip) {
@@ -3798,11 +3794,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
             for (const el of m.addedNodes) {
                 if (!isTab(el) || this.tabSeen.has(el)) continue;
                 this.tabSeen.add(el);
-                el.querySelector(".workspace-tab-header-inner")?.animate([
-                    { opacity: 0, scale: "0.3", translate: "0 -10px" },
-                    { opacity: 1, scale: "1.14", translate: "0 0", offset: 0.6 },
-                    { opacity: 1, scale: "1", translate: "0 0" },
-                ], { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" });
+                // Obsidian grows the header's width; its contents fade in
+                el.querySelector(".workspace-tab-header-inner")?.animate(ENTER_FRAMES({}, {}), ENTER_TIMING);
             }
             const strip = m.target;
             for (const el of m.removedNodes) {
