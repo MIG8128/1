@@ -1374,6 +1374,45 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.setupNameGestures();
         this.setupPhoneMenu();
         this.setupPhoneTabZoom();
+        this.setupStatusEdge();
+    }
+
+    // ---- iPhone: the status bar, Safari style ----
+
+    // The clock and indicators stay while scrolling, as in Safari: Obsidian
+    // hides the iOS status bar when the bottom bar folds (hideNavigation →
+    // its StatusBar plugin's hide), so it is shown again right away. Behind
+    // it there is no strip; text that scrolls under it is softened by a
+    // graduated blur, four layers from strong at the top to none at its
+    // lower edge (theme: .goguryeo-status-edge; design canvas "iPhone —
+    // status bar like Safari").
+    setupStatusEdge() {
+        const edge = document.body.createDiv("goguryeo-status-edge");
+        edge.setAttr("aria-hidden", "true");
+        for (let i = 0; i < 4; i++) edge.createDiv();
+        document.body.addClass("goguryeo-status-edge-on");
+        this.register(() => {
+            edge.remove();
+            document.body.removeClass("goguryeo-status-edge-on");
+        });
+        const nav = this.app.mobileNavbar;
+        if (!nav?.hideNavigation) return;
+        const own = Object.hasOwn(nav, "hideNavigation");
+        const original = nav.hideNavigation;
+        nav.hideNavigation = function (...args) {
+            // Obsidian calls this on every scroll step down: only the fold
+            // itself (one native call), not each step
+            const folding = !document.body.hasClass("is-hidden-nav");
+            const result = original.apply(this, args);
+            if (folding) try {
+                window.Capacitor?.Plugins?.StatusBar?.show?.({ animation: "NONE" })?.catch?.(() => {});
+            } catch (e) { /* no status bar plugin here */ }
+            return result;
+        };
+        this.register(() => {
+            if (own) nav.hideNavigation = original;
+            else delete nav.hideNavigation;
+        });
     }
 
     setupPhoneMenu() {

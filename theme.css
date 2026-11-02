@@ -3207,7 +3207,8 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-heade
     display: none;
 }
 
-/* The status bar area: a little glass so text doesn't run into the clock */
+/* The status bar area: a little glass so text doesn't run into the clock
+   (without the companion; with it, the graduated blur below) */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf-content::before {
     content: "";
     position: fixed;
@@ -3220,6 +3221,67 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     pointer-events: none;
+}
+
+/* With the companion, Safari's status bar instead (setupStatusEdge): no
+   strip, the clock stays, and text under it is softened by a graduated
+   blur, strongest at the top, gone by the status bar's lower edge */
+body.is-phone.is-floating-nav.goguryeo-status-edge-on:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf-content::before {
+    content: none;
+}
+
+.goguryeo-status-edge {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .goguryeo-status-edge {
+    display: block;
+    position: fixed;
+    z-index: calc(var(--layer-notice) + 1);
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--safe-area-inset-top);
+    pointer-events: none;
+}
+
+.goguryeo-status-edge > div {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+}
+
+.goguryeo-status-edge > div:nth-child(1) {
+    height: 100%;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+    -webkit-mask-image: linear-gradient(#000 60%, transparent);
+    mask-image: linear-gradient(#000 60%, transparent);
+}
+
+.goguryeo-status-edge > div:nth-child(2) {
+    height: 85%;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    -webkit-mask-image: linear-gradient(#000 55%, transparent);
+    mask-image: linear-gradient(#000 55%, transparent);
+}
+
+.goguryeo-status-edge > div:nth-child(3) {
+    height: 70%;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(#000 50%, transparent);
+    mask-image: linear-gradient(#000 50%, transparent);
+}
+
+.goguryeo-status-edge > div:nth-child(4) {
+    height: 55%;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    -webkit-mask-image: linear-gradient(#000 45%, transparent);
+    mask-image: linear-gradient(#000 45%, transparent);
 }
 
 /* ---- The capsule: ( folder › file name ) in the middle of the bar ---- */
