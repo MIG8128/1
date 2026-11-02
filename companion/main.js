@@ -3524,9 +3524,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
             el.toggleClass(CURRENT_PANE_CLASS, el === currentEl);
             el.toggleClass(LAST_PANE_CLASS, el === lastTop);
         }
-        if (groups.length > 1) this.renderSharedTabs(groups, shown);
+        // A lone card (over a background) gets the shared row too, so its
+        // tabs drag the same way: along the row, or onto the page's edge to
+        // make a split (the user's ask)
+        if (groups.length >= 1) this.renderSharedTabs(groups, shown);
         else this.removeSharedTabs();
         this.renderGrips(groups.length > 1 ? groups : []);
+        if (groups.length === 1) this.splitGroups = groups; // a lone card's edges take a dropped tab (it has no grip)
         this.flipCards(groups);
     }
 
@@ -4132,7 +4136,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     tabToEdge(d, index) {
         const bar = this.sharedBar?.getBoundingClientRect();
         const offBar = !bar || d.y > bar.bottom + 16;
-        const lone = document.body.hasClass(SOLO_CLASS);
+        const lone = document.body.hasClass(SOLO_CLASS) || document.body.hasClass(ONE_PANE_CLASS);
         const t = index == null && offBar ? this.paneDropAt(d.x, d.y, null) : null;
         // not onto the dragged tab itself, shown alone
         const edge = t && t.side !== "center" && !(lone && t.pane.children[t.pane.currentTab] === d.leaf) ? t : null;
@@ -4227,6 +4231,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.splitSeq ??= 1;
         const dir = side === "left" || side === "right" ? "vertical" : "horizontal";
         const before = side === "left" || side === "top";
+        // Every pane there is now and in no split stays out of the new one
+        // (from a lone card, nothing has marked them yet)
+        for (const pane of this.splitGroups ?? []) if (!of.has(pane)) this.loosePanes.add(pane);
         const src = leaf.parent;
         const srcShown = src.children[src.currentTab];
         src.removeChild(leaf);
@@ -4419,11 +4426,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // { solo: the lone tab, split: the split on screen }.
     syncSplitPages(groups) {
         const { workspace } = this.app;
+        // (a split made from a lone card, makeSplit, creates the maps first)
+        this.lastSplitPages ??= new Map(); // split → its page focused last
         if (!this.splitPages) {
             this.splitPages = new Map();
             this.splitOf = new Map();
             this.loosePanes = new WeakSet(); // panes in no split, known
-            this.lastSplitPages ??= new Map(); // split → its page focused last
             this.splitSeq ??= 1;
             let saved = [];
             try {
@@ -4710,7 +4718,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // and slides between them; the focused page's name is green. Tabs are
     // kept from one update to the next so the pill can slide.
     renderSharedTabs(groups, shown) {
-        const solo = shown?.solo ?? null;
+        // one pane: its tab on screen is the one shown alone
+        const solo = shown?.solo ?? (groups.length === 1 ? groups[0].children[groups[0].currentTab] ?? null : null);
         const { workspace } = this.app;
         document.body.addClass(SHARED_TABS_CLASS);
         let bar = this.sharedBar;
