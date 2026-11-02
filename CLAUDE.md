@@ -128,6 +128,7 @@ Get-CimInstance Win32_Process -Filter "Name='Obsidian.exe'" | Where-Object { $_.
 ## User preferences and decisions
 
 - Write in English. The user writes in short sentences and likes seeing screenshots and checks.
+- Reports end with what was checked. Leave out the deploy and reload steps (pull, `deploy.ps1`, Ctrl+R, reopening Obsidian on iPhone/iPad) and the version and branch line: the user knows them (2026-11-02).
 - **iPhone UI needs haptics.** Every touch control or gesture the companion adds must call `this.haptic()`: on a tap, and when a gesture crosses its go point. The user insisted ("remember!").
 - iPhone and iPad gestures follow iOS Safari: edge swipe with the other page underneath, a name pill that folds into a capsule on scroll, and drag the pill up or sideways.
 - When the user describes a change exactly, building it directly is fine without a design-canvas mockup first; check it with screenshots.
