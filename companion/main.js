@@ -2507,12 +2507,22 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const own = { show: Object.hasOwn(sw, "show"), hide: Object.hasOwn(sw, "hide") };
         const { show, hide } = sw;
         const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        // While the switcher is open, the bottom bar and the capsule fade
+        // out (theme: body.goguryeo-tabs-open), and come back as it closes
         sw.show = function (...args) {
+            // Obsidian reuses the switcher's element: the last close's fade
+            // (held at nothing) must go, or it opens invisible and takes
+            // every tap. Kept by reference: a detached element doesn't list
+            // its animations.
+            plugin.switcherFade?.cancel();
+            plugin.switcherFade = null;
+            document.body.addClass("goguryeo-tabs-open");
             const result = show.apply(this, args);
             if (!reduced()) Promise.resolve(result).then(() => plugin.phoneZoom(this, true));
             return result;
         };
         sw.hide = function (...args) {
+            document.body.removeClass("goguryeo-tabs-open");
             const shown = this.containerEl?.isConnected;
             const result = hide.apply(this, args);
             if (shown && !reduced()) plugin.phoneZoom(this, false);
@@ -2522,18 +2532,23 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (own.show) sw.show = show; else delete sw.show;
             if (own.hide) sw.hide = hide; else delete sw.hide;
             document.querySelectorAll(".goguryeo-zoom-copy, .goguryeo-zoom-backdrop").forEach((el) => el.remove());
+            document.body.removeClass("goguryeo-tabs-open");
+            this.switcherFade?.cancel();
         });
     }
 
     phoneZoom(sw, opening) {
         const container = sw.containerEl;
         if (!container?.isConnected) return;
+        document.querySelectorAll(".goguryeo-zoom-copy, .goguryeo-zoom-backdrop").forEach((el) => el.remove());
+        container.querySelectorAll(".mobile-tab-preview[style*='visibility']").forEach((el) => el.style.removeProperty("visibility"));
         const leaf = this.app.workspace.getMostRecentLeaf();
         // Obsidian's fade and scale are set as inline styles; an animation
         // wins over them
         const fade = opening ? [{ opacity: 0, transform: "none" }, { opacity: 1, transform: "none" }]
             : [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "none" }];
-        container.animate(fade, { duration: opening ? ZOOM_MS * 0.6 : 140, easing: "ease-out", fill: opening ? "none" : "forwards" });
+        this.switcherFade?.cancel();
+        this.switcherFade = container.animate(fade, { duration: opening ? ZOOM_MS * 0.6 : 140, easing: "ease-out", fill: opening ? "none" : "forwards" });
         const preview = sw.tabPreviews?.[leaf?.id]?.containerEl?.querySelector(".mobile-tab-preview");
         const card = preview?.getBoundingClientRect();
         if (!card || card.width === 0 || card.bottom < 0 || card.top > window.innerHeight) return;
@@ -2674,10 +2689,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
             d.pill.style.opacity = String(1 - Math.min(Math.abs(shift) / d.pill.offsetWidth, 1) * 0.7);
             armed = !!d.target && Math.abs(dx) >= PILL_SWIPE_AT;
         } else {
-            const up = Math.max(0, -dy);
-            d.pill.style.translate = `0 ${-up * 0.6}px`;
-            d.pill.style.scale = String(1 - Math.min(up / 150, 1) * 0.08);
-            armed = up >= PILL_SWIPE_AT;
+            // Up: the bar stays where it is (the user didn't want to see it
+            // lifted); the tick says when letting go opens the tabs, and
+            // then the bar fades as the page zooms into its card
+            armed = Math.max(0, -dy) >= PILL_SWIPE_AT;
         }
         if (armed !== d.armed) this.haptic();
         d.armed = armed;

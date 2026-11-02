@@ -3174,9 +3174,9 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .
     pointer-events: none;
     mask-image: none;
     -webkit-mask-image: none;
-    transition-property: left, width, height, bottom, padding;
-    transition-duration: var(--g-fold-time);
-    transition-timing-function: var(--g-fold-ease);
+    transition-property: left, width, height, bottom, padding, opacity;
+    transition-duration: var(--g-fold-time), var(--g-fold-time), var(--g-fold-time), var(--g-fold-time), var(--g-fold-time), 0.2s;
+    transition-timing-function: var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease), ease-out;
 }
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-container::before,
@@ -3485,8 +3485,17 @@ body.is-phone.is-floating-nav.goguryeo-phone-menu-open:not(.goguryeo-no-safari-b
 
 /* ---- Tab overview: only Obsidian's own [+] [N tabs] [Done] row; the bar
    (and its Search files button) stays out of it ---- */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-tab-switcher) .mobile-navbar {
-    display: none;
+/* While it's open (companion: body.goguryeo-tabs-open from the moment it
+   opens, until it starts closing) the bottom bar and the capsule fade out
+   instead of vanishing, and fade back in as the card grows into the page */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
+    transition: opacity 0.2s ease-out, margin-bottom 0.25s ease-in-out;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):is(.goguryeo-tabs-open, :has(.mobile-tab-switcher)) .mobile-navbar,
+body.is-phone.is-floating-nav.goguryeo-tabs-open:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* The overview itself: tab cards on the darker canvas, the current one
