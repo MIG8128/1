@@ -3525,6 +3525,14 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
     transition: opacity 0.2s ease-out, margin-bottom 0.25s ease-in-out;
 }
 
+/* Pulling the name pill up (companion: --g-tabs-pull, 0 → 1 with the
+   finger): the bar and the capsule fade as the page shrinks */
+body.is-phone.is-floating-nav.goguryeo-tabs-pulling:not(.goguryeo-no-safari-bar) .mobile-navbar,
+body.is-phone.is-floating-nav.goguryeo-tabs-pulling:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
+    opacity: calc(1 - var(--g-tabs-pull, 0) * 2.5);
+    transition: none;
+}
+
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):is(.goguryeo-tabs-open, :has(.mobile-tab-switcher)) .mobile-navbar,
 body.is-phone.is-floating-nav.goguryeo-tabs-open:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
     opacity: 0;

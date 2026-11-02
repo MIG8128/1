@@ -68,6 +68,7 @@ const SWIPE_SETTLE_MS = 280; // the page gliding the rest of the way (or back)
 const PILL_SWIPE_AT = 56; // px to drag the name pill before letting go acts
 const NEW_TAB = "new-tab"; // the name pill's target past the last tab
 const PILL_FLICK = 0.5; // px/ms: a flick of the name pill acts even when short
+const PILL_PULL_FULL = 260; // px up the name pill that shrinks the page all the way toward its card
 const SWIPE_DRAW_MS = 400; // most to wait for the new page before uncovering it
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
 const LAST_PANE_CLASS = "goguryeo-last-pane";
@@ -2651,7 +2652,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const i = tabs.indexOf(leaf);
         const t = e.touches[0];
         this.pillDrag = {
-            pill, axis: null, armed: false,
+            pill, leaf, axis: null, armed: false,
+            page: leaf.view?.contentEl ?? null, // the page that follows the finger
+            width: leaf.containerEl.getBoundingClientRect().width || window.innerWidth,
             prev: i > 0 ? tabs[i - 1] : null,
             next: i >= 0 && i < tabs.length - 1 ? tabs[i + 1] : null,
             x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, t: e.timeStamp, vx: 0, vy: 0,
@@ -2672,6 +2675,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 return;
             }
             d.pill.style.transition = "none";
+            this.pageFollow?.cancel?.(); // a spring-back still running
+            if (d.page) {
+                d.page.getAnimations().forEach((a) => a.cancel());
+                d.page.style.transition = "none";
+            }
+            if (d.axis === "y") document.body.addClass("goguryeo-tabs-pulling");
         }
         e.preventDefault();
         const dt = e.timeStamp - d.t;
@@ -2690,11 +2699,16 @@ module.exports = class GoguryeoCompanion extends Plugin {
             d.pill.style.translate = `${shift}px 0`;
             d.pill.style.opacity = String(1 - Math.min(Math.abs(shift) / d.pill.offsetWidth, 1) * 0.7);
             armed = !!d.target && Math.abs(dx) >= PILL_SWIPE_AT;
+            // The page follows the finger, the tab beside it coming in
+            this.peekTab(d, d.target && d.target !== NEW_TAB ? d.target : null);
+            this.placeSideways(d, shift);
         } else {
             // Up: the bar stays where it is (the user didn't want to see it
-            // lifted); the tick says when letting go opens the tabs, and
-            // then the bar fades as the page zooms into its card
-            armed = Math.max(0, -dy) >= PILL_SWIPE_AT;
+            // lifted) and fades, while the page shrinks toward its card
+            // with the finger; the tick says letting go opens the tabs
+            const up = Math.max(0, -dy);
+            armed = up >= PILL_SWIPE_AT;
+            this.placePull(d, Math.min(up / PILL_PULL_FULL, 1));
         }
         if (armed !== d.armed) this.haptic();
         d.armed = armed;
@@ -2718,7 +2732,92 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         if (act && d.axis === "x") this.switchTabFromPill(d);
         else this.settlePill(d.pill);
-        if (act && d.axis === "y") this.app.mobileTabSwitcher?.show();
+        if (d.axis === "x" && !act) this.springPage(d, "x");
+        if (d.axis === "y") {
+            if (act) {
+                // From where the finger left it, the page zooms on into its
+                // card (the switcher measures it as it is now); it goes back
+                // to full size once the switcher covers it
+                this.app.mobileTabSwitcher?.show();
+                window.setTimeout(() => this.clearPage(d), ZOOM_MS);
+            } else {
+                this.springPage(d, "y");
+            }
+        }
+    }
+
+    // ---- The page under the name pill follows the finger ----
+
+    // Up: the page shrinks toward the tab overview (p: 0 → 1) with rounded
+    // corners; the bar fades with it (theme: --g-tabs-pull)
+    placePull(d, p) {
+        document.body.style.setProperty("--g-tabs-pull", String(p));
+        if (!d.page) return;
+        d.page.style.scale = String(1 - 0.42 * p);
+        d.page.style.translate = `0 ${-40 * p}px`;
+        d.page.style.borderRadius = `${28 * p}px`;
+        d.page.style.overflow = "clip";
+        // A see-through page (over a background) wouldn't show its edges:
+        // it becomes a card as it shrinks, like the tab overview's
+        d.page.style.backgroundColor = `color-mix(in srgb, var(--background-primary-alt) ${Math.round(Math.min(p * 4, 1) * 100)}%, transparent)`;
+        d.page.style.boxShadow = `0 ${12 * p}px ${40 * p}px rgba(0, 0, 0, ${0.35 * p})`;
+    }
+
+    // Sideways: the page moves with the finger; the tab it goes to shows
+    // beside it (its real page, as on the desktop's slide)
+    placeSideways(d, shift) {
+        if (d.page) d.page.style.translate = `${shift}px 0`;
+        const peek = d.peek?.view?.contentEl;
+        if (peek) peek.style.translate = `${shift + (shift < 0 ? d.width : -d.width)}px 0`;
+    }
+
+    peekTab(d, leaf) {
+        if (d.peek === leaf) return;
+        if (d.peek) {
+            d.peek.containerEl.removeClass("goguryeo-page-out");
+            d.peek.view?.contentEl?.style.removeProperty("translate");
+        }
+        d.peek = leaf;
+        leaf?.containerEl.addClass("goguryeo-page-out");
+    }
+
+    // Let go short of acting: everything springs back
+    springPage(d, axis) {
+        const page = d.page;
+        const peek = d.peek?.view?.contentEl;
+        const from = axis === "x" ? parseFloat(page?.style.translate) || 0 : 0;
+        const anims = [];
+        const ease = { duration: 300, easing: "cubic-bezier(0.25, 0.8, 0.25, 1)" };
+        if (page) {
+            const now = { scale: page.style.scale || "1", translate: page.style.translate || "0 0", borderRadius: page.style.borderRadius || "0px",
+                backgroundColor: page.style.backgroundColor || "transparent", boxShadow: page.style.boxShadow || "none" };
+            this.clearPage(d, false);
+            page.style.overflow = "clip";
+            anims.push(page.animate([now, { scale: "1", translate: "0 0", borderRadius: "0px", backgroundColor: "transparent", boxShadow: "0 0 0 rgba(0, 0, 0, 0)" }], ease));
+        }
+        if (peek) {
+            const side = from < 0 ? d.width : -d.width;
+            const now = peek.style.translate || `${side}px 0`;
+            anims.push(peek.animate([{ translate: now }, { translate: `${side}px 0` }], ease));
+        }
+        if (axis === "y") document.body.removeClass("goguryeo-tabs-pulling");
+        const end = () => {
+            page?.style.removeProperty("overflow");
+            this.peekTab(d, null);
+        };
+        this.pageFollow = { cancel: () => { anims.forEach((a) => a.cancel()); end(); } };
+        Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(end);
+    }
+
+    // The page back to how it was, at once
+    clearPage(d, all = true) {
+        const page = d.page;
+        if (page) for (const k of ["scale", "translate", "border-radius", "overflow", "transition", "background-color", "box-shadow"]) page.style.removeProperty(k);
+        if (all) {
+            this.peekTab(d, null);
+            document.body.removeClass("goguryeo-tabs-pulling");
+            document.body.style.removeProperty("--g-tabs-pull");
+        }
     }
 
     settlePill(pill) {
@@ -2739,16 +2838,29 @@ module.exports = class GoguryeoCompanion extends Plugin {
         pill.style.transition = "translate 0.14s ease-in, opacity 0.14s ease-in";
         pill.style.translate = `${toward * pill.offsetWidth * 0.6}px 0`;
         pill.style.opacity = "0";
+        // The page goes on from where the finger left it, the next one
+        // sliding fully in beside it
+        const page = d.page;
+        const peek = d.peek?.view?.contentEl;
+        const ms = 220;
+        const ease = { duration: ms, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "forwards" };
+        page?.animate([{ translate: page.style.translate || "0 0" }, { translate: `${toward * d.width}px 0` }], ease);
+        peek?.animate([{ translate: peek.style.translate || `${-toward * d.width}px 0` }, { translate: "0 0" }], ease);
         window.setTimeout(() => {
             pill.style.transition = pill.style.translate = pill.style.opacity = "";
             const target = d.target === NEW_TAB ? this.app.workspace.getLeaf("tab") : d.target;
             this.app.workspace.setActiveLeaf(target, { focus: true });
-            // the new tab's name and page come in from the side it was pulled from
+            page?.getAnimations().forEach((a) => a.cancel());
+            peek?.getAnimations().forEach((a) => a.cancel());
+            this.clearPage(d);
+            peek?.style.removeProperty("translate");
+            // the new tab's name comes in from the side it was pulled from;
+            // its page is already in place (a new tab's comes in like it)
             const from = -toward;
             const slide = { scale: 1, duration: DUR.in, easing: EASE.out };
             this.enter(target.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container"), { ...slide, x: from * 40 });
-            this.enter(target.view?.contentEl, { ...slide, x: from * 48, opacity: 0.4 });
-        }, 140);
+            if (!peek) this.enter(target.view?.contentEl, { ...slide, x: from * 48, opacity: 0.4 });
+        }, ms);
     }
 
     // ---- iPhone: the name capsule brings the bars back ----
