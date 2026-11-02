@@ -68,6 +68,8 @@ const SWIPE_SETTLE_MS = 280; // the page gliding the rest of the way (or back)
 const PILL_SWIPE_AT = 56; // px to drag the name pill before letting go acts
 const NEW_TAB = "new-tab"; // the name pill's target past the last tab
 const PILL_FLICK = 0.5; // px/ms: a flick of the name pill acts even when short
+const GRIP_HOVER_MS = 600; // resting the pointer on a split pane's grip this long opens its menu
+const GRIP_LEAVE_MS = 350; // ...which closes this long after the pointer left the grip and the menu
 const PILL_PULL_FULL = 260; // px up the name pill that shrinks the page all the way toward its card
 const SWIPE_DRAW_MS = 400; // most to wait for the new page before uncovering it
 const CURRENT_PANE_CLASS = "goguryeo-current-pane";
@@ -3637,9 +3639,13 @@ module.exports = class GoguryeoCompanion extends Plugin {
         for (const pane of groups) {
             let grip = this.grips.get(pane);
             if (!grip) {
-                grip = createDiv({ cls: GRIP_CLASS, attr: { "aria-label": "Move this pane" } });
+                // no aria-label: Obsidian would show it as a tooltip, and the
+                // user didn't want one; resting on it opens the menu instead
+                grip = createDiv({ cls: GRIP_CLASS, attr: { role: "button" } });
                 grip.createDiv("goguryeo-pane-grip-bar");
                 grip.addEventListener("pointerdown", (e) => this.onGripDown(e, pane));
+                grip.addEventListener("pointerenter", (e) => this.onGripHover(e, pane, grip, true));
+                grip.addEventListener("pointerleave", (e) => this.onGripHover(e, pane, grip, false));
                 this.grips.set(pane, grip);
             }
             if (grip.parentElement !== pane.containerEl) pane.containerEl.appendChild(grip);
@@ -3650,7 +3656,39 @@ module.exports = class GoguryeoCompanion extends Plugin {
         });
     }
 
+    // Desktop: resting the pointer on the grip opens its menu (the user's
+    // ask, in place of a tooltip); it closes a moment after the pointer has
+    // left both the grip and the menu
+    onGripHover(e, pane, grip, entering) {
+        if (e.pointerType !== "mouse" || document.body.hasClass("is-mobile")) return;
+        window.clearTimeout(this.gripHoverTimer);
+        if (entering) {
+            if (this.gripMenu?.grip === grip) return this.keepGripMenu();
+            this.gripHoverTimer = window.setTimeout(() => {
+                if (this.paneDrag || !grip.matches(":hover")) return;
+                this.openGripMenu(pane, grip);
+                if (this.gripMenu) this.gripMenu.byHover = true;
+            }, GRIP_HOVER_MS);
+        } else {
+            this.letGripMenuGo();
+        }
+    }
+
+    keepGripMenu() {
+        window.clearTimeout(this.gripCloseTimer);
+    }
+
+    letGripMenuGo() {
+        window.clearTimeout(this.gripCloseTimer);
+        if (!this.gripMenu?.byHover) return;
+        this.gripCloseTimer = window.setTimeout(() => {
+            const m = this.gripMenu;
+            if (m?.byHover && !m.menu.matches(":hover") && !m.grip.matches(":hover")) this.closeGripMenu();
+        }, GRIP_LEAVE_MS);
+    }
+
     onGripDown(e, pane) {
+        window.clearTimeout(this.gripHoverTimer);
         if (e.button > 0 || this.paneDrag) return;
         e.preventDefault();
         e.stopPropagation();
@@ -5293,7 +5331,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const tiles = menu.createDiv("goguryeo-grip-menu-tiles");
         const extra = menu.createDiv("goguryeo-grip-menu-extra");
         const tile = (icon, label, cls, run) => {
-            const b = tiles.createEl("button", { cls: "goguryeo-grip-tile" + (cls ? " " + cls : ""), attr: { "aria-label": label } });
+            const b = tiles.createEl("button", { cls: "goguryeo-grip-tile" + (cls ? " " + cls : "") }); // its label shows; no tooltip
             setIcon(b.createDiv("goguryeo-grip-tile-icon"), icon);
             b.createDiv({ cls: "goguryeo-grip-tile-label", text: label });
             b.addEventListener("click", (e) => {
@@ -5361,7 +5399,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 ]) {
                     const here = now(side) && boxes.some(([, q]) => (side === "left" || side === "right"
                         ? q.top < r.bottom && q.bottom > r.top : q.left < r.right && q.right > r.left));
-                    const b2 = row.createEl("button", { cls: "goguryeo-grip-place" + (here ? " is-here" : ""), attr: { "aria-label": label } });
+                    const b2 = row.createEl("button", { cls: "goguryeo-grip-place" + (here ? " is-here" : ""), attr: { "data-side": label } }); // no tooltip: the icon shows the side
                     setIcon(b2, icon);
                     b2.addEventListener("click", (e) => {
                         e.stopPropagation();
@@ -5395,6 +5433,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         };
         this.placeGripMenu();
         this.enter(menu, { scale: 0.9, y: -6 });
+        // opened by resting on the grip: it stays while the pointer is on it
+        menu.addEventListener("pointerenter", () => this.keepGripMenu());
+        menu.addEventListener("pointerleave", () => this.letGripMenuGo());
     }
 
     // Under the grip, centred on it, inside the window
