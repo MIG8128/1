@@ -1175,6 +1175,13 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .wo
     background-color: var(--g-split-canvas);
 }
 
+/* Plain background: the whole window is that canvas, so the sidebars sit
+   on the same ground as the note's card (the window's own lighter color
+   showed around their tops, beside the note area's canvas) */
+body.goguryeo-split:not(.goguryeo-bg-color):not(.goguryeo-bg-image):is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .app-container {
+    background-color: var(--g-split-canvas);
+}
+
 /* Panes as cards; their tab row sits inside, at the top */
 body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
     --g-row2-top: 6px;
@@ -3848,8 +3855,13 @@ body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-car
     -webkit-backdrop-filter: none;
 }
 
-/* ...and the frosted band behind the top rows in the card layout */
+/* ...and the frosted band behind the top rows in the card layout. Over a
+   plain or color background it isn't drawn at all: a tinted band over the
+   note area only left the background's own color showing beside it, above
+   the sidebars (the user saw it poking out, 2026-11-02); the top is one
+   even background, and only the cards and sidebars carry color. */
 body.goguryeo-split:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    background: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
