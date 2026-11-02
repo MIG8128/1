@@ -4,7 +4,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 
 ## Files
 
-- `theme.css`: the whole theme. A Style Settings block sits at the top, followed by numbered sections:
+- `theme.css`: the whole theme, **built** from `src/theme/NN-*.css` by `node tools/build-theme.mjs` (a plain concatenation in number order). It's committed and deployed, but never edited by hand: edit the section file, then build. `00-style-settings.css` is the Style Settings block at the top, followed by numbered sections, one file each (`01-palette.css` … `13-motion.css`):
   1. Palette
   2. Glass tokens
   3. Text
@@ -19,7 +19,7 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
   12. Background (Plain / Color / Image behind everything; the note area turns see-through)
   13. Motion
 - `manifest.json`: theme manifest. Author is "MIG&Claude (opus5.5)".
-- `companion/`: the **Goguryeo Companion** plugin (`main.js` in plain CommonJS with no build step, and `manifest.json`). It does what CSS can't. It mostly sets body classes or CSS variables, which the theme then styles:
+- `companion/`: the **Goguryeo Companion** plugin. Source in `companion/src/` (ES modules, see "Module map" below), bundled by esbuild into `companion/main.js` (CommonJS, `obsidian` external) with `npm --prefix companion run build`. `main.js` is the build output Obsidian loads: committed and deployed, never edited by hand. Also `manifest.json` and `package.json` (the build script; `node_modules/` is gitignored, `npm --prefix companion install` once on a new machine). It does what CSS can't. It mostly sets body classes or CSS variables, which the theme then styles:
   - keeps the left sidebar button out of the hidden ribbon (patches `leftRibbon.containerEl.isShown`)
   - keeps both sidebar buttons in the main tab bar on desktop, ◧ at its start and ◨ at its end, also in full screen where Obsidian would move ◨ into the right sidebar (wraps `workspace.updateFrameless`)
   - desktop touch: swipe from the left edge to open the ribbon (`goguryeo-touch-active`)
@@ -53,14 +53,103 @@ A glass ("Liquid Glass", iOS/macOS 26–27 style) theme for Obsidian on Windows 
 - `.claude/agents/goguryeo-runner.md`: the Haiku agent that runs the sandbox, version bump, commit and deploy steps (see Workflow).
 - `tools/cdp.mjs`: the old DevTools client for the user's own Obsidian (port 9222). **Never use it.** Use `sandbox/cdp.mjs` instead.
 - `gemin-theme.css`: the user's old snippet, already merged into sections 3–4. Kept for reference only.
+- `tools/build-theme.mjs`: builds `theme.css` from `src/theme/`.
+
+### Module map (authoritative; part of `## Files`)
+
+Find a feature here, then open only its file. **Never Read or grep the bundles** (`theme.css`, `companion/main.js`, 5k+ lines each); search `src/theme/` and `companion/src/` instead (`Grep` with `path`).
+
+**Rules for source files (strict, every session):**
+1. **Size cap: 150–200 lines.** Every file under `companion/src/` and `src/theme/` stays within it. When a file or a feature grows past 200 lines, or starts doing two jobs, split it in the same piece of work, along domain lines: base utilities shared by several parts in `core/`, each UI or gesture domain in its own `features/<domain>/` file (theme: `NN-1-*.css`, `NN-2-*.css` sub-files of its section). Split by responsibility, not by line count. A file still over the cap must be split when it's next touched (the files listed as over it below, and the `src/main.js` remainder, which shrinks as features move out).
+2. **The map follows the files, in the same commit.** Whenever a source file is created, split, renamed, moved or deleted, update this map in the commit that does it. Each entry: its exact path relative to its folder, then **one sentence on its single responsibility**, then its main methods/selectors. Update a changed file's sentence if its job changed. A commit whose files and map disagree is incomplete.
+3. **Verify before reporting.** After any change or split (and after updating this map): run the theme build (`node tools/build-theme.mjs`) and the companion build (`npm --prefix companion run build`); both must finish without errors. A pure split must leave `theme.css` byte-identical (`git diff --quiet theme.css`) and `main.js` behaving the same. Then confirm the sandbox is ready: it answers on port 9231 (`node sandbox/cdp.mjs list`), the new build is copied and the plugin reloaded without console errors, and the feature works on screen there. Don't report the work done before that.
+
+#### Theme (`src/theme/`)
+
+`00-style-settings` (223 lines), `01-palette` (133), `02-glass-tokens` (119), `03-text` (47), `04-tasks` (82), `05-floating-surfaces` (177: menus, modals, the omnibox switcher), `06-floating-panel-layout` (1444: path row, tab row, card layout, split screen, grips, overview), `07-tabs` (574: sidebar pills, thumb, shared tab row), `08-auto-hide-ribbon` (81), `09-mobile-shared` (194), `10-iphone` (652: bottom bar, capsule fold, ⋯ panel, status edge), `11-ipad` (22), `12-background` (265: incl. baked glass), `13-motion` (128: easing/duration vars, startup reveal). 06, 07 and 10 are over the size rule; split them into `06-1-path-row.css`, `06-2-cards.css`… as they're next touched. **Before the first sub-file**, change the sort in `tools/build-theme.mjs` to a plain name sort (`a.localeCompare(b)`; the prefixes are zero-padded): it sorts by `parseInt` only, so `06-1` and `06-2` tie and fall back to `readdirSync` order, which isn't sorted on Linux (cloud sessions). After a split, `node tools/build-theme.mjs` must still give a byte-identical `theme.css` (`git diff --quiet theme.css`).
+
+#### Companion (`companion/src/`)
+
+**Status (2026-11-02):** only `core/` and `features/bakedGlass.js` are split out; everything else still lives in `src/main.js` (~5.5k lines; find a method there with `Grep "^    methodName\("`, then Read only that range). The map is the target. When a fix touches a feature still in `main.js`, first move that feature's methods to its module **as their own commit** (code moved verbatim, build, sandbox smoke test that the feature still works, no behavior change), then make the fix as the next commit.
+
+How a module is written:
+- **Mixin** (the default for moved code): `export const folderNotes = { setupFolderNotes() {…}, … };`, installed in `src/main.js` with `Object.assign(GoguryeoCompanion.prototype, folderNotes, …)`. Methods keep `this` and call each other across modules unchanged, so a move is a cut and paste. Constants only one module uses move with it; shared ones (body classes, storage keys, timings used by several) go to `core/constants.js`.
+- **Factory** (for a self-contained part with its own state, like `bakedGlass`): `export function setupX(plugin)` returns a small object the plugin keeps (`this.bakedGlass`), with one-line delegating methods on the plugin.
+- Obsidian's API comes through `core/platform.js` (extend its re-exports: `Menu`, `setIcon`, `Notice`…), not straight from `"obsidian"`.
+- `onload` keeps the setup order and its comments (the layout hub first, the path switcher before the haptics, the overview and folder notes after them, `revealUI` last).
+
+Map (file → what it holds; methods by their current names). **✓ = the file exists**, written in rule 2's form; the rest are target entries listing what moves there, and get their one-sentence responsibility (rule 2) when the file is created:
+
+- ✓ `main.js` (5466 lines, over the cap until the features move out): Sets up every part of the plugin in order and holds the features not yet moved out. Target: only `onload`, `onunload` and the mixin install.
+- `core/`
+  - ✓ `constants.js` (5): Holds the body class names shared between modules and kept in step with `theme.css`. `BAKED_CLASS`, `BG_IMAGE_CLASS`.
+  - ✓ `platform.js` (4): Is the one place the modules import Obsidian's API from. `Platform`.
+  - ✓ `layoutHub.js` (76): Batches Obsidian's layout events into one run per frame for every subscriber. `setupLayoutHub`, `onLayout`, `nudgeLayout`.
+  - ✓ `motion.js` (112): Defines the shared curves and times and plays every companion animation through WAAPI. `EASE`, `DUR`, `play`, `enter`/`leave`, `fadeIn`/`fadeOut`, `glide`, `springIn`/`springOut`, `reducedMotion` (target: the plugin's one-line wrappers join it as a mixin).
+  - `haptics.js`: `haptic`, `setupHaptics`.
+- `settings/`
+  - `settingsTab.js`: `GoguryeoSettingTab.display` (the Style Settings option list).
+  - `sections.js`: `folderNotesSection` (today it also builds the "Opening and closing tabs" and "Trackpad swipe style" settings; give those their own `motionSection` when moving it), `androidNavPicker`, `imagePicker`.
+  - `backgroundModal.js`: `BackgroundImageModal`, `isImage`, `IMAGE_EXTENSIONS`.
+- `features/frame/`
+  - `sidebarButtons.js`: `patchRibbonIsShown`, `patchUpdateFrameless`, `placeSidebarToggles`, `refreshFrame`.
+  - `touchRibbon.js`: desktop touch ribbon: `onTouchStart/Move/End`, `onClick`, `getRibbon`, `isOpen`, `open`, `close`, `snapTo`, `clearInline`.
+  - `startup.js`: `revealUI`. `popouts.js`: `setupPopouts`.
+- `features/background/`
+  - `image.js`: `updateBackground`, `showBackground`, `getStyleSettings`, `getBackgroundImage`, `setBackgroundImage`.
+  - `pickers.js`: `setupBackgroundPickers`, `chooseBackgroundImage`, `importBackgroundImage`.
+  - ✓ `bakedGlass.js` (145; now at `features/bakedGlass.js`, moves here with the rest of the background): Draws the background picture once as the glass would blur it, so the big desktop panels need no live blur. `setupBakedGlass` → `{ schedule, bake }`.
+- `features/sidebars/`
+  - `floating.js`: `setupFloatingSidebars`, `updateFloatingSidebars`, `autoHide`, `isFloating`, `split`, `closeSidebar`, `onFloatingDismiss`, `placeFloatingFrameSpace`.
+  - `peek.js`: `setupSidebarPeek`, `updatePeekZone`, `peekEnabled`, `waitPeek`, `stopWaitingPeek`, `onPeekMove`, `atEdge`, `nearPeek`, `holdsPeek`, `startPeek`, `endPeek`.
+  - `topPeek.js`: full screen top rows: `setupTopPeek`, `updateTopHidden`, `waitTop`, `onTopMove`, `topRowsBottom`, `overNoteArea`, `holdsTop`.
+- `features/web/`
+  - `pinch.js`: `setupWebPinch`. `shots.js`: `webShotURL`, `keepWebShot`, `webPageLoaded`.
+- `features/path/`
+  - `switcher.js`: `setupPathSwitcher`, `pathTapAt`, `capsuleAt`, `capsuleFolderAt`, `prefillSwitcher`, `pathCapsule`. `omnibox.js`: `dockSwitcher`.
+- `features/folderNotes/`
+  - `model.js`: `otherFolderNotesOn`, `folderNotesOn`, `folderNotePath`, `folderNoteName`, `folderNoteOf`, `isFolderNote`, `folderNoteStatus`.
+  - `view.js`: `setupFolderNotes`, `scheduleFolderNotes`, `refreshFolderNotes`, `drawFolderNotes`, `markCrumbs`, `onFolderClick`, `openFolderNote`.
+  - `files.js`: `createFolderNote`, `turnIntoFolderNote`, `followFolderRename`.
+- `features/phone/` (iPhone)
+  - `bar.js`: `setupPhoneBar`, `setupNameCapsule`. `statusEdge.js`: `setupStatusEdge`.
+  - `menu.js`: `setupPhoneMenu`, `openPhoneMenu`, `closePhoneMenu`. `noteMenu.js`: `noteMenuItems`.
+  - `pill.js`: capsule gestures: `setupNameGestures`, `onPillStart/Move/End`, `settlePill`.
+  - `pillPage.js`: the page following the finger: `placePull`, `placeSideways`, `peekTab`, `springPage`, `clearPage`, `switchTabFromPill`.
+  - `tabZoom.js`: `setupPhoneTabZoom`, `phoneZoom`.
+- `features/swipe/` (back / forward)
+  - `core.js`: `beginSwipe`, `pullSwipe`, `releaseSwipe`, `canEdgeSwipe`, `edgeSwipeEnabled`, `setAndroidNav`, `setSwipeStyle`.
+  - `edge.js`: `setupEdgeSwipe`, `onEdgeStart/Move/End`. `trackpad.js`: `setupTrackpadSwipe`, `scrollsSideways`, `onSwipeWheel`, `endWheelSwipe`.
+  - `snapshots.js`: `patchSnapshots`, `snapshotPage`, `makeSwipePage`, `restoreScrolls`.
+  - `pageStage.js`: `startPageSwipe`, `setPageSwipe`, `queuePageSwipe`, `settlePageSwipe`, `liftPageSwipe`, `endPageSwipe`, `focusNote`. `arrow.js`: `startArrowSwipe`, `setArrowSwipe`, `settleArrowSwipe`.
+- `features/overview/` (desktop + iPad tab overview)
+  - `open.js`: `setupTabOverview`, `openOverview`, `closeOverview`. `zoom.js`: `overviewPageRect`, `alignPage`, `cardCopy`, `zoomCopy`.
+  - `render.js`: `renderOverview` (~170 lines alone: split off the split card's map into `splitCard.js` when it next grows).
+  - `cardDrag.js`: `onCardDown`, `liftCard`, `placeGhost`, `onCardMove`, `moveCard`, `measureSlots`, `onCardUp`, `endCardDrag`.
+- `features/tabs/`
+  - `thumbs.js`: the sliding glass: `setupTabThumbs`, `scheduleThumbs`, `removeThumbs`, `updateThumbs`, `placeThumb`, `setThumbSpot`.
+  - `tabMotion.js`: `tabMotion`, `popTab`, `leaveTab`, `popPart`, `leavePart`, `watchTabAnimations`, `onTabMutations`.
+  - `tabSlide.js`: `patchSelectTab`, `slideTabs`, `keepSplitPage`.
+  - `screenSlide.js`: `patchScreenSlide`, `prepareScreenSlide`, `cloneCards`, `layCards`, `prepareCardsLeave`, `playCardsLeave`, `screenTabIndex`, `slideScreen`.
+- `features/split/`
+  - `update.js`: `updateSplit`, `clearSplit`, `flipCards`, `endFlip`. `model.js`: `splitIdOf`, `splitPanes`, `splitPlaces`, `barTabs`.
+  - `sync.js`: `syncSplitPages` (~130 lines), `applyFold`.
+  - `sharedTabs.js`: `renderSharedTabs`, `renderSplitTab`. `sharedTab.js`: `fillTab`, `makeSharedTab`, `removeSharedTabs`.
+  - `grip.js`: `renderGrips`, `onGripDown`, `onGripMove`, `paneDropAt`, `endPaneDrag`. `gripMenu.js`: `openGripMenu`, `placeGripMenu`, `closeGripMenu`.
+  - `panePreview.js`: `previewPanes`, `pinPane`, `clearPanePreview`. `barSlot.js`: `barDropAt`, `showBarSlot`, `followBar`, `placeBarSlot`, `hideBarSlot`.
+  - `partDrag.js`: `onPartDown`, `liftPart`, `placePartGhost`, `onPartMove`, `endPartDrag`.
+  - `toEdge.js`: `tabToEdge`, `splitTabInto`, `previewHalves`, `makeSplit`. `moves.js`: `moveTab`, `movePane`, `unsplitPage`.
+
+A new feature gets its own file in the folder it belongs to (or a new folder), added to this map in the same commit (rule 2 above).
 
 ## Workflow (the user wants this)
 
 - **One fix at a time.** Make one change, test it in the sandbox, commit it, then report briefly, saying what was checked. The user then tests it on their own devices.
 - **Mock up visual changes in the design tool before building.** That's the Design canvas artifact "Goguryeo glass directions": https://claude.ai/artifact/GaRE4WK9qs73cGQMrUqxsP. It holds directions A–D, split-screen E/F, and the iPhone and iPad artboards.
+- **Edit the sources, then build, before anything is tested or deployed:** `src/theme/*.css` → `node tools/build-theme.mjs`; `companion/src/**` → `npm --prefix companion run build`. Commit the sources and the built `theme.css` / `companion/main.js` together; a commit whose bundle doesn't match its sources is wrong. `deploy.ps1` runs the companion build itself but not the theme build, so build the theme first anyway (and building before the sandbox copy is what makes the sandbox test the code that gets deployed).
 - **Edit in this repo, never in the vault.** After the sandbox test passes, run `powershell -ExecutionPolicy Bypass -File deploy.ps1`. The vault is `C:\Users\MIG\Documents\obsidian\mig8128\.obsidian\` (theme in `themes/Goguryeo`, plugin in `plugins/goguryeo-companion`). The user reloads Obsidian with Ctrl+R.
-- **Smart model thinks, cheap model runs** (the user asked, to save tokens): the main session (Opus) reads the code, decides, edits `theme.css` / `companion/main.js`, writes the exact test JS and commit message, and looks at the key screenshots itself (the user wants to see them). The mechanical steps go to the Haiku agent `goguryeo-runner` (`.claude/agents/goguryeo-runner.md`): copy the build, launch/close the sandbox, reload the plugin, run the given evals and shots, bump the version, commit, deploy. Give it every step and snippet in full; it doesn't design or debug. Hand it one batch per fix (e.g. "copy, launch, run these 3 evals, these 2 shots, close"), not one call per command. Do a one-line check or a quick follow-up eval yourself when that's cheaper than a new handoff.
-- **Bump the version with every change** (the user asked, for file management): add 0.0.1 to the last number (0.1.0 → 0.1.1 → 0.1.2) in the manifest of what changed: `manifest.json` for `theme.css`, `companion/manifest.json` for `companion/main.js`, both when both changed. Do it in the same commit as the change, before deploying, and say the new version in the report. Keep three numbers (x.y.z): Obsidian compares versions as semver.
+- **Smart model thinks, cheap model runs** (the user asked, to save tokens): the main session (Opus) reads the code, decides, edits `src/theme/*.css` / `companion/src/**`, writes the exact test JS and commit message, and looks at the key screenshots itself (the user wants to see them). The mechanical steps go to the Haiku agent `goguryeo-runner` (`.claude/agents/goguryeo-runner.md`): run the builds, copy the build, launch/close the sandbox, reload the plugin, run the given evals and shots, bump the version, commit, deploy. Give it every step and snippet in full; it doesn't design or debug. Hand it one batch per fix (e.g. "copy, launch, run these 3 evals, these 2 shots, close"), not one call per command. Do a one-line check or a quick follow-up eval yourself when that's cheaper than a new handoff.
+- **Bump the version with every change** (the user asked, for file management): add 0.0.1 to the last number (0.1.0 → 0.1.1 → 0.1.2) in the manifest of what changed: `manifest.json` for the theme (`src/theme/`), `companion/manifest.json` for the companion (`companion/src/`), both when both changed. A pure module move with no behavior change still bumps the companion version (its `main.js` changed). Do it in the same commit as the change, before deploying, and say the new version in the report. Keep three numbers (x.y.z): Obsidian compares versions as semver.
 - **Git:** one commit per verified step, on branch `main`, ending with the Co-Authored-By line. The git history describes every decision in detail.
 
 ## User's vault & testing (sandbox)
@@ -81,6 +170,10 @@ On 2026-10-24 the user took back Claude's use of their own Obsidian ("you don't 
 
 ### Commands
 
+Build (Bash, repo root; run first, every time a source changed):
+```
+node tools/build-theme.mjs && npm --prefix companion run build
+```
 Copy the build into the sandbox (Bash, repo root). Theme CSS changes apply live; plugin changes need the reload below:
 ```
 cp theme.css manifest.json sandbox/vault/.obsidian/themes/Goguryeo/ && cp companion/main.js companion/manifest.json sandbox/vault/.obsidian/plugins/goguryeo-companion/
@@ -102,7 +195,7 @@ Get-CimInstance Win32_Process -Filter "Name='Obsidian.exe'" | Where-Object { $_.
 ### Cloud sessions (Linux): the same test, in the container
 
 A cloud session has no Windows sandbox and no deploy (it pushes to its branch; the user deploys). Use `tools/cloud-sandbox/` instead: the Obsidian AppImage of the user's version from `obsidianmd/obsidian-releases`, run under `xvfb-run`, with its own user data and the same placeholder vault (Background: Image with a made-up `wall.png`), all in `/tmp/gsbx`, DevTools on 9231.
-- `bash tools/cloud-sandbox/setup.sh` (downloads once, builds the vault, copies the build), `… launch` (starts it and accepts the plugin trust dialog), `… copy` after an edit (then reload the plugin as usual), `… close`.
+- `bash tools/cloud-sandbox/setup.sh` (downloads once, builds the vault, copies the build), `… launch` (starts it and accepts the plugin trust dialog), `… copy` after an edit and the two builds (then reload the plugin as usual), `… close`.
 - `node tools/cloud-sandbox/cdp.mjs`: `eval`, `evalfile`, `shot`, plus `record <js> <dir>` (screen frames while the JS runs), `startup <dir>` (frames of a reload: what the user sees at startup) and `slowmo <rate> '<js>' <prefix> <ms,…>` (all animations slowed, shots mid-way).
 - It renders without a GPU: about 12 frames a second, and each input event sent over DevTools takes ~75ms. Time logic with events dispatched from inside the page (`new WheelEvent(...)` at a real pace), look at motion with `slowmo`.
 - Obsidian's own CSS and JS are in `resources/obsidian.asar` of the extracted app (plain asar; a few lines of Python read it).

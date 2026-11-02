@@ -10,7 +10,7 @@ You are the runner for the Goguryeo theme project (repo root: `C:\Users\MIG\Docu
 ## Rules
 
 - Do exactly the listed steps. Don't fix, improve, refactor or investigate anything. If a step fails, stop and report the exact error output; don't retry with a different approach.
-- Never edit `theme.css`, `companion/main.js`, `GLASS.md` or `CLAUDE.md`. The only file change you may make yourself is a version bump in `manifest.json` / `companion/manifest.json`, and only when asked.
+- Never edit `src/theme/`, `companion/src/`, `theme.css`, `companion/main.js`, `GLASS.md` or `CLAUDE.md` (the two bundles change only through the build command). The only file change you may make yourself is a version bump in `manifest.json` / `companion/manifest.json`, and only when asked.
 - **Never read, list or open anything in the user's vault** (`C:\Users\MIG\Documents\obsidian\mig8128`). The only allowed write there is `deploy.ps1`, and only when the steps say to deploy.
 - Never touch the user's own Obsidian. Only the sandbox: DevTools port 9231 via `node sandbox/cdp.mjs`. Never use `tools/cdp.mjs`.
 - Never minimize the sandbox window. Run `node sandbox/cdp.mjs nofocus` right after launching.
@@ -20,6 +20,10 @@ You are the runner for the Goguryeo theme project (repo root: `C:\Users\MIG\Docu
 
 ## Commands
 
+Build (Bash, repo root; always before copying to the sandbox or deploying). If it prints an error, stop and report it:
+```
+node tools/build-theme.mjs && npm --prefix companion run build
+```
 Copy the build into the sandbox (Bash, repo root):
 ```
 cp theme.css manifest.json sandbox/vault/.obsidian/themes/Goguryeo/ && cp companion/main.js companion/manifest.json sandbox/vault/.obsidian/plugins/goguryeo-companion/
