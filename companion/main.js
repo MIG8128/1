@@ -105,6 +105,11 @@ const SHADOW_ROOM = 32; // px the switcher's clip reaches past its edge at the e
 const OVERVIEW_CLASS = "goguryeo-tab-overview"; // the tab overview sheet (desktop and iPad)
 const OVERVIEW_ICON_CLASS = "goguryeo-overview-icon"; // ⧉, which the theme shows in place of ⌄
 const OVERVIEW_MS = 240; // the sheet fading in and out
+// Opening the tab overview zooms out of the page, as on iOS and Android: a
+// copy of the page shrinks from where the page is into its card, and the
+// card picked grows back into the page on the way out
+const ZOOM_MS = 400;
+const ZOOM_EASE = "cubic-bezier(0.32, 0.72, 0, 1)"; // iOS's sheet curve
 const TAB_SPRING = "cubic-bezier(0.3, 1.5, 0.4, 1)"; // tabs and slots growing in, with a bounce
 const CARD_HOLD_MS = 300; // a finger rests on a card this long before it lifts (a mouse drags at once)
 const CARD_SLOP = 6; // px a pointer may wander before it counts as a drag (or, for a finger, a scroll)
@@ -1015,6 +1020,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.setupNameCapsule();
         this.setupNameGestures();
         this.setupPhoneMenu();
+        this.setupPhoneTabZoom();
     }
 
     setupPhoneMenu() {
@@ -1439,8 +1445,74 @@ module.exports = class GoguryeoCompanion extends Plugin {
         document.body.addClass(OVERVIEW_CLASS + "-open");
         this.renderOverview();
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        sheet.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OVERVIEW_MS, easing: "ease-out" });
-        box.animate([{ transform: "scale(1.04)" }, { transform: "none" }], { duration: OVERVIEW_MS * 1.5, easing: OMNI_EASE });
+        // The page shrinks into its card; the sheet and the other cards
+        // come in around it
+        const current = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
+        const card = this.overview.grid?.querySelector(".goguryeo-tab-card.is-current");
+        card?.scrollIntoView({ block: "nearest" });
+        sheet.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ZOOM_MS * 0.6, easing: "ease-out" });
+        for (const other of this.overview.grid?.children ?? []) {
+            if (other === card) continue;
+            other.animate([{ opacity: 0, scale: "0.94" }, { opacity: 1, scale: "1" }],
+                { duration: ZOOM_MS, delay: 60, easing: ZOOM_EASE, fill: "backwards" });
+        }
+        const thumb = card?.querySelector(".goguryeo-tab-card-thumb");
+        const page = card && this.overviewPageRect(card, current);
+        if (!thumb || !page) return;
+        card.querySelector(".goguryeo-tab-card-label")?.animate([{ opacity: 0 }, { opacity: 1 }],
+            { duration: ZOOM_MS * 0.5, delay: ZOOM_MS * 0.5, easing: "ease-out", fill: "backwards" });
+        const copy = this.cardCopy(thumb);
+        thumb.style.visibility = "hidden";
+        this.zoomCopy(copy, page, thumb.getBoundingClientRect(), true)
+            .then(() => thumb.style.removeProperty("visibility"));
+    }
+
+    // Where a card's page is on screen: a note's view, or for the split's
+    // card the panes' area (as the card's map is drawn)
+    overviewPageRect(card, leaf) {
+        if (card.hasClass("is-split")) {
+            const root = this.app.workspace.rootSplit.containerEl.getBoundingClientRect();
+            const pane = leaf?.parent?.containerEl.getBoundingClientRect();
+            const top = pane && pane.height > 0 ? pane.top : root.top;
+            return { left: root.left, top, width: root.width, height: root.bottom - top };
+        }
+        const r = leaf?.view?.containerEl.getBoundingClientRect();
+        return r && r.width > 0 && r.height > 0 ? r : null;
+    }
+
+    // A card's picture, lifted out of the sheet so it can fly over it. Its
+    // page is drawn at the note's size and shrunk by the card's zoom, read
+    // from the sheet or the split's card.
+    cardCopy(thumb) {
+        const copy = thumb.cloneNode(true);
+        const cs = getComputedStyle(thumb);
+        for (const v of ["--g-card-scale", "--g-page-w", "--g-page-h"]) copy.style.setProperty(v, cs.getPropertyValue(v));
+        copy.style.borderRadius = cs.borderRadius;
+        return copy;
+    }
+
+    // Fly a copy between a page (big) and its card (small). The copy keeps
+    // the card's size and is scaled, so the page drawn in it stays sharp to
+    // its layout ("scale"); Obsidian's own phone previews are a picture
+    // cropped to fit, so those change size instead ("box").
+    zoomCopy(copy, page, card, opening, mode = "scale") {
+        copy.addClass("goguryeo-zoom-copy");
+        document.body.appendChild(copy);
+        const radius = parseFloat(copy.style.borderRadius || getComputedStyle(copy).borderRadius) || 0;
+        const px = (n) => `${n}px`;
+        let big, small;
+        if (mode === "scale") {
+            Object.assign(copy.style, { left: px(card.left), top: px(card.top), width: px(card.width), height: px(card.height) });
+            const k = page.width / card.width;
+            big = { transform: `translate(${px(page.left - card.left)}, ${px(page.top - card.top)}) scale(${k})`, borderRadius: px(radius / k) };
+            small = { transform: "none", borderRadius: px(radius) };
+        } else {
+            big = { left: px(page.left), top: px(page.top), width: px(page.width), height: px(page.height), borderRadius: "0px" };
+            small = { left: px(card.left), top: px(card.top), width: px(card.width), height: px(card.height), borderRadius: px(radius) };
+            Object.assign(copy.style, opening ? big : small);
+        }
+        return copy.animate(opening ? [big, small] : [small, big], { duration: ZOOM_MS, easing: ZOOM_EASE, fill: "forwards" })
+            .finished.catch(() => {}).finally(() => copy.remove());
     }
 
     // The sheet covers the panes from the tab row down, so row 1 (and ⧉ in
@@ -1524,7 +1596,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (this.overview?.dropped) return; // the click that ends a drag
             this.haptic();
             workspace.setActiveLeaf(leaf, { focus: true });
-            this.closeOverview();
+            this.closeOverview(false, leaf);
         };
         const splitCards = [];
         for (const entry of entries) {
@@ -1533,6 +1605,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 // are laid out, each page in its pane's place; a page goes
                 // to that page, the name row to the focused (or first) one
                 const card = grid.createDiv("goguryeo-tab-card is-split");
+                card.gLeaves = entry;
                 splitCards.push(card);
                 const onScreen = this.shownSplit === entry.gSplit && !document.body.hasClass(SOLO_CLASS);
                 card.toggleClass("is-current", onScreen);
@@ -1561,6 +1634,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
             const leaf = entry;
             const card = grid.createDiv("goguryeo-tab-card");
+            card.gLeaves = [leaf];
             o.leafOf.set(card, leaf);
             card.toggleClass("is-current", leaf === current);
             const thumb = card.createDiv("goguryeo-tab-card-thumb");
@@ -1755,7 +1829,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         o.drag = null;
     }
 
-    closeOverview(now = false) {
+    // On the way out the card picked (or the current one, for Done) grows
+    // back into its page while the sheet fades
+    closeOverview(now = false, leaf = null) {
         const o = this.overview;
         if (!o) return;
         this.overview = null;
@@ -1765,8 +1841,101 @@ module.exports = class GoguryeoCompanion extends Plugin {
             return;
         }
         o.sheet.style.pointerEvents = "none";
-        o.sheet.animate([{ opacity: 1 }, { opacity: 0 }], { duration: OVERVIEW_MS, easing: "ease-in", fill: "forwards" })
-            .finished.finally(() => o.sheet.remove());
+        const { workspace } = this.app;
+        leaf ??= workspace.getMostRecentLeaf(workspace.rootSplit);
+        const card = [...(o.grid?.children ?? [])].find((c) => c.gLeaves?.includes(leaf));
+        const thumb = card?.querySelector(".goguryeo-tab-card-thumb");
+        const from = thumb?.getBoundingClientRect();
+        const view = o.grid?.getBoundingClientRect();
+        const seen = from && view && from.bottom > view.top && from.top < view.bottom && from.width > 0;
+        o.sheet.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ZOOM_MS * 0.7, easing: "ease-in", fill: "forwards" })
+            .finished.catch(() => {}).finally(() => o.sheet.remove());
+        if (!seen) return;
+        const copy = this.cardCopy(thumb);
+        thumb.style.visibility = "hidden";
+        copy.addClass("goguryeo-zoom-copy");
+        Object.assign(copy.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+        document.body.appendChild(copy);
+        // The page it goes to settles first (a split folding in or out)
+        window.requestAnimationFrame(() => {
+            const page = this.overviewPageRect(card, leaf);
+            if (page) this.zoomCopy(copy, page, from, false);
+            else copy.remove();
+        });
+    }
+
+    // ---- iPhone: Obsidian's own tab switcher zooms too ----
+
+    // Obsidian fades its switcher in with a small scale (90ms). Here the
+    // page shrinks into its preview instead, and the preview picked grows
+    // back into the page. Obsidian's previews are pictures of the page
+    // (taken as the switcher opens), cropped to fit the card.
+    setupPhoneTabZoom() {
+        const sw = this.app.mobileTabSwitcher;
+        if (!sw) return;
+        const plugin = this;
+        const own = { show: Object.hasOwn(sw, "show"), hide: Object.hasOwn(sw, "hide") };
+        const { show, hide } = sw;
+        const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        sw.show = function (...args) {
+            const result = show.apply(this, args);
+            if (!reduced()) Promise.resolve(result).then(() => plugin.phoneZoom(this, true));
+            return result;
+        };
+        sw.hide = function (...args) {
+            const shown = this.containerEl?.isConnected;
+            const result = hide.apply(this, args);
+            if (shown && !reduced()) plugin.phoneZoom(this, false);
+            return result;
+        };
+        this.register(() => {
+            if (own.show) sw.show = show; else delete sw.show;
+            if (own.hide) sw.hide = hide; else delete sw.hide;
+            document.querySelectorAll(".goguryeo-zoom-copy, .goguryeo-zoom-backdrop").forEach((el) => el.remove());
+        });
+    }
+
+    phoneZoom(sw, opening) {
+        const container = sw.containerEl;
+        if (!container?.isConnected) return;
+        const leaf = this.app.workspace.getMostRecentLeaf();
+        // Obsidian's fade and scale are set as inline styles; an animation
+        // wins over them
+        const fade = opening ? [{ opacity: 0, transform: "none" }, { opacity: 1, transform: "none" }]
+            : [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "none" }];
+        container.animate(fade, { duration: opening ? ZOOM_MS * 0.6 : 140, easing: "ease-out", fill: opening ? "none" : "forwards" });
+        const preview = sw.tabPreviews?.[leaf?.id]?.containerEl?.querySelector(".mobile-tab-preview");
+        const card = preview?.getBoundingClientRect();
+        if (!card || card.width === 0 || card.bottom < 0 || card.top > window.innerHeight) return;
+        const view = leaf.view;
+        const pageEl = view?.getViewType?.() === "markdown" && view.contentEl?.isShown() ? view.contentEl : view?.containerEl;
+        const copy = preview.cloneNode(true);
+        copy.style.borderRadius = getComputedStyle(preview).borderRadius;
+        copy.addClass("goguryeo-zoom-copy");
+        Object.assign(copy.style, { left: `${card.left}px`, top: `${card.top}px`, width: `${card.width}px`, height: `${card.height}px` });
+        if (!opening) document.body.appendChild(copy);
+        preview.style.visibility = "hidden";
+        let backdrop = null;
+        if (!opening) {
+            // The switcher goes at once (Obsidian removes it after 90ms);
+            // its colour stays behind the growing card a little longer
+            backdrop = createDiv("goguryeo-zoom-backdrop");
+            container.before(backdrop); // under the switcher as it fades
+            backdrop.style.backgroundColor = getComputedStyle(container).backgroundColor;
+            backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ZOOM_MS * 0.8, easing: "ease-in", fill: "forwards" });
+        }
+        const fly = () => {
+            const page = pageEl?.getBoundingClientRect();
+            const done = page && page.width > 0
+                ? this.zoomCopy(copy, page, card, opening, "box")
+                : Promise.resolve(copy.remove());
+            done.then(() => {
+                preview.style.removeProperty("visibility");
+                backdrop?.remove();
+            });
+        };
+        if (opening) fly();
+        else window.requestAnimationFrame(fly);
     }
 
     // ---- iPhone: haptics ----

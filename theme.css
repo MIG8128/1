@@ -2503,6 +2503,27 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     font-weight: var(--font-semibold);
 }
 
+/* Opening and closing the overview zooms (companion: zoomCopy): a copy of
+   a card's picture flies between the page and its card, above the sheet
+   (on iPhone, above Obsidian's own tab switcher) */
+.goguryeo-zoom-copy {
+    position: fixed !important;
+    z-index: calc(var(--layer-modal) + 1);
+    inset: auto;
+    margin: 0;
+    transform-origin: 0 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: none !important;
+}
+
+.goguryeo-zoom-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--layer-modal);
+    pointer-events: none;
+}
+
 /* One grid of every tab, in the tab row's order */
 .goguryeo-tab-overview-panes {
     position: relative;
