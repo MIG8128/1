@@ -1960,8 +1960,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.registerDomEvent(document, "mousedown", onTap, opts);
 
         // Folded, the capsule holds only the name and is as wide as it: the
-        // theme reads --g-capsule-name-w, the name's width in the folded
-        // font, measured ahead so the fold can animate to it
+        // theme reads --g-capsule-name-w, the name's width at its own size
+        // (the fold scales it by --g-fold-text), measured ahead so the fold
+        // can animate to it
         const ctx = document.createElement("canvas").getContext("2d");
         const measure = () => {
             this.app.workspace.iterateRootLeaves((leaf) => {
@@ -1969,8 +1970,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 const title = capsule?.querySelector(".view-header-title");
                 if (!title) return;
                 const cs = getComputedStyle(title);
-                const size = getComputedStyle(document.body).getPropertyValue("--font-ui-smaller").trim() || "12px";
-                ctx.font = `${cs.fontWeight} ${size} ${cs.fontFamily}`;
+                ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
                 capsule.style.setProperty("--g-capsule-name-w", `${Math.ceil(ctx.measureText(title.textContent).width)}px`);
             });
         };
