@@ -1,0 +1,16 @@
+{
+  "name": "companion",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --format=cjs --external:obsidian --external:@capacitor/* --outfile=main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -1,1 +1,4 @@
 sandbox/
+# 의존성 패키지 제외
+companion/node_modules/
+node_modules/

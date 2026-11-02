@@ -1,0 +1,22 @@
+/* -------------------------------------------------------------------------
+   11. iPad — the desktop layout (path row on top, tabs below, split screen
+       as cards; section 6) with bigger, rounder controls for fingers. The
+       sidebars stay Obsidian's glass drawers.
+   ------------------------------------------------------------------------- */
+
+body.is-tablet:not(.goguryeo-no-cards) {
+    --g-row-h: 42px;
+    --g-row-btn: 42px;
+    --g-row2-h: 38px;
+}
+
+body.is-tablet:not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-header-title-container, .view-actions),
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list),
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner,
+body.is-tablet:not(.goguryeo-no-cards) .mod-root .goguryeo-tab-thumb,
+body.is-tablet:not(.goguryeo-no-cards) :is(.goguryeo-shared-tabs-bar, .goguryeo-stab, .goguryeo-stab-part, .goguryeo-shared-tabs-bar .goguryeo-tab-thumb) {
+    border-radius: 999px;
+}
+
+

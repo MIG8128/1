@@ -1,0 +1,652 @@
+/* -------------------------------------------------------------------------
+   10. iPhone — one bar at the bottom (design G)
+       ( ‹ )  ( folder › file name )  ( ⋯ )
+       · no top row: the note runs up to the status bar
+       · round glass buttons, like iOS
+       · ‹ goes back; forward is in ⋯ and the right-edge swipe
+       · ⋯ (Obsidian's ≡ button) opens the companion's menu: forward, the
+         note's own actions (reading view, plugin actions, more options),
+         both sidebars, all tabs, search, and Obsidian's own menu
+       · the capsule shows only the folder the note is in (for a folder
+         note, the folder around it); a long folder takes at most 40%,
+         and the folder and name shorten with "…"
+       · tap the capsule → tab overview; tap the folder → quick switcher
+         (or, with the Folder notes plugin, that folder's note)
+       · drag the capsule up → tab overview; sideways → the tab beside it,
+         or past the last tab → a new tab
+       · scrolling down folds the bar into a small name capsule in one
+         motion (‹ ⋯ fold into its sides); tap it to bring the bar back
+       · the back/forward edge swipes come from the companion plugin
+   ------------------------------------------------------------------------- */
+
+body.is-phone {
+    --navbar-height: 52px;
+    --g-phone-side: 14px;
+    --g-phone-gap: 8px;
+    --g-nav-w: calc(100vw - var(--g-phone-side) * 2);
+    --g-phone-glass-shadow: inset 0 0 0 1px var(--glass-border),
+        0 4px 14px rgba(0, 0, 0, 0.22);
+    /* The fold (scrolling down) and unfold: every part moves together on
+       one curve, iOS's own sheet curve */
+    --g-fold-time: 0.42s;
+    --g-fold-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --g-fold-text: 0.88; /* the folded name's size, as a scale */
+}
+
+/* The round glass every iPhone control wears */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
+        .mobile-navbar-action-back,
+        .mobile-navbar-action-menu,
+        .mod-root .workspace-leaf .view-header-title-container
+    ) {
+    background-color: var(--glass-bg);
+    background-image: none;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-phone-glass-shadow);
+}
+
+/* ---- The bar ---- */
+
+/* The bar itself becomes a clear row; each group gets its own glass */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
+    --raised: none;
+    width: var(--g-nav-w);
+    max-width: none;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-actions {
+    gap: var(--g-phone-gap);
+    height: 100%;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action {
+    flex: 0 0 var(--navbar-height);
+    width: var(--navbar-height);
+    margin: 0;
+}
+
+/* ( ‹ ) and ( ⋯ ): circles */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
+    border-radius: 50%;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-back > button[aria-disabled="true"] {
+    opacity: 0.35;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-menu .navbar-action-flair {
+    display: none;
+}
+
+/* Forward lives in ⋯; search and new file in the tab overview */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
+        .mobile-navbar-action-forward,
+        .mobile-navbar-action-quick-switcher,
+        .mobile-navbar-action-new-tab
+    ) {
+    display: none;
+}
+
+/* The tabs button stretches into the centre slot and becomes an invisible
+   tap target; the capsule is drawn over it (below) */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-tabs {
+    flex: 1 1 auto;
+    width: auto;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-tabs .clickable-icon {
+    opacity: 0;
+}
+
+/* Content scrolls under the glass bars, so the fade mask is not needed */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root {
+    mask-image: none;
+    -webkit-mask-image: none;
+}
+
+/* ---- No top row ----
+   Obsidian's header stays in the page (it holds the capsule, and its ◧,
+   📖 and ⋯ buttons are still clicked from the ⋯ menu) but shows nothing,
+   and the note no longer leaves room for it. */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf {
+    --view-header-height: 0px;
+    --view-top-spacing: calc(var(--safe-area-inset-top) + 8px);
+    --view-top-spacing-markdown: calc(var(--safe-area-inset-top) + 16px);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header {
+    height: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    pointer-events: none;
+    opacity: 1;
+    transform: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header > :not(.view-header-title-container) {
+    display: none;
+}
+
+/* The status bar area: a little glass so text doesn't run into the clock
+   (without the companion; with it, the graduated blur below) */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf-content::before {
+    content: "";
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: var(--safe-area-inset-top);
+    background-color: color-mix(in srgb, var(--background-primary) 55%, transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+}
+
+/* With the companion, Safari's status bar instead (setupStatusEdge): no
+   strip, the clock stays, and text under it is softened by a graduated
+   blur, strongest at the top, gone by the status bar's lower edge */
+body.is-phone.is-floating-nav.goguryeo-status-edge-on:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf-content::before {
+    content: none;
+}
+
+.goguryeo-status-edge {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .goguryeo-status-edge {
+    display: block;
+    position: fixed;
+    z-index: calc(var(--layer-notice) + 1);
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--safe-area-inset-top);
+    pointer-events: none;
+}
+
+.goguryeo-status-edge > div {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+}
+
+.goguryeo-status-edge > div:nth-child(1) {
+    height: 100%;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+    -webkit-mask-image: linear-gradient(#000 60%, transparent);
+    mask-image: linear-gradient(#000 60%, transparent);
+}
+
+.goguryeo-status-edge > div:nth-child(2) {
+    height: 85%;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    -webkit-mask-image: linear-gradient(#000 55%, transparent);
+    mask-image: linear-gradient(#000 55%, transparent);
+}
+
+.goguryeo-status-edge > div:nth-child(3) {
+    height: 70%;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(#000 50%, transparent);
+    mask-image: linear-gradient(#000 50%, transparent);
+}
+
+.goguryeo-status-edge > div:nth-child(4) {
+    height: 55%;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    -webkit-mask-image: linear-gradient(#000 45%, transparent);
+    mask-image: linear-gradient(#000 45%, transparent);
+}
+
+/* ---- The capsule: ( folder › file name ) in the middle of the bar ---- */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .mod-root .workspace-leaf .view-header-title-container {
+    display: flex;
+    position: fixed;
+    z-index: 1;
+    left: calc(50% - var(--g-nav-w) / 2 + var(--navbar-height) + var(--g-phone-gap));
+    width: calc(var(--g-nav-w) - var(--navbar-height) * 2 - var(--g-phone-gap) * 2);
+    bottom: calc(var(--navbar-bottom-offset) - var(--keyboard-height) - 2px);
+    height: var(--navbar-height);
+    margin: 0;
+    padding: 0 16px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    border-radius: 999px;
+    font-size: var(--font-ui-small);
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+    transition-property: left, width, height, bottom, padding, opacity;
+    transition-duration: var(--g-fold-time), var(--g-fold-time), var(--g-fold-time), var(--g-fold-time), var(--g-fold-time), 0.2s;
+    transition-timing-function: var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease), ease-out;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-container::before,
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-container::after {
+    display: none;
+}
+
+/* The note's name; with a long folder and name both shorten, the folder
+   never taking more than 40% */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    font-size: inherit;
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    transition-property: scale, flex-shrink, max-width;
+    transition-duration: var(--g-fold-time), 0.2s, var(--g-fold-time);
+    transition-timing-function: var(--g-fold-ease);
+}
+
+/* The folder, in gray. A tap on it opens the quick switcher (or the
+   folder's note), so it takes taps; the rest of the capsule lets them
+   through to the tabs button underneath. */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
+    display: flex;
+    flex: 0 1 auto;
+    min-width: 3.5em;
+    max-width: 40%;
+    padding: 0;
+    align-items: center;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: auto;
+    transition-property: max-width, min-width, opacity;
+    transition-duration: var(--g-fold-time), var(--g-fold-time), 0.2s;
+    transition-timing-function: var(--g-fold-ease), var(--g-fold-ease), ease-out;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent:empty {
+    display: none;
+}
+
+/* A whole path doesn't fit on a phone: like Safari showing just the site,
+   only the folder the note is in. Each crumb is followed by a separator,
+   so the last crumb is the 2nd from the end. A folder note's last crumb
+   is its own folder (the folder notes plugin marks the title), so take
+   the one before; a folder note at the top shows no folder at all. */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > * {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2),
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(4) {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent > .view-header-breadcrumb:nth-last-child(2) {
+    display: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header:has(.view-header-title.path-is-folder-note) .view-header-title-parent:not(:has(> :nth-last-child(4))) {
+    display: none;
+}
+
+/* The separator after the folder becomes › */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb-separator:last-child {
+    display: block;
+    flex-shrink: 0;
+    padding: 0 5px;
+    font-size: 0;
+    color: var(--text-faint);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb-separator:last-child::after {
+    content: "›";
+    font-size: calc(var(--font-ui-small) * 1.25);
+}
+
+/* Scrolling down: like Safari, the bar folds into a small capsule holding
+   just the name, as wide as the name (--g-capsule-name-w, measured by the
+   companion at the name's full size; without it, 62% of the bar). Tapping
+   it brings the bar back (the companion; otherwise the tap would rename
+   the note).
+   It is one motion: the capsule narrows and drops, the name shrinks with
+   `scale` (a font-size change would re-lay the text every frame and
+   jitter), the folder fades as its room closes, and ‹ ⋯ shrink and fade
+   into the capsule's sides instead of Obsidian's own slide down. */
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
+    --g-capsule-w: max(80px, min(var(--g-nav-w) * 0.62, 260px, var(--g-capsule-name-w, 999px) * var(--g-fold-text) + 30px));
+    left: calc(50% - var(--g-capsule-w) / 2);
+    width: var(--g-capsule-w);
+    height: 34px;
+    bottom: max(var(--safe-area-inset-bottom) - 4px, 8px);
+    padding: 0 14px;
+    pointer-events: auto;
+}
+
+/* The name keeps its size and is scaled, so it gets the room it needs
+   before the scale (a long one still ends in "…") */
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title {
+    flex-shrink: 0;
+    max-width: calc((var(--g-capsule-w) - 28px) / var(--g-fold-text));
+    scale: var(--g-fold-text);
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
+    min-width: 0;
+    max-width: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ‹ and ⋯: Obsidian slides the whole bar down and fades it on its own
+   timings; here the bar stays, and the two circles fold into the capsule */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
+    transition-property: opacity, scale, translate;
+    transition-duration: 0.2s, var(--g-fold-time), var(--g-fold-time);
+    transition-timing-function: ease-out, var(--g-fold-ease), var(--g-fold-ease);
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
+    transform: none;
+    opacity: 1;
+    pointer-events: none;
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
+    opacity: 0;
+    scale: 0.5;
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar .mobile-navbar-action-back {
+    translate: 24px 14px;
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar .mobile-navbar-action-menu {
+    translate: -24px 14px;
+}
+
+/* Keyboard open (bar gone): the capsule hides too */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):not(:has(.mobile-navbar)) .mod-root .workspace-leaf .view-header-title-container {
+    display: none;
+}
+
+/* ---- The ⋯ panel (companion): a glass panel the width of the bar ----
+   ( ◧ )( ⧉ )( ⌕ )( 📖 )( ◨ )      ← five tiles
+   Obsidian                          ← Obsidian's ≡ menu, unfolded
+   [item] [item]  …
+   Note name                         ← the note's options, unfolded
+   [item] [item]  …                  (the panel scrolls to reach them) */
+body.is-phone .goguryeo-phone-menu-bg {
+    position: fixed;
+    z-index: var(--layer-menu);
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.25);
+}
+
+body.is-phone .goguryeo-phone-menu {
+    position: fixed;
+    z-index: calc(var(--layer-menu) + 1);
+    left: var(--g-phone-side);
+    right: var(--g-phone-side);
+    bottom: calc(var(--navbar-bottom-offset) + var(--navbar-height) + 12px);
+    max-height: min(46vh, calc(100vh - var(--navbar-bottom-offset) - var(--navbar-height) - var(--safe-area-inset-top) - 24px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 26px;
+    background-color: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-shadow);
+    transform-origin: calc(100% - 26px) 100%;
+    color: var(--text-normal);
+}
+
+/* A thin line for a scroll bar, no arrows */
+body.is-phone .goguryeo-phone-menu::-webkit-scrollbar {
+    width: 3px;
+}
+
+body.is-phone .goguryeo-phone-menu::-webkit-scrollbar-button {
+    display: none;
+}
+
+body.is-phone .goguryeo-phone-menu::-webkit-scrollbar-track {
+    margin: 18px 0;
+    background: transparent;
+}
+
+body.is-phone .goguryeo-phone-menu::-webkit-scrollbar-thumb {
+    border: none;
+    border-radius: 2px;
+    background-color: color-mix(in srgb, var(--text-normal) 28%, transparent);
+}
+
+body.is-phone .goguryeo-phone-menu-row {
+    display: flex;
+    gap: 8px;
+}
+
+body.is-phone .goguryeo-phone-menu button {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    color: var(--text-normal);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-tile {
+    flex: 1;
+    height: 52px;
+    justify-content: center;
+    border-radius: 16px;
+    background-color: color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
+/* "Obsidian" / the note's name, over a thin line */
+body.is-phone .goguryeo-phone-menu-section {
+    margin: 6px 6px 0;
+    padding: 12px 0 2px;
+    border-top: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+body.is-phone .goguryeo-phone-menu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 8px;
+}
+
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-item {
+    height: 44px;
+    padding: 0 6px;
+    gap: 12px;
+    border-radius: 12px;
+    font-size: 15px;
+}
+
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-item:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-item:not(:disabled):active,
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-tile:active {
+    background-color: color-mix(in srgb, var(--text-normal) 14%, transparent);
+}
+
+body.is-phone .goguryeo-phone-menu-icon {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-item.is-warning,
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-item.is-warning .goguryeo-phone-menu-icon {
+    color: var(--text-error);
+}
+
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-item.is-checked .goguryeo-phone-menu-icon {
+    color: var(--text-accent);
+}
+
+body.is-phone .goguryeo-phone-menu .svg-icon {
+    --icon-size: 19px;
+    --icon-stroke: 2px;
+}
+
+body.is-phone .goguryeo-phone-menu .goguryeo-phone-menu-item .svg-icon {
+    --icon-size: 18px;
+}
+
+body.is-phone .goguryeo-phone-menu-label {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ⋯ wears a green ring while its panel is open */
+body.is-phone.is-floating-nav.goguryeo-phone-menu-open:not(.goguryeo-no-safari-bar) .mobile-navbar .mobile-navbar-actions > .mobile-navbar-action-menu {
+    box-shadow: inset 0 0 0 1.5px var(--interactive-accent), var(--g-phone-glass-shadow);
+}
+
+/* ---- Tab overview: only Obsidian's own [+] [N tabs] [Done] row; the bar
+   (and its Search files button) stays out of it ---- */
+/* While it's open (companion: body.goguryeo-tabs-open from the moment it
+   opens, until it starts closing) the bottom bar and the capsule fade out
+   instead of vanishing, and fade back in as the card grows into the page */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
+    transition: opacity 0.2s ease-out, margin-bottom 0.25s ease-in-out;
+}
+
+/* Pulling the name pill up (companion: --g-tabs-pull, 0 → 1 with the
+   finger): the bar and the capsule fade as the page shrinks */
+body.is-phone.is-floating-nav.goguryeo-tabs-pulling:not(.goguryeo-no-safari-bar) .mobile-navbar,
+body.is-phone.is-floating-nav.goguryeo-tabs-pulling:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
+    opacity: calc(1 - var(--g-tabs-pull, 0) * 2.5);
+    transition: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):is(.goguryeo-tabs-open, :has(.mobile-tab-switcher)) .mobile-navbar,
+body.is-phone.is-floating-nav.goguryeo-tabs-open:not(.goguryeo-no-safari-bar) .mod-root .workspace-leaf .view-header-title-container {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* The overview itself: tab cards on the darker canvas, the current one
+   ringed in the accent, and a round glass × at each card's top-left */
+body.is-phone {
+    --tab-switcher-background: var(--g-split-canvas);
+    --tab-switcher-menubar-background: transparent;
+    --tab-switcher-preview-radius: 20px;
+    --tab-switcher-preview-shadow-active: 0 0 0 2px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7),
+        0 0 0 6px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+}
+
+/* Room at the bottom so the buttons never cover a card */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-scroll {
+    padding-bottom: calc(var(--navbar-bottom-offset) + var(--navbar-height) + 24px);
+}
+
+body.is-phone .mobile-tab .close-button {
+    inset-inline-end: auto;
+    inset-inline-start: var(--size-4-2);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-color: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+/* A soft frosted band behind the search pill and the buttons */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher::before {
+    content: "";
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--navbar-bottom-offset) + var(--navbar-height) * 2 + 60px);
+    background-color: color-mix(in srgb, var(--g-split-canvas) var(--g-band-tint), transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    -webkit-mask-image: linear-gradient(to top, #000 70%, transparent);
+    mask-image: linear-gradient(to top, #000 70%, transparent);
+    pointer-events: none;
+}
+
+/* ( + )   ( 2 tabs ⌄ )   ( Done ) — the same height as the main bar */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menubar {
+    z-index: 2;
+    padding: 0 var(--g-phone-side) calc(var(--navbar-bottom-offset) - 2px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
+        .mobile-tab-switcher-menu-spacer:first-child .clickable-icon,
+        .mobile-tab-switcher-menu-button,
+        .mobile-tab-switcher-menu-spacer:last-child .clickable-icon
+    ) {
+    height: var(--navbar-height);
+    box-sizing: border-box;
+    border-radius: 999px;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-phone-glass-shadow);
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menu-spacer:first-child .clickable-icon {
+    width: var(--navbar-height);
+    padding: 0;
+    justify-content: center;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menu-button {
+    padding: 0 18px;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-tab-switcher-menu-spacer:last-child .clickable-icon {
+    padding: 0 22px;
+    font-weight: var(--font-semibold);
+    color: var(--text-on-accent);
+    background-color: var(--interactive-accent);
+    background-image: none;
+}
+
+
+

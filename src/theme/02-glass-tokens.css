@@ -1,0 +1,119 @@
+/* -------------------------------------------------------------------------
+   2. Glass tokens (shared with Day Planner Pro and other plugins)
+   ------------------------------------------------------------------------- */
+
+/* The glass is flat: no brighter top edge or sheen. --glass-highlight and
+   --glass-sheen stay defined (as transparent / none) for plugins that use them.
+   One material for all glass: every surface is the sidebar gray at the
+   "Glass opacity" setting, blurred by "Blur strength". (Glass mixed from the
+   note's own color looked the same at any opacity over the note.) Menus and
+   pop-ups stay 20% more solid so their text reads; the frosted band behind
+   the toolbar rows fades the note's own color a little less. */
+body {
+    --g-glass-strong-tint: min(100%, calc(var(--g-glass-tint) + 20%));
+    --g-band-tint: max(0%, calc(var(--g-glass-tint) - 7%));
+}
+
+body.theme-dark {
+    --glass-bg: color-mix(in srgb, var(--g-sidebar-base) var(--g-glass-tint), transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--g-sidebar-base) var(--g-glass-strong-tint), transparent);
+    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) var(--g-sidebar-tint, var(--g-glass-tint)), transparent);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-highlight: transparent;
+    --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
+    --glass-blur: blur(var(--g-blur)) saturate(180%);
+    --glass-track: rgba(0, 0, 0, 0.32);
+    --glass-track-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --glass-thumb: linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.22)),
+        color-mix(in srgb, var(--background-primary) 85%, transparent);
+    --glass-thumb-hover: linear-gradient(rgba(255, 255, 255, 0.27), rgba(255, 255, 255, 0.27)),
+        color-mix(in srgb, var(--background-primary) 85%, transparent);
+    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.32), 0 0 0 0.5px rgba(0, 0, 0, 0.2),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.24);
+    --glass-sheen: none;
+    --glass-well: rgba(0, 0, 0, 0.18);
+    --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body.theme-light {
+    --glass-bg: color-mix(in srgb, var(--g-sidebar-base) min(100%, calc(var(--g-glass-tint) + 6%)), transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--g-sidebar-base) min(100%, calc(var(--g-glass-strong-tint) + 2%)), transparent);
+    --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) calc(var(--g-sidebar-tint, var(--g-glass-tint)) + 6%), transparent);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --glass-highlight: transparent;
+    --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.08);
+    --glass-blur: blur(var(--g-blur)) saturate(180%);
+    --glass-track: rgba(118, 118, 128, 0.16);
+    --glass-track-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    --glass-thumb: color-mix(in srgb, var(--background-primary) 96%, transparent);
+    --glass-thumb-hover: var(--background-primary);
+    --glass-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+    --glass-sheen: none;
+    --glass-well: rgba(0, 0, 0, 0.035);
+    --glass-well-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.07), 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* No blur support: near-solid glass */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    body.theme-dark,
+    body.theme-light {
+        --glass-bg: color-mix(in srgb, var(--g-sidebar-base) 95%, transparent);
+        --glass-bg-strong: color-mix(in srgb, var(--g-sidebar-base) 97%, transparent);
+        --glass-sidebar: color-mix(in srgb, var(--g-sidebar-base) 95%, transparent);
+    }
+}
+
+/* "Reduce transparency" in system settings */
+@media (prefers-reduced-transparency: reduce) {
+    body.theme-dark,
+    body.theme-light {
+        --glass-bg: color-mix(in srgb, var(--g-sidebar-base) 97%, transparent);
+        --glass-bg-strong: var(--g-sidebar-base);
+        --glass-sidebar: var(--g-sidebar-base);
+        --glass-blur: none;
+        --glass-thumb: var(--background-secondary);
+        --glass-thumb-hover: var(--background-modifier-border);
+    }
+}
+
+/* Ready-made pieces for plugins */
+.glass-panel {
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: var(--glass-shadow);
+}
+
+button.glass-btn {
+    background: var(--glass-thumb);
+    box-shadow: var(--glass-thumb-shadow);
+    border: none;
+    border-radius: 8px;
+    color: var(--text-normal);
+}
+
+button.glass-btn:hover {
+    background: var(--glass-thumb-hover);
+}
+
+.glass-track {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--glass-track);
+    box-shadow: var(--glass-track-shadow);
+}
+
+.glass-well input,
+.glass-well textarea,
+input.glass-well {
+    background-color: var(--glass-well);
+    box-shadow: var(--glass-well-shadow);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+}
+
+

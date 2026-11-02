@@ -1,0 +1,1444 @@
+/* -------------------------------------------------------------------------
+   6. Floating panel layout (desktop)
+      The editor fills the window; sidebars, the vault row and the status bar
+      float above it as glass panels.
+   ------------------------------------------------------------------------- */
+
+body:is(:not(.is-mobile), .is-tablet) .app-container {
+    background-color: var(--background-primary);
+}
+
+body.is-translucent:not(.is-fullscreen) .app-container {
+    background: transparent;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
+    --titlebar-background: transparent;
+    --titlebar-background-focused: transparent;
+    --tab-container-background: transparent;
+    --sidebar-tab-container-background: transparent;
+    --ribbon-background: transparent;
+    --ribbon-background-collapsed: transparent;
+    --tab-outline-width: 0px;
+    --tab-curve: 0px;
+    --tab-background-active: transparent;
+    --divider-color: transparent;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.horizontal-main-container, .workspace, .workspace-split.mod-root, .workspace-split.mod-sidedock) {
+    background-color: transparent;
+}
+
+/* Sidebar panels (glass). Obsidian sizes them width: 100%, which with the
+   margins would push them past their column; let them stretch instead. */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs {
+    width: auto;
+    margin: var(--g-gap) 0 var(--g-gap) var(--g-gap);
+    border-radius: var(--g-radius-panel);
+    border: 1px solid var(--glass-border);
+    background-color: var(--glass-sidebar);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-panel-shadow);
+    overflow: hidden;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-right-split .workspace-tabs {
+    margin: var(--g-gap) var(--g-gap) var(--g-gap) 0;
+}
+
+/* Inside a sidebar card, everything that normally paints the sidebar color
+   becomes clear so the glass shows through. */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock .workspace-tabs > * {
+    --background-secondary: transparent;
+}
+
+/* Main area, Safari style — two rows float over the note:
+     row 1: [◧] [‹ ›]        ( path )        [actions] [+] [⌄] [◨]
+     row 2: the tabs, sharing the full width equally
+   Row 1 is the note's own header. The sidebar buttons, + and ⌄ live in the
+   tab bar (row 2) and are lifted up into row 1. Notes scroll under both
+   rows; other views (Homepage, plugins…) start below them. */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
+    --g-row-h: 36px;
+    --g-row-btn: 40px;
+    --g-row1-top: 8px;
+    --g-row2-top: calc(var(--g-row1-top) + var(--g-row-h) + 6px);
+    --g-row2-h: 34px;
+    --g-bar-offset: calc(var(--g-row2-top) + var(--g-row2-h) + 8px);
+}
+
+/* Room each row keeps free at its ends: the lifted buttons, and on Windows
+   the window buttons (— ▢ ✕) when this pane reaches the top-right corner */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    --g-row-inset: 0px;
+    --g-row-lt: 0px;
+    --g-row-rt: 0px;
+    --g-row-left: var(--g-row-lt);
+    --g-row-right: calc(var(--g-row-inset) + var(--g-row-rt) + (var(--g-row-btn) + 6px) * 2);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:has(> .workspace-tab-header-container > .sidebar-toggle-button.mod-left) {
+    --g-row-lt: calc(var(--g-row-btn) + 6px);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:has(> .workspace-tab-header-container > .sidebar-toggle-button.mod-right) {
+    --g-row-rt: calc(var(--g-row-btn) + 6px);
+}
+
+body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscreen) .mod-root .workspace-tabs.mod-top-right-space {
+    --g-row-inset: calc(var(--frame-right-space) + 18px - var(--g-gap));
+}
+
+/* A soft frosted band behind both rows, fading out at its bottom edge. It
+   lives in each pane (the pane is its own layer), under row 1. */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(var(--g-bar-offset) + 8px);
+    background-color: color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+    pointer-events: none;
+}
+
+/* Row 2: the tab bar, full width */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    position: absolute;
+    z-index: 3;
+    top: var(--g-row2-top);
+    left: var(--g-gap);
+    right: var(--g-gap);
+    height: var(--g-row2-h);
+    padding: 3px;
+    border: 0;
+    border-radius: 11px;
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+    --tab-max-width: none;
+}
+
+/* ...glass like row 1. The blur sits on a pseudo-element: on the bar itself
+   it would make the bar the box for its lifted (fixed) buttons */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    pointer-events: auto;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-container-inner {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-spacer {
+    display: none;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container .workspace-tab-header {
+    padding: 0;
+}
+
+/* Each tab: title centered, × on the left (only on the active or hovered
+   tab), pin/link icons on the right */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner {
+    position: relative;
+    justify-content: center;
+    padding: 0 28px;
+}
+
+/* A short divider between tabs, Safari style: at the tab's own edge (it
+   clips anything outside), and gone beside the glass (active tab) or a
+   hovered tab and after the last */
+.theme-dark {
+    --g-tab-divider: rgba(255, 255, 255, 0.34);
+    --g-sidebar-tab-divider: rgba(255, 255, 255, 0.2);
+}
+
+.theme-light {
+    --g-tab-divider: rgba(0, 0, 0, 0.22);
+    --g-sidebar-tab-divider: rgba(0, 0, 0, 0.13);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner::after {
+    top: 25%;
+    inset-inline-end: 0;
+    width: 2px;
+    height: 50%;
+    border-radius: 1px;
+    background-color: var(--g-tab-divider);
+    opacity: 1;
+    transition: opacity 0.15s ease;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header:is(.is-active, :has(+ .is-active), :last-child) .workspace-tab-header-inner::after {
+    opacity: 0;
+}
+
+@media (hover: hover) {
+    body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header:is(:hover, :has(+ :hover)) .workspace-tab-header-inner::after {
+        opacity: 0;
+    }
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-title {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    text-align: center;
+}
+
+/* Obsidian pins the close button to the tab's right edge; cancel that, or
+   with left set too it stretches over the whole tab and every click closes */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-inner-close-button {
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    right: auto;
+    inset-inline-end: auto;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    justify-content: center;
+    transform: translateY(-50%);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-status-container {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header:not(.is-active):not(:hover) .workspace-tab-header-inner-close-button {
+    opacity: 0;
+}
+
+/* Buttons that live in the tab bar but show in row 1 */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    position: absolute;
+    top: calc(var(--g-row1-top) - var(--g-row2-top));
+    width: var(--g-row-btn);
+    height: var(--g-row-h);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-left {
+    left: 0;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-right {
+    right: var(--g-row-inset);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-tab-list {
+    right: calc(var(--g-row-inset) + var(--g-row-rt));
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
+    right: calc(var(--g-row-inset) + var(--g-row-rt) + var(--g-row-btn) + 6px);
+}
+
+/* Row 1: the note header — ‹ › on the left, the path centered like
+   Safari's address bar, the note's actions on the right */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header {
+    position: absolute;
+    z-index: 2;
+    top: var(--g-row1-top);
+    left: calc(var(--g-gap) + var(--g-row-left));
+    right: calc(var(--g-gap) + var(--g-row-right));
+    height: var(--g-row-h);
+    padding: 0;
+    gap: 6px;
+    border: 0;
+    background: none;
+    box-shadow: none;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container {
+    flex: 0 1 600px;
+    height: var(--g-row-h);
+    margin-inline: auto;
+    padding: 0 16px;
+    justify-content: center;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container::before,
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container::after {
+    display: none;
+}
+
+/* A web page's capsule is Obsidian's address field: its input keeps the
+   stock text-field box (fill, border, focus ring), a second layer inside
+   the glass. The capsule alone is the field; the address sits centered
+   like a note's path, and goes left while it's being edited. */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .webviewer-address {
+    height: 100%;
+    margin: 0;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .webviewer-address input {
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    text-align: center;
+    text-overflow: ellipsis;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .webviewer-address input:focus {
+    text-align: start;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .view-header-title-container.webviewer-address-container:focus-within {
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border-focus);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-actions) {
+    height: var(--g-row-h);
+    padding: 0 2px;
+}
+
+/* The glass on every row-1 piece */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root :is(.view-header-nav-buttons, .view-header-title-container, .view-actions),
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    border-radius: 12px;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+/* Windows: Obsidian makes its title bar no-drag and lets the tab bar drag
+   the window instead — but our tab bar sits in row 2. So the whole strip
+   above row 2 drags (short of the window buttons); row 1's pieces and the
+   sidebar pills punch no-drag holes in it, as they come later in the DOM. */
+body.is-hidden-frameless:not(.is-mobile):not(.is-grabbing):not(.is-fullscreen):not(.goguryeo-no-cards) .workspace::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: calc(var(--frame-right-space) + 18px);
+    height: var(--g-row2-top);
+    pointer-events: none;
+    -webkit-app-region: drag;
+}
+
+body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .view-header :is(.clickable-icon, .view-header-title-container) {
+    -webkit-app-region: no-drag;
+}
+
+/* Right sidebar starts below the window buttons */
+body.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscreen):not(.mod-macos) .mod-right-split .workspace-tabs.mod-top-right-space {
+    margin-top: var(--g-row2-top);
+}
+
+/* Split screen (2+ panes, or 1 over a background; the companion plugin sets
+   body.goguryeo-split, plus goguryeo-one-pane for the lone card):
+     [◧] [‹ ›]      ( path of the current pane )      [actions] [+] [⌄] [◨]
+     ╭─ ( tabs ) ─────╮  ╭─ ( tabs ) ─────╮
+     │  pane          │  │  pane          │
+   One shared toolbar across the note area — the current pane's own note
+   header — and each pane a card with its tab row; the current pane gets
+   an accent edge. */
+.theme-dark {
+    --g-split-canvas: #131315;
+    --g-pane-border: rgba(255, 255, 255, 0.16);
+}
+
+.theme-light {
+    --g-split-canvas: #ebebef;
+    --g-pane-border: rgba(0, 0, 0, 0.14);
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
+    --g-split-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px);
+    --g-split-inset: 0px;
+    --g-split-rt: 0px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards):has(.mod-root .sidebar-toggle-button.mod-right) {
+    --g-split-rt: calc(var(--g-row-btn) + 6px);
+}
+
+body.goguryeo-split.is-hidden-frameless:not(.is-mobile):not(.goguryeo-no-cards):not(.is-fullscreen):has(.mod-root .goguryeo-last-pane.mod-top-right-space) {
+    --g-split-inset: calc(var(--frame-right-space) + 18px - var(--g-gap));
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-split.mod-root {
+    padding-inline: 5px;
+    background-color: var(--g-split-canvas);
+}
+
+/* Plain background: the whole window is that canvas, so the sidebars sit
+   on the same ground as the note's card (the window's own lighter color
+   showed around their tops, beside the note area's canvas) */
+body.goguryeo-split:not(.goguryeo-bg-color):not(.goguryeo-bg-image):is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .app-container {
+    background-color: var(--g-split-canvas);
+}
+
+/* Panes as cards; their tab row sits inside, at the top */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    --g-row2-top: 6px;
+    --g-bar-offset: calc(var(--g-row2-top) + var(--g-row2-h) + 8px);
+    width: auto;
+    height: auto;
+    margin: var(--g-split-top) 5px var(--g-gap);
+    border: 1.5px solid var(--g-pane-border);
+    border-radius: 16px;
+    background-color: var(--background-primary);
+    box-shadow: var(--g-panel-shadow);
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane {
+    border-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.62);
+    box-shadow: 0 0 0 4px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.12), var(--g-panel-shadow);
+}
+
+/* A lone card (over a background) has nothing to stand out from */
+body.goguryeo-split.goguryeo-one-pane:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane {
+    border-color: var(--g-pane-border);
+    box-shadow: var(--g-panel-shadow);
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    left: 6px;
+    right: 6px;
+}
+
+/* The shared toolbar: only the current pane's note header shows, pinned
+   across the note area. Obsidian walls each pane in (contain: strict
+   !important); keep size containment but drop layout/paint containment so
+   the header can sit outside its pane. Plain "size": a value Safari
+   doesn't know would bring Obsidian's strict back. */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf {
+    contain: size !important;
+}
+
+/* Nothing around the toolbar may clip with overflow: hidden (Obsidian's):
+   Safari clips pinned children too, so the iPad showed no toolbar. Only
+   the note's own content clips, and the pieces round off themselves
+   (16px card less its 1.5px border). */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root :is(.workspace-tabs, .workspace-tab-container, .workspace-leaf, .workspace-leaf-content) {
+    overflow: visible;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf {
+    border-radius: 14.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+    border-radius: 14.5px 14.5px 0 0;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
+    clip-path: inset(0 round 14.5px);
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-current-pane) .workspace-leaf-content > .view-header {
+    /* !important: the web viewer's header has Obsidian's
+       .view-header-always-show (display: flex !important) */
+    display: none !important;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs.goguryeo-current-pane .workspace-leaf-content > .view-header {
+    position: fixed;
+    top: calc(var(--g-root-top, 0px) + var(--g-row1-top));
+    left: calc(var(--g-root-left) + var(--g-gap) + var(--g-row-btn) + 6px);
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt) + (var(--g-row-btn) + 6px) * 2);
+}
+
+/* Its buttons: ◧ at the far left; ⌄, + and ◨ at the far right (only the
+   top-right pane's own + and ⌄ show) */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    position: fixed;
+    top: calc(var(--g-root-top, 0px) + var(--g-row1-top));
+    left: auto;
+    right: auto;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-left {
+    left: calc(var(--g-root-left) + var(--g-gap));
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .sidebar-toggle-button.mod-right {
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset));
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-tab-list {
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt));
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > .workspace-tab-header-new-tab {
+    right: calc(var(--g-root-right) + var(--g-gap) + var(--g-split-inset) + var(--g-split-rt) + var(--g-row-btn) + 6px);
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.goguryeo-last-pane) > .workspace-tab-header-container > :is(.workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    display: none;
+}
+
+/* 2+ panes, Chrome's split view (companion, body.goguryeo-shared-tabs): one
+   tab row under the toolbar, the split as one joined tab among the normal
+   tabs:
+     [◧] [‹ ›]      ( path of the focused page )      [actions] [+] [⧉] [◨]
+     ( [ A │ B │ C ]   D    E )
+     ╭─ A ─╮ ╭─ B ─╮ ╭─ C ─╮     joined tab on screen: every pane
+   A normal tab in focus fills the screen alone (body.goguryeo-solo); the
+   glass pill sits on what's on screen, and the focused page's name is
+   green. The cards lose their own tab rows (their ◧ + ⧉ ◨ stay in row 1). */
+.goguryeo-shared-tabs-bar {
+    display: none;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) {
+    --g-shared-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px);
+    --g-split-top: calc(var(--g-shared-top) + var(--g-row2-h) + 8px);
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar {
+    position: fixed;
+    z-index: calc(var(--layer-sidedock) - 2);
+    top: calc(var(--g-root-top, 0px) + var(--g-shared-top));
+    left: calc(var(--g-root-left, 0px) + 10px);
+    right: calc(var(--g-root-right, 0px) + 10px);
+    height: var(--g-row2-h);
+    display: flex;
+    align-items: stretch;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 11px;
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+    isolation: isolate;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-app-region: no-drag;
+}
+
+.goguryeo-shared-tabs-bar::-webkit-scrollbar {
+    display: none;
+}
+
+/* The glass on a pseudo-element, as on the cards' tab rows, so the pill's
+   own blur sees the page */
+.goguryeo-shared-tabs-bar::before {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    top: calc(var(--g-root-top, 0px) + var(--g-shared-top));
+    left: calc(var(--g-root-left, 0px) + 10px);
+    right: calc(var(--g-root-right, 0px) + 10px);
+    height: var(--g-row2-h);
+    border-radius: inherit;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+}
+
+/* Every tab shares the width equally; the joined split tab counts as one
+   (the user's choice: {A · B} {C} {D} each get a third) */
+.goguryeo-stab {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 0;
+    min-width: 44px;
+    display: flex;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.goguryeo-stab-inner {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 28px;
+}
+
+/* The icon only on what's on screen, as on Obsidian's own tabs */
+.goguryeo-stab-icon {
+    display: none;
+    flex: none;
+    margin-right: 6px;
+    --icon-size: 14px;
+}
+
+.goguryeo-stab.is-active .goguryeo-stab-icon:not(:empty) {
+    display: flex;
+}
+
+.goguryeo-stab-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.goguryeo-stab.is-active {
+    color: var(--text-normal);
+}
+
+/* The focused page: its name in the accent */
+:is(.goguryeo-stab, .goguryeo-stab-part).is-focused {
+    color: var(--text-accent);
+    font-weight: var(--font-semibold);
+}
+
+@media (hover: hover) {
+    .goguryeo-stab:not(.is-active):hover {
+        background-color: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
+}
+
+/* Short dividers between tabs, gone beside the pill or a hovered tab */
+.goguryeo-stab-inner::after {
+    content: "";
+    position: absolute;
+    top: 25%;
+    right: -2.5px;
+    width: 2px;
+    height: 50%;
+    border-radius: 1px;
+    background-color: var(--g-tab-divider);
+    transition: opacity 0.15s ease;
+}
+
+.goguryeo-stab:is(.is-active, :has(+ .is-active), :last-of-type) > .goguryeo-stab-inner::after {
+    opacity: 0;
+}
+
+@media (hover: hover) {
+    .goguryeo-stab:is(:hover, :has(+ :hover)) > .goguryeo-stab-inner::after {
+        opacity: 0;
+    }
+}
+
+.goguryeo-stab-close {
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    justify-content: center;
+    transform: translateY(-50%);
+    --icon-size: 12px;
+}
+
+.goguryeo-stab:not(.is-active):not(:hover) > .goguryeo-stab-inner > .goguryeo-stab-close {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* The joined split tab: its pages' names side by side inside one tab, a
+   dot between them. Each name takes what it needs and shrinks (with …)
+   when the tab is narrow; each has its own click, and on hover a × in
+   front of it. */
+.goguryeo-stab-split > .goguryeo-stab-inner {
+    padding: 0 4px;
+    gap: 0;
+}
+
+.goguryeo-stab-part {
+    position: relative;
+    flex: 0 1 auto;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 9px;
+    border-radius: 6px;
+}
+
+/* A small dot between the split's pages (the user's choice) */
+.goguryeo-stab-part + .goguryeo-stab-part::before {
+    content: "";
+    position: absolute;
+    top: calc(50% - 2px);
+    left: -2px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: var(--text-muted);
+    opacity: 0.8;
+}
+
+/* Off screen, the joined tab keeps a faint outline so it reads as one tab */
+.goguryeo-stab-split:not(.is-active) {
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+.goguryeo-stab-split > .goguryeo-stab-inner::after,
+.goguryeo-stab:has(+ .goguryeo-stab-split) > .goguryeo-stab-inner::after {
+    opacity: 0;
+}
+
+.goguryeo-stab-split:not(.is-active) .goguryeo-stab-part + .goguryeo-stab-part::before {
+    opacity: 0.5;
+}
+
+@media (hover: hover) {
+    .goguryeo-stab-split.is-active .goguryeo-stab-part:not(.is-focused):hover {
+        background-color: var(--background-modifier-hover);
+    }
+}
+
+.goguryeo-stab-part > .goguryeo-stab-close {
+    position: static;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin: 0 3px 0 -6px;
+    transform: none;
+}
+
+.goguryeo-stab-part > .goguryeo-stab-icon {
+    display: none !important;
+}
+
+.goguryeo-stab-part:not(:hover) > .goguryeo-stab-close {
+    display: none;
+}
+
+.goguryeo-stab-split.is-active .goguryeo-stab-part:not(.is-focused) {
+    color: var(--text-normal);
+}
+
+/* What isn't on screen folds away (body.goguryeo-folded): beside a normal
+   tab shown alone, every other pane; beside a split, the panes of the
+   other splits and loose panes. They fold to nothing but keep their place
+   in Obsidian's layout. Their ◧ + ⧉ ◨ still show (fixed in row 1). */
+body.goguryeo-folded.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off {
+    flex: 0 0 0px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    visibility: hidden;
+}
+
+body.goguryeo-folded.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .goguryeo-solo-off .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    visibility: visible;
+}
+
+body.goguryeo-solo.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-resize-handle {
+    display: none;
+}
+
+/* A split on screen beside folded ones: no resize handle on the edge
+   that only folded panes follow */
+body.goguryeo-folded.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-split > :not(.goguryeo-solo-off):not(:has(~ :not(.goguryeo-solo-off))) > .workspace-leaf-resize-handle {
+    display: none;
+}
+
+/* The bar on top of each split pane (iPad Safari style): drag it onto
+   another pane's edge to put the pane there, or its middle to swap them
+   (companion: renderGrips). Only while the split is on screen. */
+.goguryeo-pane-grip {
+    display: none;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:not(.goguryeo-solo):is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .goguryeo-pane-grip {
+    position: absolute;
+    top: -1.5px;
+    left: 50%;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 14px;
+    translate: -50% 0;
+    cursor: grab;
+    touch-action: none;
+}
+
+body.is-tablet .mod-root .workspace-tabs > .goguryeo-pane-grip {
+    width: 96px !important;
+    height: 22px !important;
+}
+
+.goguryeo-pane-grip-bar {
+    width: 36px;
+    height: 5px;
+    border-radius: 3px;
+    background-color: var(--text-faint);
+    opacity: 0.5;
+    transition: width 0.25s var(--g-spring), opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.goguryeo-pane-grip:hover .goguryeo-pane-grip-bar {
+    width: 44px;
+    opacity: 0.9;
+}
+
+.goguryeo-current-pane > .goguryeo-pane-grip .goguryeo-pane-grip-bar {
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.75);
+}
+
+.goguryeo-pane-grip:is(.is-held, .is-open) .goguryeo-pane-grip-bar {
+    width: 52px;
+    opacity: 1;
+    background-color: var(--interactive-accent);
+}
+
+/* A tap on the grip: the pane's menu, a glass panel under it (design B on
+   the canvas): Own tab · Swap · Move · Close, and below them the places
+   to move to or the panes to swap with (companion: openGripMenu) */
+.goguryeo-grip-menu {
+    position: fixed;
+    z-index: var(--layer-menu);
+    width: min(340px, calc(100vw - 16px));
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 18px;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-shadow, var(--g-panel-shadow));
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    transform-origin: 50% 0;
+}
+
+.goguryeo-grip-menu-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.goguryeo-grip-menu :where(button) {
+    all: unset;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile {
+    height: 68px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 12px;
+    background-color: color-mix(in srgb, var(--text-normal) 8%, transparent);
+    transition: background-color 0.15s ease, scale 0.2s var(--g-spring);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile:hover,
+.goguryeo-grip-menu .goguryeo-grip-tile.is-on {
+    background-color: color-mix(in srgb, var(--text-normal) 15%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile:active {
+    scale: 0.94;
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.is-on {
+    color: var(--text-accent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.mod-danger {
+    color: var(--text-error);
+    background-color: color-mix(in srgb, var(--text-error) 14%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.mod-danger:hover {
+    background-color: color-mix(in srgb, var(--text-error) 22%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-tile.is-disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.goguryeo-grip-tile-icon .svg-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.goguryeo-grip-menu-extra:not(:empty) {
+    margin-top: 8px;
+    padding: 6px 4px 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.goguryeo-grip-menu-hint {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.goguryeo-grip-menu-places,
+.goguryeo-grip-menu-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.goguryeo-grip-menu .goguryeo-grip-place {
+    width: 38px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--text-normal) 7%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-place:hover {
+    background-color: color-mix(in srgb, var(--text-normal) 15%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-place.is-here {
+    color: var(--text-accent);
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.16);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-chip {
+    max-width: 140px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background-color: color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
+.goguryeo-grip-menu .goguryeo-grip-chip:hover {
+    background-color: color-mix(in srgb, var(--text-normal) 15%, transparent);
+}
+
+body.goguryeo-pane-dragging,
+body.goguryeo-pane-dragging * {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+
+/* A web page takes the pointer for itself: over one, the drag would never
+   hear the pointer move or let go */
+body.goguryeo-pane-dragging webview {
+    pointer-events: none !important;
+}
+
+/* The pane being moved steps back: only its page fades (a fade or scale on
+   the pane would take its pinned toolbar along) */
+body.goguryeo-split .mod-root .workspace-tabs.goguryeo-pane-lifted .workspace-leaf-content > .view-content {
+    opacity: 0.4;
+    transition: opacity 0.2s ease;
+}
+
+/* The frosted band behind the top rows, in the card layout too: each card's
+   own band starts at the card, below the rows, so the rows floated over
+   the bare background (a new window, without cards, had it). One panel
+   across the note area behind the path row and the tab row, square at the
+   top and ending just above the cards with lightly rounded corners (the
+   user's ask, 2026-11-02; it used to fade out); it goes with the rows in
+   full screen. */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    content: "";
+    position: fixed;
+    z-index: 0;
+    top: var(--g-root-top, 0px);
+    left: var(--g-root-left, 0px);
+    right: var(--g-root-right, 0px);
+    height: calc(var(--g-split-top) - 4px);
+    border-radius: 0 0 12px 12px;
+    background-color: color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+body.goguryeo-top-hidden:not(.goguryeo-top-peek).goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    opacity: 0;
+}
+
+/* Obsidian's own tab drag (a tab dropped on a pane's edge splits it): it
+   previews the target pane, shrunk, in .workspace-fake-target-overlay, a
+   copy that keeps the cards' classes. The overlay has a transform, so the
+   copy's pinned rows landed inside it and its tall top margin squeezed the
+   page to nothing. The copy is a plain card here, without the rows (the
+   real ones stay on screen), and the drop place is the same glass box as
+   a dragged pane's. */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-fake-target-overlay {
+    border: 1.5px solid var(--g-pane-border, rgba(255, 255, 255, 0.16));
+    border-radius: 16px;
+    box-shadow: var(--g-panel-shadow);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-fake-target-overlay > .workspace-tabs {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0;
+    box-shadow: none !important;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-fake-target-overlay :is(.view-header, .goguryeo-pane-grip, .workspace-tab-header-container > :not(.workspace-tab-header-container-inner)) {
+    display: none !important;
+}
+
+/* Obsidian hides the real pane meanwhile (an inline opacity: 0), and the
+   path row pinned in it went too: it stays, the rest of the pane doesn't */
+body.is-grabbing:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs[style*="opacity: 0"] {
+    opacity: 1 !important;
+    visibility: hidden;
+}
+
+body.is-grabbing:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs[style*="opacity: 0"] .workspace-leaf.mod-active > .workspace-leaf-content > .view-header,
+body.is-grabbing:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs[style*="opacity: 0"] > .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    visibility: visible;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .workspace-drop-overlay::before {
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+    border: 1.5px solid hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7);
+    border-radius: 14px;
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-panel-shadow);
+    opacity: 1;
+}
+
+/* The other panes make room while it's dragged: the companion pins each
+   card at the box the move would give it, and the cards glide there */
+body.goguryeo-pane-preview .mod-root .workspace-tabs {
+    transition: left 0.32s var(--g-spring-soft), top 0.32s var(--g-spring-soft),
+        width 0.32s var(--g-spring-soft), height 0.32s var(--g-spring-soft);
+}
+
+body.goguryeo-pane-preview .goguryeo-pane-drop {
+    transition: left 0.32s var(--g-spring-soft), top 0.32s var(--g-spring-soft),
+        width 0.32s var(--g-spring-soft), height 0.32s var(--g-spring-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.goguryeo-pane-preview .mod-root .workspace-tabs,
+    body.goguryeo-pane-preview .goguryeo-pane-drop {
+        transition: none;
+    }
+}
+
+/* Where it will go: a glass box over half the pane (an edge) or all of
+   it (the middle: swap) */
+.goguryeo-pane-drop {
+    position: fixed;
+    z-index: var(--layer-dragged-item, 80);
+    border: 1.5px solid hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7);
+    border-radius: 14px;
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-panel-shadow);
+    opacity: 0;
+    pointer-events: none;
+    transition: left 0.3s var(--g-spring-soft), top 0.3s var(--g-spring-soft),
+        width 0.3s var(--g-spring-soft), height 0.3s var(--g-spring-soft), opacity 0.15s ease;
+}
+
+.goguryeo-pane-drop.is-shown {
+    opacity: 1;
+}
+
+/* A split page dragged into the top tab bar (by its pane's bar, or out of
+   the joined tab) becomes a tab of its own: an empty glass slot opens
+   where it will stand, and a copy of the page's name follows the pointer */
+.goguryeo-stab-slot {
+    position: relative;
+    z-index: 2;
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+    border: 1.5px solid hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7);
+    border-radius: 8px;
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+}
+
+.goguryeo-stab-ghost {
+    position: fixed;
+    z-index: var(--layer-dragged-item, 80);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    border-radius: 9px;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border), var(--g-panel-shadow);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    white-space: nowrap;
+    pointer-events: none;
+    transition: scale 0.35s var(--g-spring-bounce), rotate 0.35s var(--g-spring-bounce);
+}
+
+.goguryeo-stab-ghost.is-lifted {
+    scale: 1.14;
+    rotate: -3deg;
+}
+
+.goguryeo-stab-ghost > .goguryeo-stab-close {
+    display: none;
+}
+
+.goguryeo-stab-ghost > .goguryeo-stab-title {
+    overflow: visible;
+}
+
+.goguryeo-stab-part.is-placeholder {
+    opacity: 0.3;
+}
+
+/* A normal tab lifted out of the bar: its place closes up while it's
+   carried, and the slot where it will land grows in */
+.goguryeo-stab-ghost .goguryeo-stab-inner > .goguryeo-stab-close {
+    display: none;
+}
+
+.goguryeo-shared-tabs-bar > .goguryeo-stab {
+    transition: flex-grow 0.32s var(--g-spring-soft), opacity 0.2s ease;
+}
+
+.goguryeo-shared-tabs-bar > .goguryeo-stab.is-placeholder {
+    flex-grow: 0.0001;
+    min-width: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+/* A closed tab in Obsidian's own tab row: a copy shrinks away in its place
+   (companion: onTabMutations) */
+.workspace-tab-header.goguryeo-tab-leaving {
+    flex: none !important;
+    max-width: none !important;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.workspace-tab-header.goguryeo-tab-leaving .workspace-tab-header-inner::after {
+    opacity: 0 !important;
+}
+
+/* The cards' own tab rows go; the note starts near the card's top */
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    --g-bar-offset: 4px;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    height: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container::before,
+body.goguryeo-shared-tabs.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container > .workspace-tab-header-container-inner {
+    display: none;
+}
+
+/* Only the top cards leave room for the toolbar; a card stacked under
+   another sits the usual gap below it. */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tabs:not(.mod-top) {
+    margin-top: 0;
+}
+
+/* Resize handles: Obsidian puts the bar on the card's own inner edge, so it
+   hugged one card. Fill the 10px gap between the cards instead and draw
+   the bar in its middle. A card's edge is its margin (5px, or 10px below)
+   plus its 1.5px border from the gap's far side; a nested split's edge is
+   the middle of the gap across, and the gap's bottom edge down. */
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-resize-handle {
+    border-width: 0;
+    background-clip: content-box;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-vertical, .mod-root .workspace-split.mod-vertical) > * > .workspace-leaf-resize-handle {
+    width: 10px;
+    padding-inline: 3.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-vertical, .mod-root .workspace-split.mod-vertical) > .workspace-tabs > .workspace-leaf-resize-handle {
+    inset-inline-end: -11.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-vertical, .mod-root .workspace-split.mod-vertical) > .workspace-split > .workspace-leaf-resize-handle {
+    inset-inline-end: -5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-horizontal, .mod-root .workspace-split.mod-horizontal) > * > .workspace-leaf-resize-handle {
+    height: 10px;
+    padding-block: 3.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-horizontal, .mod-root .workspace-split.mod-horizontal) > .workspace-tabs > .workspace-leaf-resize-handle {
+    bottom: -11.5px;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) :is(.mod-root.mod-horizontal, .mod-root .workspace-split.mod-horizontal) > .workspace-split > .workspace-leaf-resize-handle {
+    bottom: 0;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-content {
+    height: 100%;
+    padding-top: var(--g-bar-offset);
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] > .view-content {
+    padding-top: 0;
+    --file-margins: calc(var(--g-bar-offset) + var(--size-4-8)) var(--size-4-8) var(--size-4-8);
+}
+
+/* Fade the note out in the thin gap above the bar so nothing peeks there */
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content[data-type="markdown"] :is(.cm-scroller, .markdown-preview-view) {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+}
+
+/* Vault name + help/settings under the left sidebar: its own small glass card
+   (as specific as Obsidian's rule, which paints it solid) */
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
+    width: auto;
+    margin: 0 0 var(--g-gap) var(--g-gap);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--g-radius-card);
+    background-color: var(--glass-sidebar);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-panel-shadow);
+}
+
+/* Status bar: a floating glass chip in the bottom-right corner; the right
+   sidebar card ends above it instead of running underneath */
+body:not(.is-mobile):not(.goguryeo-no-cards) {
+    --status-bar-radius: 10px;
+    --status-bar-border-width: 1px;
+    --g-status-bar-height: 28px;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .status-bar {
+    bottom: var(--g-gap);
+    right: var(--g-gap);
+    box-shadow: var(--glass-shadow);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+    padding-bottom: calc(var(--g-status-bar-height) + var(--g-gap));
+}
+
+/* Narrow window: a sidebar that would leave the note too little room hides,
+   and the note keeps the full width. The companion picks which ones
+   (goguryeo-float-left / -right). Brought out at the window edge or with
+   its button, the sidebar floats over the note instead of pushing it
+   aside, and a click in the note closes it.
+   The "Bring out closed sidebars" option floats the same way: the companion
+   opens a closed sidebar as goguryeo-peek-left / -right when the pointer
+   reaches its edge, and closes it when the pointer leaves. */
+body:is(.goguryeo-float-left, .goguryeo-float-right, .goguryeo-peek-left, .goguryeo-peek-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace {
+    position: relative;
+}
+
+body:is(.goguryeo-float-left, .goguryeo-peek-left):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split,
+body:is(.goguryeo-float-right, .goguryeo-peek-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: var(--layer-sidedock);
+    max-width: calc(100% - 48px);
+}
+
+body:is(.goguryeo-float-left, .goguryeo-peek-left):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split {
+    left: 0;
+}
+
+/* An always-shown ribbon sits in the row; float beside it, not over it */
+body.goguryeo-ribbon-static:is(.goguryeo-float-left, .goguryeo-peek-left):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split {
+    left: var(--ribbon-width);
+}
+
+/* The hidden ribbon comes out with a peeking left sidebar, so the sidebar
+   floats just right of it */
+body.goguryeo-peek-left:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-ribbon-static) .workspace-split.mod-left-split {
+    left: calc(var(--g-gap) + var(--ribbon-width));
+}
+
+body:is(.goguryeo-float-right, .goguryeo-peek-right):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split {
+    right: 0;
+}
+
+/* Lighter, hairline dividers between stacked panes */
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-leaf-resize-handle:hover {
+    background-color: var(--background-modifier-border-hover);
+}
+
+/* A sidebar's resize handle: the 10px beside its card, with the bar in the
+   middle, not on the card's own edge (see the split panes, section 6) */
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-sidedock > .workspace-leaf-resize-handle {
+    width: 10px;
+    padding-inline: 3.5px;
+    border-width: 0;
+    background-clip: content-box;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-left-split > .workspace-leaf-resize-handle {
+    inset-inline-end: -10px;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-right-split > .workspace-leaf-resize-handle {
+    inset-inline-start: -10px;
+}
+
+/* Cards stacked in a sidebar: the usual 10px apart, and the handle between
+   them fills that gap with the bar in its middle. The upper card clips to
+   its rounded edge, so it lets the gap below it show (overflow-clip-margin). */
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock > .workspace-tabs ~ .workspace-tabs {
+    margin-top: 0;
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock > .workspace-tabs:has(~ .workspace-tabs) {
+    overflow: clip;
+    overflow-clip-margin: var(--g-gap);
+}
+
+body:not(.is-mobile):not(.goguryeo-no-cards) .mod-sidedock > .workspace-tabs > .workspace-leaf-resize-handle {
+    height: var(--g-gap);
+    bottom: calc(-1 * var(--g-gap) - 1px);
+    padding-inline: var(--g-radius-panel);
+    padding-block: 3.5px;
+    border-width: 0;
+    background-clip: content-box;
+}
+
+/* Full screen (F11) with "Hide the top rows in full screen": the path row
+   and the tab row slide up out of sight and the note takes their room
+   (companion: body goguryeo-top-hidden). The pointer resting on the top
+   edge brings them back over the note, like a closed sidebar
+   (goguryeo-top-peek); the note doesn't move. */
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-top-shift: calc(-1 * (var(--g-row2-top) + var(--g-row2-h) + 24px));
+    --g-bar-offset: 10px !important;
+    --g-split-top: var(--g-gap) !important;
+}
+
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header,
+body.goguryeo-top-hidden:not(.goguryeo-split):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
+body.goguryeo-top-hidden.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    translate: 0 var(--g-top-shift);
+    transition: translate 0.32s var(--g-spring-soft);
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content > .view-header,
+body.goguryeo-top-hidden.goguryeo-top-peek:not(.goguryeo-split):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container,
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-container > :is(.sidebar-toggle-button, .workspace-tab-header-new-tab, .workspace-tab-header-tab-list) {
+    translate: 0 0;
+}
+
+/* The shared tab row moves by its top, not a translate: a translate would
+   become the box for its pinned glass layer and drop the glass below it */
+body.goguryeo-top-hidden.goguryeo-shared-tabs.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-shared-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-top-shift)) !important;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-shared-tabs.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-shared-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px) !important;
+}
+
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar,
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .goguryeo-shared-tabs-bar::before {
+    transition: top 0.32s var(--g-spring-soft);
+}
+
+/* The panes' move bars would show through the rows */
+body.goguryeo-top-hidden.goguryeo-top-peek .mod-root .workspace-tabs > .goguryeo-pane-grip {
+    visibility: hidden;
+}
+
+/* A lone card over a background keeps its tab row inside the card. It
+   fades out (its pinned buttons slide with row 1) and comes back with the
+   card's usual place. */
+body.goguryeo-top-hidden:not(.goguryeo-top-peek).goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    --g-bar-offset: 4px;
+}
+
+body.goguryeo-top-hidden.goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.goguryeo-shared-tabs):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs > .workspace-tab-header-container {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* The frosted band behind the rows goes with them, and comes back at its
+   full height with them (the note's top room is only 10px here, and the
+   band is sized from it). In a top card it starts at the card's top. */
+body.goguryeo-top-hidden:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+    transition: opacity 0.25s ease;
+}
+
+body.goguryeo-top-hidden:not(.goguryeo-top-peek):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-leaf-content::after {
+    opacity: 0;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek:not(.goguryeo-split):not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top .workspace-leaf-content::after {
+    height: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-row2-h) + 16px);
+}
+
+/* Split screen: the rows can't float over the cards (the cards' edges and
+   the gaps between them would cut through the rows), so the cards slide
+   down to their usual place and the rows come back above them, as in the
+   normal split layout */
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-split-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px) !important;
+}
+
+body.goguryeo-top-hidden.goguryeo-top-peek.goguryeo-shared-tabs.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) {
+    --g-split-top: calc(var(--g-row1-top) + var(--g-row-h) + 8px + var(--g-row2-h) + 8px) !important;
+}
+
+body.goguryeo-top-hidden.goguryeo-split:not(.is-mobile):not(.goguryeo-no-cards) .mod-root .workspace-tabs.mod-top {
+    transition: margin-top 0.32s var(--g-spring-soft);
+}
+
+

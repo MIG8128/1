@@ -1,0 +1,133 @@
+/* -------------------------------------------------------------------------
+   1. Palette — Apple system grays, green accent
+   ------------------------------------------------------------------------- */
+
+body {
+    --g-blur: 16px;
+    --g-glass-tint: 62%;
+    --g-line-height: 1.85;
+    --g-ribbon-hotzone: 12px;
+
+    --g-gap: 10px;
+    --g-radius-card: 14px;
+    --g-radius-panel: 18px;
+    /* Motion: one set of curves and times for everything that moves (section
+       13, the tab glass, the cards), the same the companion uses (EASE, DUR) */
+    --g-ease: cubic-bezier(0.2, 0.8, 0.2, 1); /* settling: slides and fades in */
+    --g-spring: cubic-bezier(0.3, 1.3, 0.4, 1); /* menus and panels opening, the tab glass */
+    --g-spring-soft: cubic-bezier(0.3, 1.15, 0.4, 1); /* gliding to a new place, making room */
+    --g-spring-bounce: cubic-bezier(0.3, 1.5, 0.4, 1); /* tabs and slots growing in */
+    --g-dur-in: 0.24s; /* menus, panels, dialogs coming in */
+    --g-dur-out: 0.15s; /* anything going away */
+
+    --font-interface-theme: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", "Apple SD Gothic Neo",
+        "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+    --font-text-theme: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", "Apple SD Gothic Neo",
+        "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+    --font-monospace-theme: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+
+    --line-height-normal: var(--g-line-height);
+    --checkbox-radius: 50%;
+
+    --radius-s: 6px;
+    --radius-m: 8px;
+    --radius-l: 12px;
+    --radius-xl: 16px;
+}
+
+body.is-mobile {
+    --g-blur: 12px;
+}
+
+.theme-light {
+    --accent-h: 135;
+    --accent-s: 59%;
+    --accent-l: 42%;
+
+    --g-gray: #8e8e93;
+    --g-gray2: #aeaeb2;
+    --g-gray3: #c7c7cc;
+    --g-gray4: #d1d1d6;
+    --g-gray5: #e5e5ea;
+    --g-gray6: #f2f2f7;
+    --g-sidebar-base: #f5f5f8;
+
+    --background-primary: #ffffff;
+    --background-primary-alt: #f9f9fb;
+    --background-secondary: var(--g-sidebar-base);
+    --background-secondary-alt: var(--g-gray5);
+    --background-modifier-border: rgba(0, 0, 0, 0.09);
+    --background-modifier-border-hover: rgba(0, 0, 0, 0.14);
+    --background-modifier-border-focus: rgba(0, 0, 0, 0.2);
+    --background-modifier-hover: rgba(0, 0, 0, 0.045);
+    --background-modifier-active-hover: rgba(0, 0, 0, 0.07);
+    --background-modifier-form-field: rgba(0, 0, 0, 0.035);
+    --interactive-normal: #ffffff;
+    --interactive-hover: var(--g-gray6);
+
+    --text-normal: #1d1d1f;
+    --text-muted: #6e6e73;
+    --text-faint: #aeaeb2;
+    --divider-color: rgba(0, 0, 0, 0.08);
+
+    --g-panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.10);
+}
+
+.theme-dark {
+    --accent-h: 135;
+    --accent-s: 64%;
+    --accent-l: 50%;
+
+    --g-gray: #8e8e93;
+    --g-gray2: #636366;
+    --g-gray3: #48484a;
+    --g-gray4: #3a3a3c;
+    --g-gray5: #2c2c2e;
+    --g-gray6: #1c1c1e;
+    --g-sidebar-base: #2c2c2e;
+
+    --background-primary: #1c1c1e;
+    --background-primary-alt: #232325;
+    --background-secondary: var(--g-sidebar-base);
+    --background-secondary-alt: var(--g-gray5);
+    --background-modifier-border: rgba(255, 255, 255, 0.10);
+    --background-modifier-border-hover: rgba(255, 255, 255, 0.15);
+    --background-modifier-border-focus: rgba(255, 255, 255, 0.22);
+    --background-modifier-hover: rgba(255, 255, 255, 0.06);
+    --background-modifier-active-hover: rgba(255, 255, 255, 0.10);
+    --background-modifier-form-field: rgba(255, 255, 255, 0.05);
+    --interactive-normal: var(--g-gray5);
+    --interactive-hover: var(--g-gray4);
+
+    --text-normal: #f5f5f7;
+    --text-muted: #a1a1a6;
+    --text-faint: #636366;
+    --divider-color: rgba(255, 255, 255, 0.08);
+
+    --g-panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.30), 0 16px 40px rgba(0, 0, 0, 0.38);
+}
+
+.theme-light,
+.theme-dark {
+    --text-selection: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.25);
+    --tag-color: var(--text-muted);
+    --tag-color-hover: var(--text-normal);
+    --tag-background: var(--background-modifier-hover);
+    --tag-background-hover: var(--background-modifier-active-hover);
+    --tag-border-width: 0px;
+}
+
+/* Links: gray with a green underline unless "Green links" is on */
+body:not(.goguryeo-accent-links) {
+    --link-color: var(--text-normal);
+    --link-color-hover: var(--text-accent);
+    --link-external-color: var(--text-normal);
+    --link-external-color-hover: var(--text-accent);
+    --link-unresolved-color: var(--text-muted);
+}
+
+body:not(.goguryeo-accent-links) :is(.internal-link, .external-link, .cm-hmd-internal-link .cm-underline, .cm-link .cm-underline, .cm-url .cm-underline) {
+    text-decoration-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.6);
+}
+
+

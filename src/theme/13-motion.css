@@ -1,0 +1,128 @@
+/* -------------------------------------------------------------------------
+   13. Motion
+   ------------------------------------------------------------------------- */
+
+/* Startup. Obsidian draws the workspace before the plugins are done, so it
+   used to rebuild before your eyes: the plain dark look, then the
+   background, then the floating card. The panes now stay hidden until the
+   companion has laid them out (body.goguryeo-ready), fade in once, and
+   then the background picture fades in under the glass (goguryeo-bg-shown,
+   once it has loaded; section 12 keeps it hidden until then). Without the
+   companion they show anyway after 1.6s. Fill "backwards" only: once done,
+   the animations leave the elements' own opacity alone. */
+@keyframes goguryeo-startup-hold {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes goguryeo-startup-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+body:not(.goguryeo-ready) :is(.workspace, .status-bar, .mobile-navbar) {
+    animation: goguryeo-startup-hold 0.3s ease-out 1.6s backwards;
+}
+
+body.goguryeo-ready :is(.workspace, .status-bar, .mobile-navbar) {
+    animation: goguryeo-startup-in 0.32s ease-out backwards;
+}
+
+@keyframes goguryeo-bg-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+body.goguryeo-bg-image.goguryeo-bg-shown .app-container::before {
+    animation: goguryeo-bg-in 0.6s ease-out backwards;
+}
+
+/* Floating glass comes in instead of popping up: menus, the command
+   palette and quick switcher, dialogs, link previews, suggestions, notices
+   and tooltips grow out of a slightly smaller, see-through self with a
+   small spring (iOS 26). The individual scale / translate properties add
+   to what the theme already places with transform (Find in note). Only in
+   (Obsidian removes them at once when they close). The iPhone keeps
+   Obsidian's own sheets. */
+body {
+    --g-pop: var(--g-spring);
+}
+
+@keyframes goguryeo-pop-in {
+    from { opacity: 0; scale: 0.94; }
+}
+
+@keyframes goguryeo-drop-in {
+    from { opacity: 0; scale: 0.97; translate: 0 -6px; }
+}
+
+@keyframes goguryeo-rise-in {
+    from { opacity: 0; scale: 0.97; translate: 0 8px; }
+}
+
+@keyframes goguryeo-slide-in {
+    from { opacity: 0; translate: 24px 0; }
+}
+
+@keyframes goguryeo-fade-in {
+    from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    /* menus open from the corner at the pointer */
+    body:not(.is-phone) .menu {
+        transform-origin: top left;
+        animation: goguryeo-pop-in var(--g-dur-in) var(--g-pop);
+    }
+
+    /* the command palette and quick switcher drop down (from the path
+       capsule when docked there) */
+    body:not(.is-phone) .modal-container .prompt {
+        transform-origin: top center;
+        animation: goguryeo-drop-in var(--g-dur-in) var(--g-pop);
+    }
+
+    body:not(.is-phone) .modal-container .modal {
+        animation: goguryeo-pop-in var(--g-dur-in) var(--g-pop);
+    }
+
+    .modal-container .modal-bg {
+        animation: goguryeo-fade-in 0.2s ease-out;
+    }
+
+    .popover.hover-popover,
+    .suggestion-container {
+        transform-origin: top left;
+        animation: goguryeo-pop-in 0.18s var(--g-pop);
+    }
+
+    .notice {
+        animation: goguryeo-slide-in 0.3s var(--g-pop);
+    }
+
+    /* on a phone notices come from the top */
+    body.is-phone .notice {
+        animation-name: goguryeo-drop-in;
+    }
+
+    .tooltip {
+        animation: goguryeo-fade-in 0.12s ease-out;
+    }
+
+    /* Find in note rises out of the bottom of the note */
+    body .workspace-leaf-content .document-search-container {
+        animation: goguryeo-rise-in var(--g-dur-in) var(--g-pop);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body:not(.is-mobile) .workspace-ribbon.mod-primary {
+        transition: none;
+    }
+
+    /* still in one piece, but at once */
+    body.goguryeo-ready :is(.workspace, .status-bar, .mobile-navbar),
+    body.goguryeo-bg-image.goguryeo-bg-shown .app-container::before {
+        animation-duration: 1ms;
+    }
+}

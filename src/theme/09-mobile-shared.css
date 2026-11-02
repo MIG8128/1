@@ -1,0 +1,194 @@
+/* -------------------------------------------------------------------------
+   9. Mobile — shared (iPhone + iPad)
+   ------------------------------------------------------------------------- */
+
+body.is-mobile {
+    --mobile-sidebar-background: var(--glass-sidebar);
+    --tab-switcher-menubar-background: var(--glass-bg);
+}
+
+/* Glass drawers. The blur lives on a pseudo-element so the drawer itself
+   does not trap fixed-position children (the iPad sidebar buttons). */
+.workspace-drawer {
+    isolation: isolate;
+    background-color: transparent;
+}
+
+.workspace-drawer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-color: var(--glass-sidebar);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 0.5px var(--glass-border);
+    pointer-events: none;
+}
+
+/* Obsidian paints the drawer's insides solid, over the glass; clear them
+   so the Sidebar opacity setting shows… */
+body.is-mobile :is(.workspace-drawer-inner, .workspace-drawer-active-tab-container) {
+    background-color: transparent;
+}
+
+/* …and fades its lists out into that solid color, which over glass is a
+   dark band */
+body.is-mobile .workspace-drawer :is(.nav-buttons-container, .workspace-leaf-content)::after {
+    display: none;
+}
+
+/* Properties: on mobile Obsidian boxes them in a solid card
+   (--background-primary-alt), pulled 12px out to the left. Drop the card
+   so they sit on the note's glass like on desktop */
+body.is-mobile .metadata-content {
+    background-color: transparent;
+    transform: none;
+    width: auto;
+    padding: 0;
+}
+
+.mobile-tab-switcher-menubar {
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* Back / forward edge swipe (companion plugin), Safari style: the page
+   slides with the finger and the one it goes to shows from underneath. The
+   real page hides while a stage of still copies (.goguryeo-swipe-page)
+   plays it out over the leaf. */
+.goguryeo-swiping > .view-content {
+    visibility: hidden;
+}
+
+.goguryeo-swipe-stage {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .goguryeo-swipe-stage {
+    border-radius: 14.5px;
+}
+
+.goguryeo-swipe-page {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+}
+
+.goguryeo-swipe-page > .workspace-leaf-content {
+    position: absolute;
+    inset: 0;
+}
+
+.goguryeo-swipe-page > .workspace-leaf-content::after {
+    display: none;
+}
+
+/* The top page casts a shadow onto the one it uncovers, which is dimmed
+   a little until it is fully out */
+.goguryeo-swipe-page.is-over {
+    box-shadow: -10px 0 28px rgba(0, 0, 0, 0.3);
+}
+
+.goguryeo-swipe-dim {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.goguryeo-swipe-stage.is-settling > .goguryeo-swipe-page {
+    transition: transform 0.28s var(--g-ease), clip-path 0.28s var(--g-ease);
+}
+
+/* Chrome-style trackpad swipe (companion option): a round glass arrow
+   comes in from the side; filled once letting go would go */
+.goguryeo-swipe-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: var(--layer-popover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-top: -22px;
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    background-color: var(--glass-bg-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+    color: var(--text-muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+
+.goguryeo-swipe-arrow.is-back {
+    left: 0;
+}
+
+.goguryeo-swipe-arrow.is-forward {
+    right: 0;
+}
+
+.goguryeo-swipe-arrow.is-armed {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.goguryeo-swipe-arrow.is-settling {
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
+/* A web page's picture fades off it once the page has loaded again */
+.goguryeo-swipe-stage.is-lifting {
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+}
+
+.goguryeo-swipe-stage.is-settling .goguryeo-swipe-dim {
+    transition: opacity 0.28s ease-out;
+}
+
+/* A web viewer's page is a picture of it (a <webview> can't be copied) */
+.goguryeo-swipe-page .goguryeo-swipe-shot {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top left;
+    background-color: var(--background-primary);
+}
+
+/* No copy of that page yet (e.g. right after starting Obsidian): its
+   name and icon instead */
+.goguryeo-swipe-blank {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 32px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-semibold);
+    text-align: center;
+}
+
+.goguryeo-swipe-blank-icon .svg-icon {
+    --icon-size: 32px;
+    color: var(--text-faint);
+}
+
+

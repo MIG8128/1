@@ -1,0 +1,81 @@
+/* -------------------------------------------------------------------------
+   8. Desktop ribbon — hidden, slides out like a drawer at the left edge
+      Mouse:      hover the left edge.
+      Touchscreen: a small grab handle shows on the left edge; tap it.
+      Plugins can add body.goguryeo-touch-active to keep it open.
+   ------------------------------------------------------------------------- */
+
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary {
+    position: fixed;
+    top: calc(var(--header-height) + var(--g-gap));
+    bottom: calc(var(--g-gap) * 4);
+    left: var(--g-gap);
+    height: auto;
+    margin: 0;
+    padding: var(--size-4-2) 0;
+    overflow: visible;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--g-radius-panel);
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+    z-index: calc(var(--layer-status-bar) + 1);
+    opacity: 0;
+    transform: translateX(calc(-100% - var(--g-gap) - 4px));
+    transition: transform 260ms var(--g-ease) 400ms, opacity 180ms ease 400ms;
+}
+
+/* The header filler Obsidian draws above the ribbon */
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary::before {
+    display: none;
+}
+
+/* Obsidian moves the sidebar button out of a floating ribbon on its next
+   layout pass; until then keep it as a normal first item, not overlapping */
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary .sidebar-toggle-button {
+    position: static;
+    height: auto;
+    padding: 0 0 var(--size-4-2);
+}
+
+/* Hover zone: covers the ribbon plus the gap on its left and a strip on its
+   right, from below the title bar to the window bottom. Hidden, only that
+   right strip pokes in from the window edge; shown, the pointer can rest
+   anywhere from the very edge to just past the ribbon without closing it. */
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: calc(var(--g-gap) * -1);
+    bottom: calc(var(--g-gap) * -4);
+    left: calc(var(--g-gap) * -1 - 2px);
+    right: calc((var(--g-ribbon-hotzone) + 4px) * -1);
+    -webkit-app-region: no-drag;
+}
+
+body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within),
+body.goguryeo-touch-active:not(.is-mobile) .workspace-ribbon.mod-primary,
+body.goguryeo-peek-left:not(.is-mobile):not(.goguryeo-no-cards) .workspace-ribbon.mod-primary {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0ms;
+}
+
+/* Touchscreen PCs: show a grab handle on the edge */
+@media (any-pointer: coarse) {
+    body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary::after {
+        right: calc((28px + 4px) * -1);
+        background-image: linear-gradient(var(--text-faint), var(--text-faint));
+        background-repeat: no-repeat;
+        background-size: 6px 56px;
+        background-position: right 8px center;
+    }
+
+    body:not(.is-mobile):not(.goguryeo-ribbon-static) .workspace-ribbon.mod-primary:is(:hover, :focus-within)::after,
+    body:not(.is-mobile):not(.goguryeo-ribbon-static):is(.goguryeo-touch-active, .goguryeo-peek-left) .workspace-ribbon.mod-primary::after {
+        background-image: none;
+    }
+}
+
+

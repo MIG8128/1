@@ -1,7 +1,12 @@
+# companion/src -> companion/main.js 자동 빌드
+npm --prefix companion run build
 # Copies the theme and its companion plugin into the Obsidian vault.
 # Run after every change:
 #   powershell -ExecutionPolicy Bypass -File deploy.ps1
 # Then reload Obsidian (Ctrl+R) to see it.
+
+
+
 
 $obsidian = "C:\Users\MIG\Documents\obsidian\mig8128\.obsidian"
 $vaultTheme = "$obsidian\themes\Goguryeo"

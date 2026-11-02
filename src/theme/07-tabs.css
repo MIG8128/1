@@ -1,0 +1,574 @@
+/* -------------------------------------------------------------------------
+   7. Tabs
+      Sidebars: icons inside one bordered pill (like the Border theme).
+      Editor tabs: centered in one pill in the main tab bar.
+      Active tab = raised glass; with the companion plugin, that glass slides
+      to the newly picked tab with a liquid swell.
+   ------------------------------------------------------------------------- */
+
+body {
+    --tab-radius: 8px;
+    --tab-radius-active: 8px;
+    /* The tab under the glass reads bright in every pane; the rest stay faint */
+    --tab-text-color: var(--text-faint);
+    --tab-text-color-focused: var(--text-muted);
+    --tab-text-color-active: var(--text-normal);
+    --tab-text-color-focused-active: var(--text-normal);
+}
+
+.workspace-tab-header-container .workspace-tab-header::before,
+.workspace-tab-header-container .workspace-tab-header::after {
+    display: none;
+}
+
+.workspace-tab-header-container .workspace-tab-header.is-active {
+    box-shadow: none;
+    background-color: transparent;
+}
+
+.workspace-tab-header-container .workspace-tab-header.is-active .workspace-tab-header-inner {
+    background: var(--glass-thumb);
+    box-shadow: var(--glass-thumb-shadow);
+}
+
+@media (hover: hover) {
+    .workspace-tab-header-container .workspace-tab-header:not(.is-active):hover {
+        background-color: transparent;
+        box-shadow: none;
+    }
+
+    .workspace-tab-header-container .workspace-tab-header:not(.is-active):hover .workspace-tab-header-inner {
+        background-color: var(--background-modifier-hover);
+    }
+}
+
+/* Sliding glass thumb (drawn by the companion plugin under the active tab) */
+body.goguryeo-glass-thumbs .workspace-tab-header-container .workspace-tab-header.is-active .workspace-tab-header-inner {
+    background: transparent;
+    box-shadow: none;
+}
+
+body.goguryeo-glass-thumbs .workspace-tab-header-container > .workspace-tab-header-container-inner {
+    position: relative;
+    z-index: 1;
+}
+
+/* Same motion as Day Planner Pro's glass segmented control: the glide is a
+   springy curve that overshoots a little, and the swell is a separate,
+   quicker scale, so the drop of glass grows and settles without wobbling */
+.goguryeo-tab-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: var(--g-thumb-w);
+    height: var(--g-thumb-h);
+    border-radius: 8px;
+    background: var(--glass-thumb);
+    box-shadow: var(--glass-thumb-shadow);
+    -webkit-backdrop-filter: blur(calc(var(--g-blur) * 0.625)) saturate(1.8);
+    backdrop-filter: blur(calc(var(--g-blur) * 0.625)) saturate(1.8);
+    transform: translate(var(--g-thumb-x), var(--g-thumb-y));
+    pointer-events: none;
+    transition: transform 0.42s var(--g-spring), width 0.42s var(--g-spring),
+        scale 0.2s ease;
+}
+
+.mod-sidedock .goguryeo-tab-thumb {
+    border-radius: 7px;
+}
+
+.goguryeo-tab-thumb.is-placing {
+    transition: none;
+}
+
+/* Swells a little while moving */
+.goguryeo-tab-thumb.is-moving {
+    scale: 1.06 1.12;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .goguryeo-tab-thumb {
+        transition: none;
+    }
+
+    .goguryeo-tab-thumb.is-moving {
+        scale: none;
+    }
+}
+
+/* Sidebar tab pill: the whole tab bar row becomes one rounded pill as wide
+   as the sidebar, its tab buttons sharing that width equally */
+.mod-sidedock .workspace-tabs > .workspace-tab-header-container {
+    align-self: stretch;
+    width: auto;
+    height: auto;
+    margin: 6px 8px;
+    padding: 3px;
+    gap: 2px;
+    border-bottom: none;
+    border-radius: 10px;
+    background: var(--glass-track);
+    box-shadow: var(--glass-track-shadow);
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header-inner {
+    position: relative;
+    justify-content: center;
+}
+
+/* Like the editor tab divider (section 6), but a softer hairline between
+   the icons */
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header-inner::after {
+    content: "";
+    position: absolute;
+    top: 25%;
+    inset-inline-end: 0;
+    width: 1px;
+    height: 50%;
+    background-color: var(--g-sidebar-tab-divider);
+    transition: opacity 0.15s ease;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header:is(.is-active, :has(+ .is-active), :last-child) .workspace-tab-header-inner::after {
+    opacity: 0;
+}
+
+@media (hover: hover) {
+    .mod-sidedock .workspace-tab-header-container .workspace-tab-header:is(:hover, :has(+ :hover)) .workspace-tab-header-inner::after {
+        opacity: 0;
+    }
+}
+
+/* Obsidian reserves room for the window buttons as padding inside the tab
+   bar; keep the pill's own padding (the right sidebar now starts below the
+   Windows buttons, and macOS's traffic lights are kept clear on the left) */
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-right-space > .workspace-tab-header-container {
+    padding: 3px;
+}
+
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-left-space > .workspace-tab-header-container {
+    padding: 3px;
+    margin-inline-start: calc(8px + var(--frame-left-space));
+}
+
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-right-space > .workspace-tab-header-container::after {
+    right: calc(var(--frame-right-space) * -1);
+}
+
+.is-hidden-frameless:not(.is-fullscreen) .mod-sidedock .workspace-tabs.mod-top-left-space > .workspace-tab-header-container::before {
+    left: calc(var(--frame-left-space) * -1);
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header-container-inner {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header-spacer {
+    display: none;
+}
+
+/* Sidebar collapse buttons as "tabs" in the pill: first in the left sidebar,
+   last in the right one (the companion plugin moves the right one in),
+   each with a hairline between it and the tabs */
+.mod-sidedock .workspace-tab-header-container > .sidebar-toggle-button {
+    height: auto;
+    padding: 0;
+    align-items: center;
+    gap: 2px;
+}
+
+.mod-sidedock .workspace-tab-header-container > .sidebar-toggle-button .clickable-icon {
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 7px;
+}
+
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button {
+    order: -1;
+}
+
+.mod-right-split .workspace-tab-header-container > .sidebar-toggle-button {
+    order: 99;
+}
+
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button::after,
+.mod-right-split .workspace-tab-header-container > .sidebar-toggle-button::before {
+    content: "";
+    width: 1px;
+    height: 14px;
+    background-color: var(--background-modifier-border);
+}
+
+.mod-left-split .workspace-tab-header-container > .sidebar-toggle-button::after {
+    margin-inline-start: 2px;
+}
+
+.mod-right-split .workspace-tab-header-container > .sidebar-toggle-button::before {
+    margin-inline-end: 2px;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header {
+    padding: 0;
+}
+
+.mod-sidedock .workspace-tab-header-inner {
+    padding: 0 9px;
+    border-radius: 7px;
+}
+
+.mod-sidedock .workspace-tab-header-container .workspace-tab-header:not(.is-active) .workspace-tab-header-inner-icon {
+    opacity: 0.7;
+}
+
+/* Tab overview (companion plugin), desktop and iPad, Safari style: the ⌄
+   tab list becomes ⧉, which lays every tab out as a card with its page.
+   A right click on ⧉ still opens Obsidian's tab menu. */
+.goguryeo-overview-icon {
+    display: none;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-tab-list > .clickable-icon > .goguryeo-overview-icon {
+    display: flex;
+}
+
+body:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .mod-root .workspace-tab-header-tab-list > .clickable-icon:has(> .goguryeo-overview-icon) > svg {
+    display: none;
+}
+
+body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clickable-icon {
+    color: var(--text-normal);
+    background-color: var(--glass-thumb);
+}
+
+.goguryeo-tab-overview {
+    position: fixed;
+    z-index: calc(var(--layer-sidedock) - 1);
+    display: flex;
+    flex-direction: column;
+    border-radius: 14.5px;
+    background-color: color-mix(in srgb, var(--g-split-canvas) 78%, transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+    -webkit-app-region: no-drag;
+}
+
+/* ( + ) ( Done ) at the top right */
+.goguryeo-tab-overview-bar {
+    flex: none;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px 0;
+}
+
+.goguryeo-tab-overview-bar > :is(.clickable-icon, .goguryeo-tab-overview-done) {
+    height: 30px;
+    border-radius: 999px;
+    background-color: var(--glass-bg);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+.goguryeo-tab-overview-bar > .clickable-icon {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
+}
+
+.goguryeo-tab-overview-done {
+    padding: 0 14px;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-semibold);
+}
+
+/* Opening and closing the overview zooms (companion: zoomCopy): a copy of
+   a card's picture flies between the page and its card, above the sheet
+   (on iPhone, above Obsidian's own tab switcher) */
+.goguryeo-zoom-copy {
+    position: fixed !important;
+    z-index: calc(var(--layer-modal) + 1);
+    inset: auto;
+    margin: 0;
+    transform-origin: 0 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: none !important;
+    /* its own GPU layer, painted once and only moved */
+    will-change: transform, opacity;
+    contain: strict;
+}
+
+.goguryeo-zoom-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--layer-modal);
+    pointer-events: none;
+}
+
+/* Switching tabs (desktop and iPad, companion: slideTabs): the tab left
+   behind stays on screen for the slide, under the new one, see-through so
+   the new page shows where the old one has moved away from. Its own rows
+   (the path row) stay hidden, the new tab's are the ones in place. */
+.mod-root .workspace-tab-container:has(> .workspace-leaf.goguryeo-page-out) {
+    position: relative;
+}
+
+.mod-root .workspace-leaf.goguryeo-page-out {
+    display: flex !important;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.mod-root .workspace-leaf.goguryeo-page-out :is(.workspace-leaf-content, .view-content) {
+    background: transparent !important;
+}
+
+/* ...and without its glass (the card behind the note, the blur behind the
+   rows): over the new page it would blur it away */
+.mod-root .workspace-leaf.goguryeo-page-out::before,
+.mod-root .workspace-leaf.goguryeo-page-out::after,
+.mod-root .workspace-leaf.goguryeo-page-out .workspace-leaf-content::before,
+.mod-root .workspace-leaf.goguryeo-page-out .workspace-leaf-content::after {
+    display: none !important;
+}
+
+.mod-root .workspace-leaf.goguryeo-page-out .view-header {
+    visibility: hidden;
+}
+
+/* Switching between a split and a lone tab (companion: slideScreen): still
+   copies of the cards that were on screen slide out, clipped to the panes'
+   area, over the cards coming on screen. Their path rows stay hidden: the
+   real one is in place. */
+.goguryeo-screen-out {
+    position: fixed;
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.goguryeo-screen-out-track {
+    position: absolute;
+    inset: 0;
+}
+
+.goguryeo-screen-out .goguryeo-screen-shot {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top left;
+}
+
+.goguryeo-screen-out .view-header,
+.goguryeo-screen-out .goguryeo-pane-grip {
+    visibility: hidden;
+}
+
+/* One grid of every tab, in the tab row's order */
+.goguryeo-tab-overview-panes {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.goguryeo-tab-overview-grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    align-content: start;
+    gap: 22px 18px;
+    padding: 12px 20px 24px;
+    overflow-y: auto;
+}
+
+.goguryeo-tab-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.goguryeo-tab-card-thumb {
+    position: relative;
+    aspect-ratio: var(--g-card-ratio, 4 / 3);
+    overflow: hidden;
+    border-radius: 12px;
+    background-color: var(--background-primary);
+    box-shadow: 0 0 0 1px var(--glass-border), 0 6px 18px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* The current tab, ringed like the iPhone's tab overview */
+.goguryeo-tab-card.is-current .goguryeo-tab-card-thumb {
+    box-shadow: 0 0 0 2px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7),
+        0 0 0 6px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14),
+        0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+@media (hover: hover) {
+    .goguryeo-tab-card:hover .goguryeo-tab-card-thumb {
+        transform: scale(1.02);
+    }
+}
+
+/* No scrollbars in the copies */
+.goguryeo-tab-card-thumb ::-webkit-scrollbar {
+    display: none;
+}
+
+/* The page at the note's own size, shrunk to the card */
+.goguryeo-tab-card-thumb > .goguryeo-swipe-page {
+    inset: auto;
+    top: 0;
+    left: 0;
+    width: var(--g-page-w);
+    height: var(--g-page-h);
+    transform: scale(var(--g-card-scale, 0.25));
+    transform-origin: 0 0;
+    will-change: auto;
+    pointer-events: none;
+}
+
+.goguryeo-tab-card-thumb > .goguryeo-swipe-page .goguryeo-swipe-blank-icon .svg-icon {
+    --icon-size: 64px;
+}
+
+.goguryeo-tab-card-thumb > .goguryeo-swipe-page .goguryeo-swipe-blank {
+    font-size: 2em;
+}
+
+/* Split screen (Chrome style): the split is one wide card, a small map of
+   the panes as they are laid out; the companion places each page (left,
+   top, width, height in %), sizes the card to the panes' area and draws
+   each page at its pane's real size. The focused page is ringed. */
+.goguryeo-tab-card.is-split .goguryeo-tab-card-thumb {
+    aspect-ratio: auto;
+    background-color: var(--glass-border);
+}
+
+.goguryeo-tab-card-part {
+    position: absolute;
+    overflow: hidden;
+    background-color: var(--background-primary);
+    box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+.goguryeo-tab-card-part > .goguryeo-swipe-page {
+    inset: auto;
+    top: 0;
+    left: 0;
+    width: var(--g-page-w);
+    height: var(--g-page-h);
+    transform: scale(var(--g-card-scale, 0.25));
+    transform-origin: 0 0;
+    will-change: auto;
+    pointer-events: none;
+}
+
+.goguryeo-tab-card-part > .goguryeo-swipe-page .goguryeo-swipe-blank-icon .svg-icon {
+    --icon-size: 64px;
+}
+
+.goguryeo-tab-card-part > .goguryeo-swipe-page .goguryeo-swipe-blank {
+    font-size: 2em;
+}
+
+/* The focused page of the split, ringed inside the card */
+.goguryeo-tab-card-part.is-focused::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 0 2px hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.7);
+    pointer-events: none;
+}
+
+/* × · icon · name under the card */
+.goguryeo-tab-card-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0 4px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.goguryeo-tab-card.is-current .goguryeo-tab-card-label {
+    color: var(--text-normal);
+}
+
+.goguryeo-tab-card-icon {
+    display: flex;
+    flex: none;
+    --icon-size: 14px;
+}
+
+.goguryeo-tab-card-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.goguryeo-tab-card-close {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    --icon-size: 12px;
+}
+
+@media (hover: hover) {
+    .goguryeo-tab-card:not(:hover) .goguryeo-tab-card-close {
+        opacity: 0;
+    }
+}
+
+/* A card being dragged to a new spot (companion): a copy of it (the ghost)
+   lifts and follows the pointer, among any pane's cards; the card stays
+   behind as an empty slot where it would land, and
+   the others slide out of its way */
+.goguryeo-tab-card {
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.goguryeo-tab-card-ghost {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    transform-origin: 0 0;
+}
+
+.goguryeo-tab-card.is-placeholder {
+    visibility: hidden;
+}
+
+.goguryeo-tab-card.is-lifted .goguryeo-tab-card-thumb {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 1px var(--glass-border), 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+

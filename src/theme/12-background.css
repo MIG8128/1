@@ -1,0 +1,265 @@
+/* -------------------------------------------------------------------------
+   12. Background — a color or a picture behind everything, so the glass has
+       something to show. The note area turns see-through over it. The
+       companion plugin turns the image setting (--g-bg-image, a vault path
+       or link) into --g-bg-url.
+   ------------------------------------------------------------------------- */
+
+/* The note is the same glass, set by Glass opacity: a little more solid
+   than the sidebars over an image (72% at the default 62%) */
+body {
+    --g-bg-blur: 0px;
+    --g-bg-dim: 40%;
+    --g-note-tint: min(100%, calc(var(--g-glass-tint) + 10%));
+}
+
+/* A plain color needs no help with legibility, so let more of it through
+   (40% at the default) */
+body.goguryeo-bg-color {
+    --g-note-tint: max(0%, calc(var(--g-glass-tint) - 22%));
+}
+
+.theme-light {
+    --g-bg-color: #c8d4e0;
+    --g-bg-veil: #ffffff;
+}
+
+.theme-dark {
+    --g-bg-color: #1d2a36;
+    --g-bg-veil: #000000;
+}
+
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) {
+    --g-note-bg: color-mix(in srgb, var(--background-primary) var(--g-note-tint), transparent);
+}
+
+/* Plain and Color: the sidebars wear the note card's own color, not the
+   lighter sidebar gray, which looked off beside it (the user's ask,
+   2026-11-02). Over an image they stay glass. */
+body:is(.theme-dark, .theme-light):not(.goguryeo-bg-color):not(.goguryeo-bg-image) {
+    --glass-sidebar: var(--background-primary);
+}
+
+body:is(.theme-dark, .theme-light).goguryeo-bg-color {
+    --glass-sidebar: var(--g-note-bg);
+}
+
+body.goguryeo-bg-color .app-container {
+    background-color: var(--g-bg-color);
+}
+
+body.goguryeo-bg-image .app-container {
+    isolation: isolate;
+    background-color: var(--background-primary);
+}
+
+/* The picture, with the dim veil on top; oversized so the blur has no
+   soft edges */
+body.goguryeo-bg-image .app-container::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: calc(var(--g-bg-blur) * -2);
+    background:
+        linear-gradient(color-mix(in srgb, var(--g-bg-veil) var(--g-bg-dim), transparent) 0 0),
+        var(--g-bg-url, none) center / cover no-repeat;
+    filter: blur(var(--g-bg-blur));
+    pointer-events: none;
+}
+
+/* ...shown once the companion has loaded it (it then fades in, section 13);
+   until then the plain dark (or light) base, which the glass matches */
+body.goguryeo-bg-image:not(.goguryeo-bg-shown) .app-container::before {
+    opacity: 0;
+}
+
+/* Mobile keyboard: Obsidian shortens the app to end above it, but the
+   keyboard's rounded corners show what's below. The picture (with its dim
+   and blur) already spans the screen, as the app box is not positioned;
+   a plain color and, on iPhone, the note's tint carry on down there too. */
+body.is-mobile.goguryeo-bg-color .app-container {
+    isolation: isolate;
+}
+
+
+body.is-mobile.goguryeo-bg-color .app-container::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;
+    background-color: var(--g-bg-color);
+    pointer-events: none;
+}
+
+body.is-phone:is(.goguryeo-bg-color, .goguryeo-bg-image) .app-container::after {
+    content: "";
+    position: absolute;
+    top: calc(100vh - var(--keyboard-height));
+    left: 0;
+    right: 0;
+    height: var(--keyboard-height);
+    background-color: var(--g-note-bg);
+    pointer-events: none;
+}
+
+/* Phones paint the note area itself too */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root {
+    background-color: transparent;
+}
+
+/* ...as frosted glass, like the sidebars: Glass opacity tints it and Blur
+   strength frosts what's behind. The glass is a layer under the pane
+   (Obsidian isolates each pane), not the pane itself: a backdrop-filter
+   on the pane would trap the shared toolbar pinned outside it. */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .workspace-leaf {
+    background-color: transparent;
+}
+
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .workspace-leaf::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    background-color: var(--g-note-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+}
+
+/* The big glass over a still background doesn't blur live. A live blur
+   (backdrop-filter) is worked out again on every frame anything under or
+   over it changes (typing, scrolling, switching tabs), and over the note
+   area and the sidebars that tripled the time of each frame (measured).
+   Over a plain color there is nothing to blur: off. Over a picture, on
+   desktop, the companion blurs the picture once as the glass would
+   (goguryeo-glass-baked, --g-bg-glass: the glass's blur and saturation,
+   the background's own blur and dim), and these panels show that copy
+   fixed to the window, under their usual tint: the same look. Only while
+   they sit over nothing but the background: a sidebar floating over the
+   note, the ribbon, menus and the bars over scrolling text keep the live
+   blur, and so do iPad and iPhone (Safari ignores fixed backgrounds). */
+body.goguryeo-bg-color .workspace-split.mod-root .workspace-leaf::before {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-bg-image.goguryeo-glass-baked .workspace-split.mod-root .workspace-leaf::before {
+    background: linear-gradient(var(--g-note-bg), var(--g-note-bg)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ...the docked sidebars and the vault card under the left one */
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .mod-left-split .workspace-tabs,
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-right):not(.goguryeo-peek-right) .mod-right-split .workspace-tabs,
+body:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .mod-left-split .workspace-tabs,
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-right):not(.goguryeo-peek-right) .mod-right-split .workspace-tabs,
+body.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards):not(.goguryeo-float-left):not(.goguryeo-peek-left) .workspace-split.mod-primary-split .workspace-sidedock-vault-profile {
+    background: linear-gradient(var(--glass-sidebar), var(--glass-sidebar)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ...and the frosted band behind the top rows in the card layout. Over a
+   plain or color background it isn't drawn at all: a tinted band over the
+   note area only left the background's own color showing beside it, above
+   the sidebars (the user saw it poking out, 2026-11-02); the top is one
+   even background, and only the cards and sidebars carry color. */
+body.goguryeo-split:not(.goguryeo-bg-image):not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.goguryeo-split.goguryeo-bg-image.goguryeo-glass-baked:not(.is-mobile):not(.goguryeo-no-cards) .workspace-split.mod-root::before {
+    background: linear-gradient(color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent), color-mix(in srgb, var(--background-primary) var(--g-band-tint), transparent)), var(--g-bg-glass) 0 0 / 100vw 100vh no-repeat fixed;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* Views paint their own --background-primary (Day Planner Pro, Dayloom and
+   other plugin views); inside a pane it is clear, the pane already tints */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .view-content {
+    --background-primary: transparent;
+    background-color: transparent;
+}
+
+/* Bases: Obsidian sets its table, card and kanban colors on body, so they
+   keep the solid note color. Clear them; cards keep a faint neutral lift */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root .view-content {
+    --bases-table-group-background: transparent;
+    --bases-table-header-background: transparent;
+    --bases-table-summary-background: transparent;
+    --bases-cards-background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+    --bases-cards-cover-background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+    --bases-kanban-column-background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+    --bases-kanban-column-header-background: transparent;
+    --bases-kanban-card-background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+    --bases-kanban-cover-background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+}
+
+/* ...the sticky header and footer frost the rows scrolling under them */
+body:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace-split.mod-root :is(.bases-thead, .bases-table-footer) {
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+
+/* iPad: the strip above the note, under the status bar, matches the note so
+   the clock stays readable */
+body.is-tablet:is(.goguryeo-bg-color, .goguryeo-bg-image) .workspace > .mod-root {
+    background-image: linear-gradient(var(--g-note-bg) 0 0);
+    background-size: 100% var(--safe-area-inset-top);
+    background-repeat: no-repeat;
+}
+
+/* Split screen: the canvas between the cards shows the background too, and
+   the cards take their color from the pane inside */
+body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-cards) .workspace-split.mod-root,
+body.goguryeo-split:is(.goguryeo-bg-color, .goguryeo-bg-image):not(.goguryeo-no-cards) .mod-root .workspace-tabs {
+    background-color: transparent;
+}
+
+
+/* The companion plugin's image picker: a small preview before each path */
+.goguryeo-image-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ...and its settings tab: a preview of the current background image */
+.goguryeo-bg-setting .setting-item-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.goguryeo-bg-preview {
+    width: 160px;
+    height: 96px;
+    margin-bottom: 4px;
+    border-radius: 10px;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+
+.goguryeo-image-suggestion > img {
+    flex: none;
+    width: 56px;
+    height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    background-color: var(--background-modifier-hover);
+}
+
+

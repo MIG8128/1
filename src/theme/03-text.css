@@ -1,0 +1,47 @@
+/* -------------------------------------------------------------------------
+   3. Text — line height, bold, headings (merged from gemin-theme.css)
+   ------------------------------------------------------------------------- */
+
+.markdown-source-view.mod-cm6 .cm-line,
+.markdown-reading-view p,
+.markdown-reading-view li,
+.markdown-reading-view blockquote,
+.markdown-reading-view table td {
+    line-height: var(--g-line-height);
+}
+
+body.theme-dark:not(.goguryeo-plain-bold) {
+    --bold-color: #ffdab9;
+}
+
+body.theme-light:not(.goguryeo-plain-bold) {
+    --bold-color: #c85a17;
+}
+
+body.theme-dark:not(.goguryeo-plain-headings) {
+    --h1-color: #f7e6c4;
+    --h2-color: #daf7c4;
+    --h3-color: #c4e1f7;
+    --h4-color: #dfc0fb;
+}
+
+body.theme-light:not(.goguryeo-plain-headings) {
+    --h1-color: #b25e00;
+    --h2-color: #2e7d32;
+    --h3-color: #1565c0;
+    --h4-color: #760ed1;
+}
+
+body {
+    --h1-size: 1.85em;
+    --h2-size: 1.55em;
+    --h3-size: 1.3em;
+    --h4-size: 1.15em;
+}
+
+/* cssclasses: myclass */
+.theme-dark .myclass {
+    background-color: #505050;
+}
+
+
