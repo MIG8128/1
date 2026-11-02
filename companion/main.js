@@ -3548,6 +3548,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const pending = this.pendingScreen;
         this.pendingScreen = null;
         if (pending) this.slideScreen(pending);
+        const leaving = this.pendingLeave;
+        this.pendingLeave = null;
+        if (leaving) this.playCardsLeave(leaving);
     }
 
     // ---- Split screen: the cards glide when the layout changes ----
@@ -4710,6 +4713,21 @@ module.exports = class GoguryeoCompanion extends Plugin {
             }
         };
         ws.setActiveLeaf = patched;
+        // The plugin's own layout changes (swap, move, own tab, split, a
+        // moved tab) focus stand-in or moved leaves on the way: those are
+        // no screen switches, and they animate by their cards gliding
+        for (const name of ["movePane", "unsplitPage", "makeSplit", "splitTabInto", "moveTab"]) {
+            const fn = this[name];
+            if (typeof fn !== "function") continue;
+            this[name] = function (...args) {
+                plugin.ownLayout = (plugin.ownLayout ?? 0) + 1;
+                try {
+                    return fn.apply(this, args);
+                } finally {
+                    plugin.ownLayout--;
+                }
+            };
+        }
         this.register(() => {
             if (ws.setActiveLeaf !== patched) return;
             if (own) ws.setActiveLeaf = original;
@@ -4722,7 +4740,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // screen, with their scroll, and note where they stand in the tab row.
     prepareScreenSlide(leaf) {
         const { workspace } = this.app;
-        if (Platform.isPhone || !leaf?.parent || !document.body.hasClass(SPLIT_CLASS)) return null;
+        if (Platform.isPhone || !leaf?.parent || !document.body.hasClass(SPLIT_CLASS) || this.ownLayout) return null;
         if (this.overview || Date.now() < (this.overviewClosingUntil ?? 0) || this.partDrag || this.paneDrag) return null;
         if (this.reducedMotion() || this.tabMotion?.() === "off" || !this.screenKey) return null;
         const pages = this.splitPages ?? new Map();
@@ -4735,14 +4753,22 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const was = workspace.getLeafById?.(old.slice(4));
             if (was?.parent === leaf.parent) return null;
         }
-        const rootEl = workspace.rootSplit.containerEl;
+        const clones = this.cloneCards();
+        if (!clones.length) return null;
+        return { old, clones, from: this.screenTabIndex(old) };
+    }
+
+    // Still copies of the cards on screen (only those of `panes`, if given),
+    // with their scroll, where they stand
+    cloneCards(panes = null) {
+        const rootEl = this.app.workspace.rootSplit.containerEl;
+        const only = panes && new Set(panes.map((p) => p.containerEl));
         const cards = [...rootEl.querySelectorAll(".workspace-tabs")].filter((el) => {
-            if (el.hasClass(SOLO_OFF_CLASS) || el.closest(".goguryeo-screen-out")) return false;
+            if (el.hasClass(SOLO_OFF_CLASS) || el.closest(".goguryeo-screen-out") || (only && !only.has(el))) return false;
             const r = el.getBoundingClientRect();
             return r.width > 0 && r.height > 0;
         });
-        if (!cards.length) return null;
-        const clones = cards.map((el) => {
+        return cards.map((el) => {
             const clone = el.cloneNode(true);
             // A copied <webview> would load its page anew (and a copy of a
             // web viewer used to do just that on every switch): a still
@@ -4764,7 +4790,55 @@ module.exports = class GoguryeoCompanion extends Plugin {
             walk(el, []);
             return { clone, rect: el.getBoundingClientRect(), scrolls };
         });
-        return { old, clones, from: this.screenTabIndex(old) };
+    }
+
+    // Copies laid where the cards stood, in a box over the panes' area
+    // (so nothing crosses the sidebars); returns the box and its track
+    layCards(clones) {
+        const rootEl = this.app.workspace.rootSplit.containerEl;
+        const R = rootEl.getBoundingClientRect();
+        const box = rootEl.createDiv("goguryeo-screen-out");
+        Object.assign(box.style, { left: `${R.left}px`, top: `${R.top}px`, width: `${R.width}px`, height: `${R.height}px` });
+        const track = box.createDiv("goguryeo-screen-out-track");
+        for (const { clone, rect, scrolls } of clones) {
+            Object.assign(clone.style, {
+                position: "absolute", left: `${rect.left - R.left}px`, top: `${rect.top - R.top}px`,
+                width: `${rect.width}px`, height: `${rect.height}px`, margin: "0", boxSizing: "border-box",
+            });
+            track.appendChild(clone);
+            for (const [path, top, left] of scrolls) {
+                let node = clone;
+                for (const i of path) node = node?.children[i];
+                if (node) { node.scrollTop = top; node.scrollLeft = left; }
+            }
+        }
+        return { box, track, R };
+    }
+
+    // A card leaving the screen with the plugin's own move (a page taken
+    // out of its split as its own tab, a split page closed): copied just
+    // before, then, once the layout has changed, shrinking a little and
+    // fading out toward its own side while the cards that stay glide
+    prepareCardsLeave(panes) {
+        if (Platform.isPhone || this.reducedMotion() || !document.body.hasClass(SPLIT_CLASS)) return;
+        const clones = this.cloneCards(panes);
+        if (clones.length) this.pendingLeave = { clones };
+    }
+
+    playCardsLeave(p) {
+        const { box, track, R } = this.layCards(p.clones);
+        const mid = R.left + R.width / 2;
+        const anims = [];
+        for (const { clone, rect } of p.clones) {
+            const side = rect.left + rect.width / 2 < mid ? -1 : 1;
+            clone.style.transformOrigin = side < 0 ? "left center" : "right center";
+            anims.push(clone.animate([
+                { opacity: 1, scale: "1", translate: "0 0" },
+                { opacity: 0, scale: "0.92", translate: `${side * 48}px 0` },
+            ], { duration: TAB_SLIDE_MS - 60, easing: "cubic-bezier(0.4, 0, 0.6, 1)", fill: "forwards" }));
+        }
+        Promise.all(anims.map((x) => x.finished.catch(() => {}))).then(() => box.remove());
+        void track;
     }
 
     // Where a screen (split:id or tab:leafId) stands in the shared tab row
@@ -4788,21 +4862,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
         // The old cards: copies where they stood, sliding out in a box the
         // size of the panes' area (so they don't cross the sidebars)
         this.screenOut?.remove();
-        const box = this.screenOut = rootEl.createDiv("goguryeo-screen-out");
-        Object.assign(box.style, { left: `${R.left}px`, top: `${R.top}px`, width: `${W}px`, height: `${R.height}px` });
-        const track = box.createDiv("goguryeo-screen-out-track");
-        for (const { clone, rect, scrolls } of p.clones) {
-            Object.assign(clone.style, {
-                position: "absolute", left: `${rect.left - R.left}px`, top: `${rect.top - R.top}px`,
-                width: `${rect.width}px`, height: `${rect.height}px`, margin: "0", boxSizing: "border-box",
-            });
-            track.appendChild(clone);
-            for (const [path, top, left] of scrolls) {
-                let node = clone;
-                for (const i of path) node = node?.children[i];
-                if (node) { node.scrollTop = top; node.scrollLeft = left; }
-            }
-        }
+        const { box, track } = this.layCards(p.clones);
+        this.screenOut = box;
         const ease = { duration: TAB_SLIDE_MS, easing: ZOOM_EASE };
         const anims = [track.animate([{ translate: "0 0" }, { translate: `${-dir * W}px 0` }], { ...ease, fill: "forwards" })];
         // The pages now on screen come in from the other side
@@ -5322,6 +5383,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.placeGripMenu();
         };
         tile("lucide-square-arrow-out-up-right", "Own tab", "", () => done(() => {
+            this.prepareCardsLeave(mates); // the rest of the split goes; this page grows into the screen
             const tabs = this.barTabs();
             const at = tabs.indexOf(this.splitTabs?.get(id));
             this.unsplitPage(page, at < 0 ? tabs.length : at + 1);
@@ -5374,7 +5436,10 @@ module.exports = class GoguryeoCompanion extends Plugin {
                 }
             });
         });
-        tile("lucide-x", "Close", "mod-danger", () => done(() => page.detach()));
+        tile("lucide-x", "Close", "mod-danger", () => done(() => {
+            if (pane.children.length === 1) this.prepareCardsLeave([pane]); // its card goes; the others grow
+            page.detach();
+        }));
 
         const off = (e) => {
             if (e.type === "keydown") {
