@@ -377,6 +377,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         if (Platform.isDesktopApp) this.app.workspace.onLayoutReady(() => this.setupTrackpadSwipe());
         this.app.workspace.onLayoutReady(() => this.setupTabThumbs());
         this.app.workspace.onLayoutReady(() => this.patchSelectTab());
+        this.app.workspace.onLayoutReady(() => this.patchScreenSlide());
         this.app.workspace.onLayoutReady(() => this.setupFloatingSidebars());
         this.app.workspace.onLayoutReady(() => this.setupSidebarPeek());
         this.app.workspace.onLayoutReady(() => this.setupTopPeek());
@@ -3505,8 +3506,18 @@ module.exports = class GoguryeoCompanion extends Plugin {
         }
         // 2+ panes: Chrome's split view. A normal tab in focus fills the
         // screen alone; a page of the split brings every pane back
-        const shown = groups.length > 1 && !body.hasClass("goguryeo-no-cards")
-            ? this.syncSplitPages(groups) : { solo: null, split: null };
+        this.syncingPages = true; // its tab switches put panes on their pages: no slide of their own
+        let shown;
+        try {
+            shown = groups.length > 1 && !body.hasClass("goguryeo-no-cards")
+                ? this.syncSplitPages(groups) : { solo: null, split: null };
+        } finally {
+            this.syncingPages = false;
+        }
+        // What's on screen, for the screen slide: a split or a lone tab
+        const loneTab = shown.solo ?? (groups.length === 1 ? groups[0].children[groups[0].currentTab] : null);
+        this.screenKey = shown.split != null ? `split:${shown.split}` : loneTab ? `tab:${loneTab.id}` : null;
+        if (this.pendingScreen) this.flipSkip = true; // the screen slides instead of the cards gliding
         const solo = shown.solo;
         this.applyFold(groups, shown);
         if (groups.length < 2) this.splitPages = null;
@@ -3534,6 +3545,9 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.renderGrips(groups.length > 1 ? groups : []);
         if (groups.length === 1) this.splitGroups = groups; // a lone card's edges take a dropped tab (it has no grip)
         this.flipCards(groups);
+        const pending = this.pendingScreen;
+        this.pendingScreen = null;
+        if (pending) this.slideScreen(pending);
     }
 
     // ---- Split screen: the cards glide when the layout changes ----
@@ -4643,6 +4657,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     // above stay put, and each is clipped by its own view.
     slideTabs(pane, from, to) {
         if (!from || !to || from === to || Platform.isPhone || pane.isStacked) return;
+        if (this.syncingPages || this.screenSwitching) return; // the whole screen slides instead
         if (this.overview || Date.now() < (this.overviewClosingUntil ?? 0)) return; // the overview zooms instead
         if (this.reducedMotion() || this.tabMotion?.() === "off") return;
         const children = pane.children ?? [];
@@ -4666,6 +4681,142 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (this.pageSlide?.anims === anims) this.pageSlide = null;
         });
         this.pageSlide.anims = anims;
+    }
+
+    // Desktop and iPad: switching between what's on screen (a split and a
+    // lone tab, or two of them) slides the whole screen, like a tab switch
+    // inside a pane: the cards that were on screen slide out one way (still
+    // copies, made just before Obsidian switches) and the pages coming on
+    // screen slide in from the other, in the tab row's order. The cards
+    // themselves don't move (the path row is pinned inside the current one).
+    patchScreenSlide() {
+        const ws = this.app.workspace;
+        const plugin = this;
+        const own = Object.prototype.hasOwnProperty.call(ws, "setActiveLeaf");
+        const original = ws.setActiveLeaf;
+        const patched = function (leaf, ...rest) {
+            let prep = null;
+            try {
+                prep = plugin.prepareScreenSlide(leaf);
+            } catch (e) { /* only a nicety */ }
+            if (!prep) return original.call(this, leaf, ...rest);
+            plugin.screenSwitching = true;
+            try {
+                return original.call(this, leaf, ...rest);
+            } finally {
+                plugin.screenSwitching = false;
+                plugin.pendingScreen = prep;
+                plugin.nudgeLayout?.("thumbs");
+            }
+        };
+        ws.setActiveLeaf = patched;
+        this.register(() => {
+            if (ws.setActiveLeaf !== patched) return;
+            if (own) ws.setActiveLeaf = original;
+            else delete ws.setActiveLeaf;
+        });
+    }
+
+    // Before the switch: will it change what's on screen (not just the tab
+    // inside one pane, which slides by itself)? Then copy the cards on
+    // screen, with their scroll, and note where they stand in the tab row.
+    prepareScreenSlide(leaf) {
+        const { workspace } = this.app;
+        if (Platform.isPhone || !leaf?.parent || !document.body.hasClass(SPLIT_CLASS)) return null;
+        if (this.overview || Date.now() < (this.overviewClosingUntil ?? 0) || this.partDrag || this.paneDrag) return null;
+        if (this.reducedMotion() || this.tabMotion?.() === "off" || !this.screenKey) return null;
+        const pages = this.splitPages ?? new Map();
+        const id = pages.get(leaf.parent) === leaf ? this.splitOf?.get(leaf.parent) : null;
+        const next = id != null ? `split:${id}` : `tab:${leaf.id}`;
+        if (next === this.screenKey) return null;
+        const old = this.screenKey;
+        // a lone tab to a lone tab in the same pane: the pane's own slide
+        if (old.startsWith("tab:") && next.startsWith("tab:")) {
+            const was = workspace.getLeafById?.(old.slice(4));
+            if (was?.parent === leaf.parent) return null;
+        }
+        const rootEl = workspace.rootSplit.containerEl;
+        const cards = [...rootEl.querySelectorAll(".workspace-tabs")].filter((el) => {
+            if (el.hasClass(SOLO_OFF_CLASS) || el.closest(".goguryeo-screen-out")) return false;
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+        });
+        if (!cards.length) return null;
+        const clones = cards.map((el) => {
+            const clone = el.cloneNode(true);
+            // A copied <webview> would load its page anew (and a copy of a
+            // web viewer used to do just that on every switch): a still
+            // picture of it takes its place, filled in once Electron has it
+            const real = [...el.querySelectorAll("webview")];
+            clone.querySelectorAll("webview").forEach((copy, i) => {
+                const img = createEl("img", { cls: "goguryeo-screen-shot" });
+                img.style.cssText = copy.style.cssText;
+                copy.replaceWith(img);
+                try {
+                    real[i]?.capturePage?.().then((shot) => { img.src = shot.toDataURL(); }).catch(() => {});
+                } catch (e) { /* not attached */ }
+            });
+            const scrolls = [];
+            const walk = (node, path) => {
+                if (node.scrollTop || node.scrollLeft) scrolls.push([path, node.scrollTop, node.scrollLeft]);
+                [...node.children].forEach((k, i) => walk(k, path.concat(i)));
+            };
+            walk(el, []);
+            return { clone, rect: el.getBoundingClientRect(), scrolls };
+        });
+        return { old, clones, from: this.screenTabIndex(old) };
+    }
+
+    // Where a screen (split:id or tab:leafId) stands in the shared tab row
+    screenTabIndex(key) {
+        if (!key) return -1;
+        const tabs = this.barTabs();
+        if (key.startsWith("split:")) return tabs.indexOf(this.splitTabs?.get(Number(key.slice(6))));
+        const leaf = this.app.workspace.getLeafById?.(key.slice(4));
+        return leaf ? tabs.indexOf(this.sharedTabs?.get(leaf)) : -1;
+    }
+
+    slideScreen(p) {
+        const { workspace } = this.app;
+        if (!this.screenKey || this.screenKey === p.old) return;
+        const rootEl = workspace.rootSplit.containerEl;
+        const R = rootEl.getBoundingClientRect();
+        if (!R.width) return;
+        const a = p.from, b = this.screenTabIndex(this.screenKey);
+        const dir = a < 0 || b < 0 ? 1 : b > a ? 1 : -1;
+        const W = R.width;
+        // The old cards: copies where they stood, sliding out in a box the
+        // size of the panes' area (so they don't cross the sidebars)
+        this.screenOut?.remove();
+        const box = this.screenOut = rootEl.createDiv("goguryeo-screen-out");
+        Object.assign(box.style, { left: `${R.left}px`, top: `${R.top}px`, width: `${W}px`, height: `${R.height}px` });
+        const track = box.createDiv("goguryeo-screen-out-track");
+        for (const { clone, rect, scrolls } of p.clones) {
+            Object.assign(clone.style, {
+                position: "absolute", left: `${rect.left - R.left}px`, top: `${rect.top - R.top}px`,
+                width: `${rect.width}px`, height: `${rect.height}px`, margin: "0", boxSizing: "border-box",
+            });
+            track.appendChild(clone);
+            for (const [path, top, left] of scrolls) {
+                let node = clone;
+                for (const i of path) node = node?.children[i];
+                if (node) { node.scrollTop = top; node.scrollLeft = left; }
+            }
+        }
+        const ease = { duration: TAB_SLIDE_MS, easing: ZOOM_EASE };
+        const anims = [track.animate([{ translate: "0 0" }, { translate: `${-dir * W}px 0` }], { ...ease, fill: "forwards" })];
+        // The pages now on screen come in from the other side
+        for (const el of rootEl.querySelectorAll(".workspace-tabs")) {
+            if (el.hasClass(SOLO_OFF_CLASS) || el.closest(".goguryeo-screen-out")) continue;
+            const r = el.getBoundingClientRect();
+            if (!r.width || !r.height) continue;
+            const leafEl = el.querySelector(":scope > .workspace-tab-container > .workspace-leaf:not([style*='display: none']) .view-content");
+            for (const k of leafEl?.children ?? []) anims.push(k.animate([{ translate: `${dir * W}px 0` }, { translate: "0 0" }], ease));
+        }
+        Promise.all(anims.map((x) => x.finished.catch(() => {}))).then(() => {
+            if (this.screenOut === box) this.screenOut = null;
+            box.remove();
+        });
     }
 
     keepSplitPage(pane, next) {

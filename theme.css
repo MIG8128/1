@@ -2567,6 +2567,35 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     visibility: hidden;
 }
 
+/* Switching between a split and a lone tab (companion: slideScreen): still
+   copies of the cards that were on screen slide out, clipped to the panes'
+   area, over the cards coming on screen. Their path rows stay hidden: the
+   real one is in place. */
+.goguryeo-screen-out {
+    position: fixed;
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.goguryeo-screen-out-track {
+    position: absolute;
+    inset: 0;
+}
+
+.goguryeo-screen-out .goguryeo-screen-shot {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top left;
+}
+
+.goguryeo-screen-out .view-header,
+.goguryeo-screen-out .goguryeo-pane-grip {
+    visibility: hidden;
+}
+
 /* One grid of every tab, in the tab row's order */
 .goguryeo-tab-overview-panes {
     position: relative;
