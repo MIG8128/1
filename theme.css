@@ -2522,6 +2522,9 @@ body.goguryeo-tab-overview-open .mod-root .workspace-tab-header-tab-list > .clic
     overflow: hidden;
     pointer-events: none;
     transition: none !important;
+    /* its own GPU layer, painted once and only moved */
+    will-change: transform, opacity;
+    contain: strict;
 }
 
 .goguryeo-zoom-backdrop {

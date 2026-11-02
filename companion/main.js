@@ -2125,9 +2125,12 @@ module.exports = class GoguryeoCompanion extends Plugin {
         let big, small;
         if (mode === "scale") {
             Object.assign(copy.style, { left: px(card.left), top: px(card.top), width: px(card.width), height: px(card.height) });
+            // transform only (with the opacity below): the GPU moves the copy
+            // as one picture; a border-radius in the frames would repaint
+            // the whole copied page on every frame
             const k = page.width / card.width;
-            big = { transform: `translate(${px(page.left - card.left)}, ${px(page.top - card.top)}) scale(${k})`, borderRadius: px(radius / k) };
-            small = { transform: "none", borderRadius: px(radius) };
+            big = { transform: `translate(${px(page.left - card.left)}, ${px(page.top - card.top)}) scale(${k})` };
+            small = { transform: "none" };
         } else {
             big = { left: px(page.left), top: px(page.top), width: px(page.width), height: px(page.height), borderRadius: "0px" };
             small = { left: px(card.left), top: px(card.top), width: px(card.width), height: px(card.height), borderRadius: px(radius) };
