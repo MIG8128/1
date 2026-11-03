@@ -2948,16 +2948,16 @@ body.is-phone {
     --navbar-height: 52px;
     --g-phone-side: 14px;
     --g-phone-gap: 8px;
+    --g-phone-inner: 44px; /* ‹ and ⋯, inside the capsule (design I) */
     --g-nav-w: calc(100vw - var(--g-phone-side) * 2);
     --g-phone-glass-shadow: inset 0 0 0 1px var(--glass-border),
         0 4px 14px rgba(0, 0, 0, 0.22);
 }
 
-/* The round glass every iPhone control wears (design I: the ◧ ◨ circles,
-   the capsule holding ‹ name ⋯, and the folded name capsule) */
+/* The round glass every iPhone control wears (design I: the ◧ ◨ circles
+   and the capsule, which reaches under ‹ and ⋯) */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
         .goguryeo-phone-side,
-        .mobile-navbar .mobile-navbar-actions,
         .mod-root .workspace-leaf .view-header-title-container
     ) {
     background-color: var(--glass-bg);
@@ -2972,7 +2972,6 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
 /* The bar itself becomes a clear row; each group gets its own glass */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
     --raised: none;
-    --g-phone-inner: 44px; /* ‹ and ⋯ inside the capsule */
     width: var(--g-nav-w);
     max-width: none;
     box-sizing: border-box;
@@ -2982,8 +2981,10 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
     overflow: visible;
 }
 
-/* Design I: ( ◧ ) [ ‹  folder / name  ⋯ ] ( ◨ ). The actions row is the
-   capsule's glass; the name is drawn over its middle (below). */
+/* Design I: ( ◧ ) [ ‹  folder / name  ⋯ ] ( ◨ ). The bar is a layer
+   above the note's capsule, so the bar stays clear: a glass here would
+   blur the name underneath. The capsule's own glass reaches under ‹ and
+   ⋯ instead (below). */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-actions {
     gap: 0;
     height: 100%;
@@ -3122,13 +3123,14 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .
     display: flex;
     position: fixed;
     z-index: 1;
-    --g-capsule-inset: calc(var(--navbar-height) + var(--g-phone-gap) + var(--g-phone-inner, 44px));
+    --g-capsule-inset: calc(var(--navbar-height) + var(--g-phone-gap));
     left: calc(50% - var(--g-nav-w) / 2 + var(--g-capsule-inset));
     width: calc(var(--g-nav-w) - var(--g-capsule-inset) * 2);
     bottom: calc(var(--navbar-bottom-offset) - var(--keyboard-height) - 2px);
     height: var(--navbar-height);
     margin: 0;
-    padding: 0 4px;
+    /* ‹ and ⋯ (the bar, above) sit on its two ends */
+    padding: 0 calc(var(--g-phone-inner) + 4px);
     box-sizing: border-box;
     /* Design I: the folder small on top, the name under it */
     flex-direction: column;
@@ -3137,11 +3139,6 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .
     gap: 0;
     line-height: 1.2;
     border-radius: 999px;
-    /* the glass is the actions row's, behind it; only folded it has its own */
-    background-color: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
     font-size: var(--font-ui-small);
     white-space: nowrap;
     overflow: hidden;
@@ -3252,10 +3249,6 @@ body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-ro
     flex-direction: row;
     font-size: var(--font-ui-smaller);
     pointer-events: auto;
-    background-color: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    box-shadow: var(--g-phone-glass-shadow);
 }
 
 body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
