@@ -998,6 +998,33 @@ module.exports = class GoguryeoCompanion extends Plugin {
         this.setupNameCapsule();
         this.setupNameGestures();
         this.setupPhoneMenu();
+        this.setupPhoneSideButtons();
+    }
+
+    // Design I (canvas "I · (◧) [‹ folder / name ⋯] (◨)"): a round glass
+    // sidebar button at each end of the bar; ‹ and ⋯ move into the capsule
+    // (theme section 10). They live in Obsidian's navbar, so they fold away
+    // and slide with it. <button>s, so each tap ticks (setupHaptics).
+    setupPhoneSideButtons() {
+        const ws = this.app.workspace;
+        const add = () => {
+            const nav = this.app.mobileNavbar?.containerEl;
+            if (!nav || nav.querySelector(":scope > .goguryeo-phone-side")) return;
+            for (const side of ["left", "right"]) {
+                const b = nav.createEl("button", {
+                    cls: `goguryeo-phone-side mod-${side}`,
+                    attr: { "aria-label": side === "left" ? "Left sidebar" : "Right sidebar" },
+                });
+                setIcon(b, side === "left" ? "panel-left" : "panel-right");
+                b.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    (side === "left" ? ws.leftSplit : ws.rightSplit).toggle();
+                });
+            }
+        };
+        ws.onLayoutReady(add);
+        this.registerEvent(ws.on("layout-change", add));
+        this.register(() => document.querySelectorAll(".goguryeo-phone-side").forEach((b) => b.remove()));
     }
 
     setupPhoneMenu() {
@@ -1037,8 +1064,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // Design G's ⋯ panel (canvas: "G · ⋯ open" / "scrolled down"): a glass
     // panel the width of the bar, above it (the page dims a little behind).
-    // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, find in note, reading
-    // view / edit, right sidebar). Below, in two columns and scrolling:
+    // On top three tiles, ⧉ ⌕ 📖 (all tabs, find in note, reading view /
+    // edit; ◧ and ◨ are on the bar since design I). Below, in two columns and scrolling:
     // Obsidian's own ≡ menu unfolded (the ribbon's items), then the note's
     // options unfolded (the hidden top row's plugin actions, then the menu
     // Obsidian's own ⋯ would open, built but never shown). Every control is
@@ -1075,7 +1102,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
             setIcon(b, icon);
             b.addEventListener("click", run(fn));
         };
-        tile("panel-left", "Left sidebar", () => ws.leftSplit.toggle());
+        // ◧ and ◨ are on the bar (design I)
         tile("copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
         // Find in this note (the capsule already opens the quick switcher)
         tile("text-search", "Find", () => this.app.commands.executeCommandById("editor:open-search"));
@@ -1084,7 +1111,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
             const reading = view.getMode?.() === "preview";
             tile(reading ? "pencil" : "book-open", reading ? "Edit" : "Reading view", () => mode.click());
         }
-        tile("panel-right", "Right sidebar", () => ws.rightSplit.toggle());
 
         const section = (title) => {
             panel.createDiv({ cls: "goguryeo-phone-menu-section", text: title });
@@ -1296,7 +1322,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         const crumb = [...header.querySelectorAll(".view-header-title-parent > .view-header-breadcrumb")]
             .find((c) => c.offsetWidth > 0);
         const r = crumb?.getBoundingClientRect();
-        return r && x >= r.left - 4 && x <= r.right + 4 ? crumb : null;
+        return r && x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 2 ? crumb : null;
     }
 
     // Like a browser's address bar, the field opens holding the note's path,

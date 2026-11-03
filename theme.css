@@ -2924,17 +2924,17 @@ body.goguryeo-split:is(:not(.is-mobile), .is-tablet):not(.goguryeo-no-cards) .go
 
 
 /* -------------------------------------------------------------------------
-   10. iPhone — one bar at the bottom (design G)
-       ( ‹ )  ( folder › file name )  ( ⋯ )
+   10. iPhone — one bar at the bottom (design I, 2026-11-03; was G)
+       ( ◧ )  [ ‹   folder / file name   ⋯ ]  ( ◨ )
        · no top row: the note runs up to the status bar
-       · round glass buttons, like iOS
+       · round glass ◧ ◨ (companion) open the sidebars
        · ‹ goes back; forward is in ⋯ and the right-edge swipe
        · ⋯ (Obsidian's ≡ button) opens the companion's menu: forward, the
          note's own actions (reading view, plugin actions, more options),
-         both sidebars, all tabs, search, and Obsidian's own menu
+         all tabs, search, and Obsidian's own menu
        · the capsule shows only the folder the note is in (for a folder
-         note, the folder around it); a long folder takes at most 40%,
-         and the folder and name shorten with "…"
+         note, the folder around it), small, above the name; both
+         shorten with "…"
        · tap the capsule → tab overview; tap the folder → quick switcher
          (or, with the Folder notes plugin, that folder's note)
        · drag the capsule up → tab overview; sideways → the tab beside it,
@@ -2953,10 +2953,11 @@ body.is-phone {
         0 4px 14px rgba(0, 0, 0, 0.22);
 }
 
-/* The round glass every iPhone control wears */
+/* The round glass every iPhone control wears (design I: the ◧ ◨ circles,
+   the capsule holding ‹ name ⋯, and the folded name capsule) */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
-        .mobile-navbar-action-back,
-        .mobile-navbar-action-menu,
+        .goguryeo-phone-side,
+        .mobile-navbar .mobile-navbar-actions,
         .mod-root .workspace-leaf .view-header-title-container
     ) {
     background-color: var(--glass-bg);
@@ -2971,17 +2972,61 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
 /* The bar itself becomes a clear row; each group gets its own glass */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
     --raised: none;
+    --g-phone-inner: 44px; /* ‹ and ⋯ inside the capsule */
     width: var(--g-nav-w);
     max-width: none;
-    padding: 0;
+    box-sizing: border-box;
+    padding: 0 calc(var(--navbar-height) + var(--g-phone-gap));
     border-radius: 0;
     background: transparent;
     overflow: visible;
 }
 
+/* Design I: ( ◧ ) [ ‹  folder / name  ⋯ ] ( ◨ ). The actions row is the
+   capsule's glass; the name is drawn over its middle (below). */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-actions {
-    gap: var(--g-phone-gap);
+    gap: 0;
     height: 100%;
+    border-radius: 999px;
+}
+
+/* ◧ and ◨ (companion): round glass at the bar's two ends */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .goguryeo-phone-side {
+    all: unset;
+    position: absolute;
+    bottom: 0;
+    width: var(--navbar-height);
+    height: var(--navbar-height);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--text-normal);
+    cursor: pointer;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .goguryeo-phone-side.mod-left {
+    left: 0;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .goguryeo-phone-side.mod-right {
+    right: 0;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .goguryeo-phone-side .svg-icon {
+    width: 19px;
+    height: 19px;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .goguryeo-phone-side:active {
+    background-color: var(--glass-bg-strong);
+}
+
+body:not(.is-phone) .goguryeo-phone-side,
+body.is-phone:not(.is-floating-nav) .goguryeo-phone-side,
+body.is-phone.goguryeo-no-safari-bar .goguryeo-phone-side {
+    display: none;
 }
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action {
@@ -2990,9 +3035,13 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action
     margin: 0;
 }
 
-/* ( ‹ ) and ( ⋯ ): circles */
+/* ‹ and ⋯: plain icons at the capsule's two ends */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
-    border-radius: 50%;
+    flex: 0 0 var(--g-phone-inner);
+    width: var(--g-phone-inner);
+    border-radius: 999px;
+    background: none;
+    box-shadow: none;
 }
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-back > button[aria-disabled="true"] {
@@ -3073,17 +3122,26 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .
     display: flex;
     position: fixed;
     z-index: 1;
-    left: calc(50% - var(--g-nav-w) / 2 + var(--navbar-height) + var(--g-phone-gap));
-    width: calc(var(--g-nav-w) - var(--navbar-height) * 2 - var(--g-phone-gap) * 2);
+    --g-capsule-inset: calc(var(--navbar-height) + var(--g-phone-gap) + var(--g-phone-inner, 44px));
+    left: calc(50% - var(--g-nav-w) / 2 + var(--g-capsule-inset));
+    width: calc(var(--g-nav-w) - var(--g-capsule-inset) * 2);
     bottom: calc(var(--navbar-bottom-offset) - var(--keyboard-height) - 2px);
     height: var(--navbar-height);
     margin: 0;
-    padding: 0 16px;
+    padding: 0 4px;
     box-sizing: border-box;
+    /* Design I: the folder small on top, the name under it */
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0;
+    line-height: 1.2;
     border-radius: 999px;
+    /* the glass is the actions row's, behind it; only folded it has its own */
+    background-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
     font-size: var(--font-ui-small);
     white-space: nowrap;
     overflow: hidden;
@@ -3123,10 +3181,12 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .workspace-
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
     display: flex;
     flex: 0 1 auto;
-    min-width: 3.5em;
-    max-width: 40%;
+    min-width: 0;
+    max-width: 100%;
     padding: 0;
+    justify-content: center;
     align-items: center;
+    font-size: var(--font-ui-smaller);
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
@@ -3163,9 +3223,10 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-heade
     display: none;
 }
 
-/* The separator after the folder becomes › */
+/* Design I puts the folder on its own line, so no separator. (Before:
+   the separator after the folder became ›.) */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent > .view-header-breadcrumb-separator:last-child {
-    display: block;
+    display: none;
     flex-shrink: 0;
     padding: 0 5px;
     font-size: 0;
@@ -3188,8 +3249,13 @@ body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-ro
     height: 34px;
     bottom: max(var(--safe-area-inset-bottom) - 4px, 8px);
     padding: 0 14px;
+    flex-direction: row;
     font-size: var(--font-ui-smaller);
     pointer-events: auto;
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--g-phone-glass-shadow);
 }
 
 body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-root .view-header-title-parent {
@@ -3202,7 +3268,7 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):not(:has(.mobile-navb
 }
 
 /* ---- The ⋯ panel (companion): a glass panel the width of the bar ----
-   ( ◧ )( ⧉ )( ⌕ )( 📖 )( ◨ )      ← five tiles
+   ( ⧉ )( ⌕ )( 📖 )                ← three tiles (◧ ◨ are on the bar)
    Obsidian                          ← Obsidian's ≡ menu, unfolded
    [item] [item]  …
    Note name                         ← the note's options, unfolded
@@ -3346,9 +3412,10 @@ body.is-phone .goguryeo-phone-menu-label {
     text-overflow: ellipsis;
 }
 
-/* ⋯ wears a green ring while its panel is open */
-body.is-phone.is-floating-nav.goguryeo-phone-menu-open:not(.goguryeo-no-safari-bar) .mobile-navbar .mobile-navbar-actions > .mobile-navbar-action-menu {
-    box-shadow: inset 0 0 0 1.5px var(--interactive-accent), var(--g-phone-glass-shadow);
+/* ⋯ turns green while its panel is open (it sits inside the capsule now,
+   so no ring) */
+body.is-phone.is-floating-nav.goguryeo-phone-menu-open:not(.goguryeo-no-safari-bar) .mobile-navbar .mobile-navbar-actions > .mobile-navbar-action-menu .clickable-icon {
+    color: var(--interactive-accent);
 }
 
 /* ---- Tab overview: only Obsidian's own [+] [N tabs] [Done] row; the bar
