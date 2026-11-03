@@ -3,7 +3,8 @@
        ( ◧ )  [ ‹   folder / file name   ⋯ ]  ( ◨ )
        · no top row: the note runs up to the status bar
        · round glass ◧ ◨ (companion) open the sidebars
-       · ‹ goes back; forward is in ⋯ and the right-edge swipe
+       · ‹ and › show only when there is a page to go back / forward to
+         (› beside ⋯); the right-edge swipe goes forward too
        · ⋯ (Obsidian's ≡ button) opens the companion's menu: forward, the
          note's own actions (reading view, plugin actions, more options),
          all tabs, search, and Obsidian's own menu
@@ -113,24 +114,51 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action
     margin: 0;
 }
 
-/* ‹ and ⋯: plain icons at the capsule's two ends */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
+/* ‹ › and ⋯: plain icons at the capsule's ends: [ ‹  name  › ⋯ ] */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(.mobile-navbar-action-back, .mobile-navbar-action-forward, .mobile-navbar-action-menu) {
     flex: 0 0 var(--g-phone-inner);
     width: var(--g-phone-inner);
+    min-width: 0;
+    overflow: hidden;
     border-radius: 999px;
 }
 
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-back > button[aria-disabled="true"] {
-    opacity: 0.35;
+/* › stands beside ⋯ (Obsidian puts it right after ‹) */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-forward {
+    order: 1;
+}
+
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-menu {
+    order: 2;
+}
+
+/* ‹ and › only show when there is somewhere to go (Obsidian marks the
+   button aria-disabled otherwise): they shrink and fade out of the
+   capsule, and back in when a page is left / gone back from */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar :is(.mobile-navbar-action-back, .mobile-navbar-action-forward):has(> button[aria-disabled="true"]) {
+    flex-basis: 0;
+    width: 0;
+    opacity: 0;
+    scale: 0.5;
+    pointer-events: none;
+}
+
+/* The capsule's text keeps clear of › when it shows (--g-fwd-w); the
+   text then sits a little left of centre rather than lose more room */
+body.is-phone {
+    --g-fwd-w: 0px;
+}
+
+body.is-phone:has(.mobile-navbar-action-forward > button:not([aria-disabled="true"])) {
+    --g-fwd-w: var(--g-phone-inner);
 }
 
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar-action-menu .navbar-action-flair {
     display: none;
 }
 
-/* Forward lives in ⋯; search and new file in the tab overview */
+/* Search and new file live in the tab overview */
 body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) :is(
-        .mobile-navbar-action-forward,
         .mobile-navbar-action-quick-switcher,
         .mobile-navbar-action-new-tab
     ) {
@@ -266,7 +294,7 @@ body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar):has(.mobile-navbar) .
     height: var(--navbar-height);
     margin: 0;
     /* ‹ and ⋯ (the bar, above it) sit on its two ends */
-    padding: 0 calc(var(--g-phone-inner) + 4px);
+    padding: 0 calc(var(--g-phone-inner) + var(--g-fwd-w) + 4px) 0 calc(var(--g-phone-inner) + 4px);
     box-sizing: border-box;
     /* design I: the folder small on top, the name under it */
     flex-direction: column;
@@ -411,12 +439,12 @@ body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mod-ro
     pointer-events: none;
 }
 
-/* ‹ and ⋯: Obsidian slides the whole bar down and fades it on its own
-   timings; here the bar stays, and the two circles fold into the capsule */
-body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
-    transition-property: opacity, scale, translate;
-    transition-duration: 0.2s, var(--g-fold-time), var(--g-fold-time);
-    transition-timing-function: ease-out, var(--g-fold-ease), var(--g-fold-ease);
+/* ‹ › ⋯: Obsidian slides the whole bar down and fades it on its own
+   timings; here the bar stays, and the icons fold into the capsule */
+body.is-phone.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar :is(.mobile-navbar-action-back, .mobile-navbar-action-forward, .mobile-navbar-action-menu) {
+    transition-property: opacity, scale, translate, flex-basis, width;
+    transition-duration: 0.2s, var(--g-fold-time), var(--g-fold-time), var(--g-fold-time), var(--g-fold-time);
+    transition-timing-function: ease-out, var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease), var(--g-fold-ease);
 }
 
 body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar {
@@ -425,9 +453,13 @@ body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile
     pointer-events: none;
 }
 
-body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar :is(.mobile-navbar-action-back, .mobile-navbar-action-menu) {
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar :is(.mobile-navbar-action-back, .mobile-navbar-action-forward, .mobile-navbar-action-menu) {
     opacity: 0;
     scale: 0.5;
+}
+
+body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar .mobile-navbar-action-forward {
+    translate: -24px 14px;
 }
 
 body.is-phone.is-hidden-nav.is-floating-nav:not(.goguryeo-no-safari-bar) .mobile-navbar .mobile-navbar-action-back {
