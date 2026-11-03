@@ -70,7 +70,7 @@ Find a feature here, then open only its file. **Never Read or grep the bundles**
 
 #### Companion (`companion/src/`)
 
-**Status (2026-11-02):** only `core/`, `features/bakedGlass.js` and the iPhone bar and ⋯ menu (`features/phone/bar.js`, `menu.js`, `noteMenu.js`) are split out; everything else still lives in `src/main.js` (~5.5k lines; find a method there with `Grep "^    methodName\("`, then Read only that range). The map is the target. When a fix touches a feature still in `main.js`, first move that feature's methods to its module **as their own commit** (code moved verbatim, build, sandbox smoke test that the feature still works, no behavior change), then make the fix as the next commit.
+**Status (2026-11-02):** only `core/`, `features/bakedGlass.js` the iPhone bar and ⋯ menu (`features/phone/bar.js`, `menu.js`, `noteMenu.js`) and the path switcher (`features/path/switcher.js`) are split out; everything else still lives in `src/main.js` (~5.5k lines; find a method there with `Grep "^    methodName\("`, then Read only that range). The map is the target. When a fix touches a feature still in `main.js`, first move that feature's methods to its module **as their own commit** (code moved verbatim, build, sandbox smoke test that the feature still works, no behavior change), then make the fix as the next commit.
 
 How a module is written:
 - **Mixin** (the default for moved code): `export const folderNotes = { setupFolderNotes() {…}, … };`, installed in `src/main.js` with `Object.assign(GoguryeoCompanion.prototype, folderNotes, …)`. Methods keep `this` and call each other across modules unchanged, so a move is a cut and paste. Constants only one module uses move with it; shared ones (body classes, storage keys, timings used by several) go to `core/constants.js`.
@@ -80,7 +80,7 @@ How a module is written:
 
 Map (file → what it holds; methods by their current names). **✓ = the file exists**, written in rule 2's form; the rest are target entries listing what moves there, and get their one-sentence responsibility (rule 2) when the file is created:
 
-- ✓ `main.js` (5218 lines, over the cap until the features move out): Sets up every part of the plugin in order and holds the features not yet moved out. Target: only `onload`, `onunload` and the mixin install.
+- ✓ `main.js` (5099 lines, over the cap until the features move out): Sets up every part of the plugin in order and holds the features not yet moved out. Target: only `onload`, `onunload` and the mixin install.
 - `core/`
   - ✓ `constants.js` (5): Holds the body class names shared between modules and kept in step with `theme.css`. `BAKED_CLASS`, `BG_IMAGE_CLASS`.
   - ✓ `platform.js` (4): Is the one place the modules import Obsidian's API from. `Platform`, `Menu`, `setIcon`.
@@ -106,7 +106,8 @@ Map (file → what it holds; methods by their current names). **✓ = the file e
 - `features/web/`
   - `pinch.js`: `setupWebPinch`. `shots.js`: `webShotURL`, `keepWebShot`, `webPageLoaded`.
 - `features/path/`
-  - `switcher.js`: `setupPathSwitcher`, `pathTapAt`, `capsuleAt`, `capsuleFolderAt`, `prefillSwitcher`, `pathCapsule`. `omnibox.js`: `dockSwitcher`.
+  - ✓ `switcher.js` (126): Makes the path capsule an address bar: a tap on the path opens the quick switcher holding the note's path. `setupPathSwitcher`, `pathTapAt`, `capsuleAt`, `capsuleFolderAt`, `prefillSwitcher`, `pathCapsule`.
+  - `omnibox.js`: `dockSwitcher`.
 - `features/folderNotes/`
   - `model.js`: `otherFolderNotesOn`, `folderNotesOn`, `folderNotePath`, `folderNoteName`, `folderNoteOf`, `isFolderNote`, `folderNoteStatus`.
   - `view.js`: `setupFolderNotes`, `scheduleFolderNotes`, `refreshFolderNotes`, `drawFolderNotes`, `markCrumbs`, `onFolderClick`, `openFolderNote`.
