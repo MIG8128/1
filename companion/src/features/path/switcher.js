@@ -97,7 +97,8 @@ export const pathSwitcher = {
         const crumb = [...header.querySelectorAll(".view-header-title-parent > .view-header-breadcrumb")]
             .find((c) => c.offsetWidth > 0);
         const r = crumb?.getBoundingClientRect();
-        return r && x >= r.left - 4 && x <= r.right + 4 ? crumb : null;
+        // design I: the folder has its own line above the name
+        return r && x >= r.left - 4 && x <= r.right + 4 && y <= r.bottom + 2 ? crumb : null;
     },
 
     // Like a browser's address bar, the field opens holding the note's path,

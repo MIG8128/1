@@ -711,7 +711,7 @@ var init_switcher = __esm({
         if (!capsule || y < capsule.top || y > capsule.bottom) return null;
         const crumb = [...header.querySelectorAll(".view-header-title-parent > .view-header-breadcrumb")].find((c) => c.offsetWidth > 0);
         const r = crumb?.getBoundingClientRect();
-        return r && x >= r.left - 4 && x <= r.right + 4 ? crumb : null;
+        return r && x >= r.left - 4 && x <= r.right + 4 && y <= r.bottom + 2 ? crumb : null;
       },
       // Like a browser's address bar, the field opens holding the note's path,
       // all selected: typing replaces it, an arrow key keeps it to edit
