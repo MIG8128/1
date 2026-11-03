@@ -70,7 +70,7 @@ Find a feature here, then open only its file. **Never Read or grep the bundles**
 
 #### Companion (`companion/src/`)
 
-**Status (2026-11-02):** only `core/` and `features/bakedGlass.js` are split out; everything else still lives in `src/main.js` (~5.5k lines; find a method there with `Grep "^    methodName\("`, then Read only that range). The map is the target. When a fix touches a feature still in `main.js`, first move that feature's methods to its module **as their own commit** (code moved verbatim, build, sandbox smoke test that the feature still works, no behavior change), then make the fix as the next commit.
+**Status (2026-11-02):** only `core/`, `features/bakedGlass.js` and the iPhone bar and ⋯ menu (`features/phone/bar.js`, `menu.js`, `noteMenu.js`) are split out; everything else still lives in `src/main.js` (~5.5k lines; find a method there with `Grep "^    methodName\("`, then Read only that range). The map is the target. When a fix touches a feature still in `main.js`, first move that feature's methods to its module **as their own commit** (code moved verbatim, build, sandbox smoke test that the feature still works, no behavior change), then make the fix as the next commit.
 
 How a module is written:
 - **Mixin** (the default for moved code): `export const folderNotes = { setupFolderNotes() {…}, … };`, installed in `src/main.js` with `Object.assign(GoguryeoCompanion.prototype, folderNotes, …)`. Methods keep `this` and call each other across modules unchanged, so a move is a cut and paste. Constants only one module uses move with it; shared ones (body classes, storage keys, timings used by several) go to `core/constants.js`.
@@ -80,10 +80,10 @@ How a module is written:
 
 Map (file → what it holds; methods by their current names). **✓ = the file exists**, written in rule 2's form; the rest are target entries listing what moves there, and get their one-sentence responsibility (rule 2) when the file is created:
 
-- ✓ `main.js` (5466 lines, over the cap until the features move out): Sets up every part of the plugin in order and holds the features not yet moved out. Target: only `onload`, `onunload` and the mixin install.
+- ✓ `main.js` (5218 lines, over the cap until the features move out): Sets up every part of the plugin in order and holds the features not yet moved out. Target: only `onload`, `onunload` and the mixin install.
 - `core/`
   - ✓ `constants.js` (5): Holds the body class names shared between modules and kept in step with `theme.css`. `BAKED_CLASS`, `BG_IMAGE_CLASS`.
-  - ✓ `platform.js` (4): Is the one place the modules import Obsidian's API from. `Platform`.
+  - ✓ `platform.js` (4): Is the one place the modules import Obsidian's API from. `Platform`, `Menu`, `setIcon`.
   - ✓ `layoutHub.js` (76): Batches Obsidian's layout events into one run per frame for every subscriber. `setupLayoutHub`, `onLayout`, `nudgeLayout`.
   - ✓ `motion.js` (112): Defines the shared curves and times and plays every companion animation through WAAPI. `EASE`, `DUR`, `play`, `enter`/`leave`, `fadeIn`/`fadeOut`, `glide`, `springIn`/`springOut`, `reducedMotion` (target: the plugin's one-line wrappers join it as a mixin).
   - `haptics.js`: `haptic`, `setupHaptics`.
@@ -112,8 +112,9 @@ Map (file → what it holds; methods by their current names). **✓ = the file e
   - `view.js`: `setupFolderNotes`, `scheduleFolderNotes`, `refreshFolderNotes`, `drawFolderNotes`, `markCrumbs`, `onFolderClick`, `openFolderNote`.
   - `files.js`: `createFolderNote`, `turnIntoFolderNote`, `followFolderRename`.
 - `features/phone/` (iPhone)
-  - `bar.js`: `setupPhoneBar`, `setupNameCapsule`. `statusEdge.js`: `setupStatusEdge`.
-  - `menu.js`: `setupPhoneMenu`, `openPhoneMenu`, `closePhoneMenu`. `noteMenu.js`: `noteMenuItems`.
+  - ✓ `bar.js` (61): Sets up the iPhone's bottom bar and the folded name capsule. `setupPhoneBar`, `setupNameCapsule`. `statusEdge.js`: `setupStatusEdge`.
+  - ✓ `menu.js` (148): Turns Obsidian's ≡ into ⋯ and draws the companion's own glass ⋯ panel. `setupPhoneMenu`, `openPhoneMenu`, `closePhoneMenu`.
+  - ✓ `noteMenu.js` (62): Lays the items of Obsidian's own more-options menu flat for the ⋯ panel. `noteMenuItems`.
   - `pill.js`: capsule gestures: `setupNameGestures`, `onPillStart/Move/End`, `settlePill`.
   - `pillPage.js`: the page following the finger: `placePull`, `placeSideways`, `peekTab`, `springPage`, `clearPage`, `switchTabFromPill`.
   - `tabZoom.js`: `setupPhoneTabZoom`, `phoneZoom`.

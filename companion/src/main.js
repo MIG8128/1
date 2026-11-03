@@ -36,6 +36,9 @@ const { EASE, DUR } = motion;
 const { setupLayoutHub, onLayout, nudgeLayout } = require("./core/layoutHub.js");
 const { BAKED_CLASS } = require("./core/constants.js");
 const { setupBakedGlass } = require("./features/bakedGlass.js");
+const { phoneBar } = require("./features/phone/bar.js");
+const { phoneMenu } = require("./features/phone/menu.js");
+const { noteMenu } = require("./features/phone/noteMenu.js");
 
 const EDGE = 40; // px from the window's left edge where a swipe may start
 const OPEN_AT = 50; // px the finger must travel to keep the ribbon open
@@ -1184,21 +1187,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
 
     // ---- iPhone: a right sidebar button (Obsidian has none on phones) ----
 
-    // ---- iPhone: one bar at the bottom ----
-
-    // ( ‹ ) ( folder › name ) ( ⋯ ): the theme hides the top row and draws
-    // the capsule over Obsidian's tabs button; the plugin gives the capsule
-    // its gestures and turns Obsidian's ≡ into ⋯, one menu holding what the
-    // top row had.
-    setupPhoneBar() {
-        if (!Platform.isPhone) return;
-        this.setupNameCapsule();
-        this.setupNameGestures();
-        this.setupPhoneMenu();
-        this.setupPhoneTabZoom();
-        this.setupStatusEdge();
-    }
-
     // ---- iPhone: the status bar, Safari style ----
 
     // The clock and indicators stay while scrolling, as in Safari: Obsidian
@@ -1235,204 +1223,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
             if (own) nav.hideNavigation = original;
             else delete nav.hideNavigation;
         });
-    }
-
-    setupPhoneMenu() {
-        const iconEl = () => document.querySelector(".mobile-navbar-action-menu > .clickable-icon");
-        const paint = () => {
-            const el = iconEl();
-            if (el && !el.querySelector(".lucide-more-horizontal")) setIcon(el, "more-horizontal");
-        };
-        paint();
-        this.phoneMenu = null;
-        this.onLayout(["layout-change", "active-leaf-change"], paint);
-        this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.closePhoneMenu()));
-        this.register(() => {
-            const el = iconEl();
-            if (el) setIcon(el, "menu");
-            this.closePhoneMenu(true);
-        });
-        // A long press still opens Obsidian's own menu (its contextmenu)
-        this.registerDomEvent(document, "click", (e) => {
-            const action = e.target.closest?.(".mobile-navbar-action-menu");
-            if (!action) return;
-            // stopPropagation, not stopImmediatePropagation: Obsidian's own
-            // handler (on the button) never runs, the haptics one (also on
-            // document) still does, whichever was registered first
-            e.preventDefault();
-            e.stopPropagation();
-            if (this.phoneMenu) this.closePhoneMenu();
-            else this.openPhoneMenu();
-        }, { capture: true });
-        this.registerDomEvent(document, "keydown", (e) => {
-            if (e.key === "Escape" && this.phoneMenu) this.closePhoneMenu();
-        }, { capture: true });
-    }
-
-    // Design G's ⋯ panel (canvas: "G · ⋯ open" / "scrolled down"): a glass
-    // panel the width of the bar, above it (the page dims a little behind).
-    // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, find in note, reading
-    // view / edit, right sidebar). Below, in two columns and scrolling:
-    // Obsidian's own ≡ menu unfolded (the ribbon's items), then the note's
-    // options unfolded (the hidden top row's plugin actions, then the menu
-    // Obsidian's own ⋯ would open, built but never shown). Every control is
-    // a <button>, so each tap ticks (setupHaptics).
-    openPhoneMenu() {
-        const ws = this.app.workspace;
-        const leaf = ws.getMostRecentLeaf(ws.rootSplit);
-        const view = leaf?.view;
-        const bg = document.body.createDiv("goguryeo-phone-menu-bg");
-        const panel = document.body.createDiv({ cls: "goguryeo-phone-menu", attr: { role: "menu", "aria-label": "More" } });
-        this.phoneMenu = { bg, panel };
-        document.body.addClass("goguryeo-phone-menu-open");
-        bg.addEventListener("click", () => this.closePhoneMenu());
-        // Close first; the action runs once the panel is gone (another menu
-        // or sheet may open from it). The tap already ticked, so a hidden
-        // top-row button clicked for it doesn't tick again.
-        const run = (fn) => () => {
-            this.closePhoneMenu();
-            window.setTimeout(() => {
-                const before = this.suppressClickUntil;
-                this.suppressClickUntil = Date.now() + 1000;
-                try {
-                    fn();
-                } finally {
-                    this.suppressClickUntil = before;
-                }
-            }, 0);
-        };
-        const click = () => new MouseEvent("click");
-
-        const row = panel.createDiv("goguryeo-phone-menu-row");
-        const tile = (icon, label, fn) => {
-            const b = row.createEl("button", { cls: "goguryeo-phone-menu-tile", attr: { "aria-label": label } });
-            setIcon(b, icon);
-            b.addEventListener("click", run(fn));
-        };
-        tile("panel-left", "Left sidebar", () => ws.leftSplit.toggle());
-        tile("copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
-        // Find in this note (the capsule already opens the quick switcher)
-        tile("text-search", "Find", () => this.app.commands.executeCommandById("editor:open-search"));
-        const mode = view?.modeButtonEl;
-        if (mode) {
-            const reading = view.getMode?.() === "preview";
-            tile(reading ? "pencil" : "book-open", reading ? "Edit" : "Reading view", () => mode.click());
-        }
-        tile("panel-right", "Right sidebar", () => ws.rightSplit.toggle());
-
-        const section = (title) => {
-            panel.createDiv({ cls: "goguryeo-phone-menu-section", text: title });
-            return panel.createDiv("goguryeo-phone-menu-grid");
-        };
-        // icon: an icon id, or a menu item's icon element (copied)
-        const item = (grid, icon, label, fn, { warning = false, disabled = false, checked = false } = {}) => {
-            const b = grid.createEl("button", { cls: "goguryeo-phone-menu-item", attr: { role: "menuitem" } });
-            b.toggleClass("is-warning", warning);
-            b.toggleClass("is-checked", checked);
-            const i = b.createSpan("goguryeo-phone-menu-icon");
-            if (typeof icon === "string") setIcon(i, icon);
-            else if (icon) i.append(...[...icon.childNodes].map((n) => n.cloneNode(true)));
-            b.createSpan({ cls: "goguryeo-phone-menu-label", text: label });
-            if (disabled) b.disabled = true;
-            else b.addEventListener("click", run(fn));
-        };
-
-        const ribbon = (ws.leftRibbon?.items ?? []).filter((r) => !r.hidden && typeof r.callback === "function");
-        if (ribbon.length) {
-            const grid = section("Obsidian");
-            for (const r of ribbon) item(grid, r.icon, r.title, () => r.callback(click()));
-        }
-
-        if (view) {
-            const grid = section(view.getDisplayText?.() || "Note");
-            const seen = new Set();
-            const actions = view.containerEl.querySelectorAll(":scope > .view-header .view-actions > .view-action");
-            for (const button of actions) {
-                if (button === mode || button === view.moreOptionsButtonEl) continue;
-                const label = (button.getAttribute("aria-label") ?? "").split("\n")[0];
-                const icon = [...(button.querySelector("svg")?.classList ?? [])].find((c) => c.startsWith("lucide-"));
-                seen.add(label);
-                item(grid, icon, label, () => button.click());
-            }
-            for (const entry of this.noteMenuItems(view)) {
-                if (seen.has(entry.title)) continue;
-                seen.add(entry.title);
-                item(grid, entry.iconEl, entry.title, () => entry.run(click()), entry);
-            }
-        }
-
-        this.enter(panel, { scale: 0.96, y: 16 });
-        this.fadeIn(bg);
-    }
-
-    // The items of the menu Obsidian's own ⋯ (more options) opens, built the
-    // same way (its sections, onPaneMenu, onMoreOptionsMenu, then "leaf-menu"
-    // for plugins) but never shown: each as { title, iconEl, warning,
-    // disabled, checked, run }, in section order, submenus laid flat
-    noteMenuItems(view) {
-        const order = ["close", "pane", "open", "action", "find", "info", "info.copy", "view", "view.linked", "system", "", "danger"];
-        const menu = new Menu();
-        try {
-            menu.addSections?.(order);
-            view.onPaneMenu?.(menu, "more-options");
-            view.onMoreOptionsMenu?.(menu);
-            this.app.workspace.trigger("leaf-menu", menu, view.leaf);
-        } catch (e) {
-            console.error("Goguryeo: couldn't build the note menu", e);
-        }
-        const rank = (s) => {
-            const i = order.indexOf(s ?? "");
-            return i < 0 ? order.indexOf("") : i;
-        };
-        const flat = [];
-        const walk = (items, section) => {
-            for (const it of items ?? []) {
-                if (!it?.dom || it.dom.hasClass?.("is-label")) continue;
-                if (it.submenu?.items?.length) {
-                    walk(it.submenu.items, it.section ?? section);
-                    continue;
-                }
-                flat.push({ it, section: it.section || section });
-            }
-        };
-        walk(menu.items, "");
-        // Obsidian shows these two sections as submenus; laid flat, their
-        // short titles ("as Obsidian URL") get the submenu's name in front,
-        // in Obsidian's own language
-        const tr = (key, fallback) => {
-            const text = window.i18next?.t?.(key);
-            return text && text !== key ? text : fallback;
-        };
-        const prefix = {
-            "info.copy": tr("interface.menu.copy-path", "Copy path"),
-            "view.linked": tr("interface.menu.open-linked-view", "Open linked view"),
-        };
-        return flat
-            .map((e, i) => ({ ...e, i }))
-            .sort((a, b) => rank(a.section) - rank(b.section) || a.i - b.i)
-            .map(({ it, section }) => ({
-                title: [prefix[section], it.titleEl?.textContent?.trim() || it.dom.textContent.trim()].filter(Boolean).join(" · "),
-                iconEl: it.iconEl,
-                warning: it.dom.hasClass("is-warning") || section === "danger",
-                disabled: !!it.disabled || it.dom.hasClass("is-disabled"),
-                checked: !!it.checked,
-                run: (evt) => (it.callback ? it.callback(evt) : it.handleEvent?.(evt)),
-            }))
-            .filter((e) => e.title);
-    }
-
-    closePhoneMenu(now = false) {
-        const menu = this.phoneMenu;
-        if (!menu) return;
-        this.phoneMenu = null;
-        document.body.removeClass("goguryeo-phone-menu-open");
-        if (now) {
-            menu.bg.remove();
-            menu.panel.remove();
-            return;
-        }
-        this.fadeOut(menu.bg);
-        this.leave(menu.panel, { scale: 0.92 });
     }
 
     // ---- Folder notes ----
@@ -2723,46 +2513,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
             this.enter(target.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container"), { ...slide, x: from * 40 });
             if (!peek) this.enter(target.view?.contentEl, { ...slide, x: from * 48, opacity: 0.4 });
         }, ms);
-    }
-
-    // ---- iPhone: the name capsule brings the bars back ----
-
-    // Scrolling down folds the bottom bar into a small capsule with just the
-    // note's name (the theme, on body.is-hidden-nav). The name is Obsidian's
-    // title, which renames the note when tapped; while folded, a tap brings
-    // the bars back instead, like Safari.
-    setupNameCapsule() {
-        const onTap = (e) => {
-            if (!document.body.hasClass("is-hidden-nav")) return;
-            if (!e.target.closest?.(".mod-root .view-header-title-container")) return;
-            e.preventDefault();
-            e.stopPropagation();
-            this.app.mobileNavbar?.restoreNavigation();
-            this.haptic();
-        };
-        const opts = { passive: false, capture: true };
-        this.registerDomEvent(document, "touchstart", onTap, opts);
-        this.registerDomEvent(document, "mousedown", onTap, opts);
-
-        // Folded, the capsule holds only the name and is as wide as it: the
-        // theme reads --g-capsule-name-w, the name's width at its own size
-        // (the fold scales it by --g-fold-text), measured ahead so the fold
-        // can animate to it
-        const ctx = document.createElement("canvas").getContext("2d");
-        const measure = () => {
-            this.app.workspace.iterateRootLeaves((leaf) => {
-                const capsule = leaf.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container");
-                const title = capsule?.querySelector(".view-header-title");
-                if (!title) return;
-                const cs = getComputedStyle(title);
-                ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-                capsule.style.setProperty("--g-capsule-name-w", `${Math.ceil(ctx.measureText(title.textContent).width)}px`);
-            });
-        };
-        this.app.workspace.onLayoutReady(() => window.setTimeout(measure, 0));
-        this.onLayout(["layout-change", "active-leaf-change", "file-open", "css-change", "rename"], measure);
-        this.register(() => document.querySelectorAll(".view-header-title-container")
-            .forEach((el) => el.style.removeProperty("--g-capsule-name-w")));
     }
 
     // ---- iPhone & iPad: swipe in from an edge to go back / forward ----
@@ -5464,3 +5214,5 @@ module.exports = class GoguryeoCompanion extends Plugin {
         ribbon.style.removeProperty("opacity");
     }
 };
+
+Object.assign(module.exports.prototype, phoneBar, phoneMenu, noteMenu);

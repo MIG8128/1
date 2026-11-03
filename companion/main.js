@@ -334,12 +334,272 @@ var init_bakedGlass = __esm({
   }
 });
 
+// src/features/phone/bar.js
+var bar_exports = {};
+__export(bar_exports, {
+  phoneBar: () => phoneBar
+});
+var phoneBar;
+var init_bar = __esm({
+  "src/features/phone/bar.js"() {
+    init_platform();
+    phoneBar = {
+      // ---- iPhone: one bar at the bottom ----
+      // ( ‹ ) ( folder › name ) ( ⋯ ): the theme hides the top row and draws
+      // the capsule over Obsidian's tabs button; the plugin gives the capsule
+      // its gestures and turns Obsidian's ≡ into ⋯, one menu holding what the
+      // top row had.
+      setupPhoneBar() {
+        if (!import_obsidian.Platform.isPhone) return;
+        this.setupNameCapsule();
+        this.setupNameGestures();
+        this.setupPhoneMenu();
+        this.setupPhoneTabZoom();
+        this.setupStatusEdge();
+      },
+      // ---- iPhone: the name capsule brings the bars back ----
+      // Scrolling down folds the bottom bar into a small capsule with just the
+      // note's name (the theme, on body.is-hidden-nav). The name is Obsidian's
+      // title, which renames the note when tapped; while folded, a tap brings
+      // the bars back instead, like Safari.
+      setupNameCapsule() {
+        const onTap = (e) => {
+          if (!document.body.hasClass("is-hidden-nav")) return;
+          if (!e.target.closest?.(".mod-root .view-header-title-container")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          this.app.mobileNavbar?.restoreNavigation();
+          this.haptic();
+        };
+        const opts = { passive: false, capture: true };
+        this.registerDomEvent(document, "touchstart", onTap, opts);
+        this.registerDomEvent(document, "mousedown", onTap, opts);
+        const ctx = document.createElement("canvas").getContext("2d");
+        const measure = () => {
+          this.app.workspace.iterateRootLeaves((leaf) => {
+            const capsule = leaf.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container");
+            const title = capsule?.querySelector(".view-header-title");
+            if (!title) return;
+            const cs = getComputedStyle(title);
+            ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+            capsule.style.setProperty("--g-capsule-name-w", `${Math.ceil(ctx.measureText(title.textContent).width)}px`);
+          });
+        };
+        this.app.workspace.onLayoutReady(() => window.setTimeout(measure, 0));
+        this.onLayout(["layout-change", "active-leaf-change", "file-open", "css-change", "rename"], measure);
+        this.register(() => document.querySelectorAll(".view-header-title-container").forEach((el) => el.style.removeProperty("--g-capsule-name-w")));
+      }
+    };
+  }
+});
+
+// src/features/phone/menu.js
+var menu_exports = {};
+__export(menu_exports, {
+  phoneMenu: () => phoneMenu
+});
+var phoneMenu;
+var init_menu = __esm({
+  "src/features/phone/menu.js"() {
+    init_platform();
+    phoneMenu = {
+      setupPhoneMenu() {
+        const iconEl = () => document.querySelector(".mobile-navbar-action-menu > .clickable-icon");
+        const paint = () => {
+          const el = iconEl();
+          if (el && !el.querySelector(".lucide-more-horizontal")) (0, import_obsidian.setIcon)(el, "more-horizontal");
+        };
+        paint();
+        this.phoneMenu = null;
+        this.onLayout(["layout-change", "active-leaf-change"], paint);
+        this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.closePhoneMenu()));
+        this.register(() => {
+          const el = iconEl();
+          if (el) (0, import_obsidian.setIcon)(el, "menu");
+          this.closePhoneMenu(true);
+        });
+        this.registerDomEvent(document, "click", (e) => {
+          const action = e.target.closest?.(".mobile-navbar-action-menu");
+          if (!action) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.phoneMenu) this.closePhoneMenu();
+          else this.openPhoneMenu();
+        }, { capture: true });
+        this.registerDomEvent(document, "keydown", (e) => {
+          if (e.key === "Escape" && this.phoneMenu) this.closePhoneMenu();
+        }, { capture: true });
+      },
+      // Design G's ⋯ panel (canvas: "G · ⋯ open" / "scrolled down"): a glass
+      // panel the width of the bar, above it (the page dims a little behind).
+      // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, find in note, reading
+      // view / edit, right sidebar). Below, in two columns and scrolling:
+      // Obsidian's own ≡ menu unfolded (the ribbon's items), then the note's
+      // options unfolded (the hidden top row's plugin actions, then the menu
+      // Obsidian's own ⋯ would open, built but never shown). Every control is
+      // a <button>, so each tap ticks (setupHaptics).
+      openPhoneMenu() {
+        const ws = this.app.workspace;
+        const leaf = ws.getMostRecentLeaf(ws.rootSplit);
+        const view = leaf?.view;
+        const bg = document.body.createDiv("goguryeo-phone-menu-bg");
+        const panel = document.body.createDiv({ cls: "goguryeo-phone-menu", attr: { role: "menu", "aria-label": "More" } });
+        this.phoneMenu = { bg, panel };
+        document.body.addClass("goguryeo-phone-menu-open");
+        bg.addEventListener("click", () => this.closePhoneMenu());
+        const run = (fn) => () => {
+          this.closePhoneMenu();
+          window.setTimeout(() => {
+            const before = this.suppressClickUntil;
+            this.suppressClickUntil = Date.now() + 1e3;
+            try {
+              fn();
+            } finally {
+              this.suppressClickUntil = before;
+            }
+          }, 0);
+        };
+        const click = () => new MouseEvent("click");
+        const row = panel.createDiv("goguryeo-phone-menu-row");
+        const tile = (icon, label, fn) => {
+          const b = row.createEl("button", { cls: "goguryeo-phone-menu-tile", attr: { "aria-label": label } });
+          (0, import_obsidian.setIcon)(b, icon);
+          b.addEventListener("click", run(fn));
+        };
+        tile("panel-left", "Left sidebar", () => ws.leftSplit.toggle());
+        tile("copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
+        tile("text-search", "Find", () => this.app.commands.executeCommandById("editor:open-search"));
+        const mode = view?.modeButtonEl;
+        if (mode) {
+          const reading = view.getMode?.() === "preview";
+          tile(reading ? "pencil" : "book-open", reading ? "Edit" : "Reading view", () => mode.click());
+        }
+        tile("panel-right", "Right sidebar", () => ws.rightSplit.toggle());
+        const section = (title) => {
+          panel.createDiv({ cls: "goguryeo-phone-menu-section", text: title });
+          return panel.createDiv("goguryeo-phone-menu-grid");
+        };
+        const item = (grid, icon, label, fn, { warning = false, disabled = false, checked = false } = {}) => {
+          const b = grid.createEl("button", { cls: "goguryeo-phone-menu-item", attr: { role: "menuitem" } });
+          b.toggleClass("is-warning", warning);
+          b.toggleClass("is-checked", checked);
+          const i = b.createSpan("goguryeo-phone-menu-icon");
+          if (typeof icon === "string") (0, import_obsidian.setIcon)(i, icon);
+          else if (icon) i.append(...[...icon.childNodes].map((n) => n.cloneNode(true)));
+          b.createSpan({ cls: "goguryeo-phone-menu-label", text: label });
+          if (disabled) b.disabled = true;
+          else b.addEventListener("click", run(fn));
+        };
+        const ribbon = (ws.leftRibbon?.items ?? []).filter((r) => !r.hidden && typeof r.callback === "function");
+        if (ribbon.length) {
+          const grid = section("Obsidian");
+          for (const r of ribbon) item(grid, r.icon, r.title, () => r.callback(click()));
+        }
+        if (view) {
+          const grid = section(view.getDisplayText?.() || "Note");
+          const seen = /* @__PURE__ */ new Set();
+          const actions = view.containerEl.querySelectorAll(":scope > .view-header .view-actions > .view-action");
+          for (const button of actions) {
+            if (button === mode || button === view.moreOptionsButtonEl) continue;
+            const label = (button.getAttribute("aria-label") ?? "").split("\n")[0];
+            const icon = [...button.querySelector("svg")?.classList ?? []].find((c) => c.startsWith("lucide-"));
+            seen.add(label);
+            item(grid, icon, label, () => button.click());
+          }
+          for (const entry of this.noteMenuItems(view)) {
+            if (seen.has(entry.title)) continue;
+            seen.add(entry.title);
+            item(grid, entry.iconEl, entry.title, () => entry.run(click()), entry);
+          }
+        }
+        this.enter(panel, { scale: 0.96, y: 16 });
+        this.fadeIn(bg);
+      },
+      closePhoneMenu(now = false) {
+        const menu = this.phoneMenu;
+        if (!menu) return;
+        this.phoneMenu = null;
+        document.body.removeClass("goguryeo-phone-menu-open");
+        if (now) {
+          menu.bg.remove();
+          menu.panel.remove();
+          return;
+        }
+        this.fadeOut(menu.bg);
+        this.leave(menu.panel, { scale: 0.92 });
+      }
+    };
+  }
+});
+
+// src/features/phone/noteMenu.js
+var noteMenu_exports = {};
+__export(noteMenu_exports, {
+  noteMenu: () => noteMenu
+});
+var noteMenu;
+var init_noteMenu = __esm({
+  "src/features/phone/noteMenu.js"() {
+    init_platform();
+    noteMenu = {
+      // The items of the menu Obsidian's own ⋯ (more options) opens, built the
+      // same way (its sections, onPaneMenu, onMoreOptionsMenu, then "leaf-menu"
+      // for plugins) but never shown: each as { title, iconEl, warning,
+      // disabled, checked, run }, in section order, submenus laid flat
+      noteMenuItems(view) {
+        const order = ["close", "pane", "open", "action", "find", "info", "info.copy", "view", "view.linked", "system", "", "danger"];
+        const menu = new import_obsidian.Menu();
+        try {
+          menu.addSections?.(order);
+          view.onPaneMenu?.(menu, "more-options");
+          view.onMoreOptionsMenu?.(menu);
+          this.app.workspace.trigger("leaf-menu", menu, view.leaf);
+        } catch (e) {
+          console.error("Goguryeo: couldn't build the note menu", e);
+        }
+        const rank = (s) => {
+          const i = order.indexOf(s ?? "");
+          return i < 0 ? order.indexOf("") : i;
+        };
+        const flat = [];
+        const walk = (items, section) => {
+          for (const it of items ?? []) {
+            if (!it?.dom || it.dom.hasClass?.("is-label")) continue;
+            if (it.submenu?.items?.length) {
+              walk(it.submenu.items, it.section ?? section);
+              continue;
+            }
+            flat.push({ it, section: it.section || section });
+          }
+        };
+        walk(menu.items, "");
+        const tr = (key, fallback) => {
+          const text = window.i18next?.t?.(key);
+          return text && text !== key ? text : fallback;
+        };
+        const prefix = {
+          "info.copy": tr("interface.menu.copy-path", "Copy path"),
+          "view.linked": tr("interface.menu.open-linked-view", "Open linked view")
+        };
+        return flat.map((e, i) => ({ ...e, i })).sort((a, b) => rank(a.section) - rank(b.section) || a.i - b.i).map(({ it, section }) => ({
+          title: [prefix[section], it.titleEl?.textContent?.trim() || it.dom.textContent.trim()].filter(Boolean).join(" \xB7 "),
+          iconEl: it.iconEl,
+          warning: it.dom.hasClass("is-warning") || section === "danger",
+          disabled: !!it.disabled || it.dom.hasClass("is-disabled"),
+          checked: !!it.checked,
+          run: (evt) => it.callback ? it.callback(evt) : it.handleEvent?.(evt)
+        })).filter((e) => e.title);
+      }
+    };
+  }
+});
+
 // src/main.js
 var {
   Plugin,
   Platform: Platform2,
-  Menu,
-  setIcon,
+  Menu: Menu2,
+  setIcon: setIcon2,
   normalizePath,
   FuzzySuggestModal,
   Notice,
@@ -355,6 +615,9 @@ var { EASE: EASE2, DUR: DUR2 } = motion;
 var { setupLayoutHub: setupLayoutHub2, onLayout: onLayout2, nudgeLayout: nudgeLayout2 } = (init_layoutHub(), __toCommonJS(layoutHub_exports));
 var { BAKED_CLASS: BAKED_CLASS2 } = (init_constants(), __toCommonJS(constants_exports));
 var { setupBakedGlass: setupBakedGlass2 } = (init_bakedGlass(), __toCommonJS(bakedGlass_exports));
+var { phoneBar: phoneBar2 } = (init_bar(), __toCommonJS(bar_exports));
+var { phoneMenu: phoneMenu2 } = (init_menu(), __toCommonJS(menu_exports));
+var { noteMenu: noteMenu2 } = (init_noteMenu(), __toCommonJS(noteMenu_exports));
 var EDGE = 40;
 var OPEN_AT = 50;
 var LOCK_AT = 10;
@@ -1350,19 +1613,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
     return !!active?.closest?.(".mod-root .view-header, .goguryeo-shared-tabs-bar") && active.matches("input, textarea, [contenteditable='true']");
   }
   // ---- iPhone: a right sidebar button (Obsidian has none on phones) ----
-  // ---- iPhone: one bar at the bottom ----
-  // ( ‹ ) ( folder › name ) ( ⋯ ): the theme hides the top row and draws
-  // the capsule over Obsidian's tabs button; the plugin gives the capsule
-  // its gestures and turns Obsidian's ≡ into ⋯, one menu holding what the
-  // top row had.
-  setupPhoneBar() {
-    if (!Platform2.isPhone) return;
-    this.setupNameCapsule();
-    this.setupNameGestures();
-    this.setupPhoneMenu();
-    this.setupPhoneTabZoom();
-    this.setupStatusEdge();
-  }
   // ---- iPhone: the status bar, Safari style ----
   // The clock and indicators stay while scrolling, as in Safari: Obsidian
   // hides the iOS status bar when the bottom bar folds (hideNavigation →
@@ -1398,179 +1648,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
       if (own) nav.hideNavigation = original;
       else delete nav.hideNavigation;
     });
-  }
-  setupPhoneMenu() {
-    const iconEl = () => document.querySelector(".mobile-navbar-action-menu > .clickable-icon");
-    const paint = () => {
-      const el = iconEl();
-      if (el && !el.querySelector(".lucide-more-horizontal")) setIcon(el, "more-horizontal");
-    };
-    paint();
-    this.phoneMenu = null;
-    this.onLayout(["layout-change", "active-leaf-change"], paint);
-    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.closePhoneMenu()));
-    this.register(() => {
-      const el = iconEl();
-      if (el) setIcon(el, "menu");
-      this.closePhoneMenu(true);
-    });
-    this.registerDomEvent(document, "click", (e) => {
-      const action = e.target.closest?.(".mobile-navbar-action-menu");
-      if (!action) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (this.phoneMenu) this.closePhoneMenu();
-      else this.openPhoneMenu();
-    }, { capture: true });
-    this.registerDomEvent(document, "keydown", (e) => {
-      if (e.key === "Escape" && this.phoneMenu) this.closePhoneMenu();
-    }, { capture: true });
-  }
-  // Design G's ⋯ panel (canvas: "G · ⋯ open" / "scrolled down"): a glass
-  // panel the width of the bar, above it (the page dims a little behind).
-  // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, find in note, reading
-  // view / edit, right sidebar). Below, in two columns and scrolling:
-  // Obsidian's own ≡ menu unfolded (the ribbon's items), then the note's
-  // options unfolded (the hidden top row's plugin actions, then the menu
-  // Obsidian's own ⋯ would open, built but never shown). Every control is
-  // a <button>, so each tap ticks (setupHaptics).
-  openPhoneMenu() {
-    const ws = this.app.workspace;
-    const leaf = ws.getMostRecentLeaf(ws.rootSplit);
-    const view = leaf?.view;
-    const bg = document.body.createDiv("goguryeo-phone-menu-bg");
-    const panel = document.body.createDiv({ cls: "goguryeo-phone-menu", attr: { role: "menu", "aria-label": "More" } });
-    this.phoneMenu = { bg, panel };
-    document.body.addClass("goguryeo-phone-menu-open");
-    bg.addEventListener("click", () => this.closePhoneMenu());
-    const run = (fn) => () => {
-      this.closePhoneMenu();
-      window.setTimeout(() => {
-        const before = this.suppressClickUntil;
-        this.suppressClickUntil = Date.now() + 1e3;
-        try {
-          fn();
-        } finally {
-          this.suppressClickUntil = before;
-        }
-      }, 0);
-    };
-    const click = () => new MouseEvent("click");
-    const row = panel.createDiv("goguryeo-phone-menu-row");
-    const tile = (icon, label, fn) => {
-      const b = row.createEl("button", { cls: "goguryeo-phone-menu-tile", attr: { "aria-label": label } });
-      setIcon(b, icon);
-      b.addEventListener("click", run(fn));
-    };
-    tile("panel-left", "Left sidebar", () => ws.leftSplit.toggle());
-    tile("copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
-    tile("text-search", "Find", () => this.app.commands.executeCommandById("editor:open-search"));
-    const mode = view?.modeButtonEl;
-    if (mode) {
-      const reading = view.getMode?.() === "preview";
-      tile(reading ? "pencil" : "book-open", reading ? "Edit" : "Reading view", () => mode.click());
-    }
-    tile("panel-right", "Right sidebar", () => ws.rightSplit.toggle());
-    const section = (title) => {
-      panel.createDiv({ cls: "goguryeo-phone-menu-section", text: title });
-      return panel.createDiv("goguryeo-phone-menu-grid");
-    };
-    const item = (grid, icon, label, fn, { warning = false, disabled = false, checked = false } = {}) => {
-      const b = grid.createEl("button", { cls: "goguryeo-phone-menu-item", attr: { role: "menuitem" } });
-      b.toggleClass("is-warning", warning);
-      b.toggleClass("is-checked", checked);
-      const i = b.createSpan("goguryeo-phone-menu-icon");
-      if (typeof icon === "string") setIcon(i, icon);
-      else if (icon) i.append(...[...icon.childNodes].map((n) => n.cloneNode(true)));
-      b.createSpan({ cls: "goguryeo-phone-menu-label", text: label });
-      if (disabled) b.disabled = true;
-      else b.addEventListener("click", run(fn));
-    };
-    const ribbon = (ws.leftRibbon?.items ?? []).filter((r) => !r.hidden && typeof r.callback === "function");
-    if (ribbon.length) {
-      const grid = section("Obsidian");
-      for (const r of ribbon) item(grid, r.icon, r.title, () => r.callback(click()));
-    }
-    if (view) {
-      const grid = section(view.getDisplayText?.() || "Note");
-      const seen = /* @__PURE__ */ new Set();
-      const actions = view.containerEl.querySelectorAll(":scope > .view-header .view-actions > .view-action");
-      for (const button of actions) {
-        if (button === mode || button === view.moreOptionsButtonEl) continue;
-        const label = (button.getAttribute("aria-label") ?? "").split("\n")[0];
-        const icon = [...button.querySelector("svg")?.classList ?? []].find((c) => c.startsWith("lucide-"));
-        seen.add(label);
-        item(grid, icon, label, () => button.click());
-      }
-      for (const entry of this.noteMenuItems(view)) {
-        if (seen.has(entry.title)) continue;
-        seen.add(entry.title);
-        item(grid, entry.iconEl, entry.title, () => entry.run(click()), entry);
-      }
-    }
-    this.enter(panel, { scale: 0.96, y: 16 });
-    this.fadeIn(bg);
-  }
-  // The items of the menu Obsidian's own ⋯ (more options) opens, built the
-  // same way (its sections, onPaneMenu, onMoreOptionsMenu, then "leaf-menu"
-  // for plugins) but never shown: each as { title, iconEl, warning,
-  // disabled, checked, run }, in section order, submenus laid flat
-  noteMenuItems(view) {
-    const order = ["close", "pane", "open", "action", "find", "info", "info.copy", "view", "view.linked", "system", "", "danger"];
-    const menu = new Menu();
-    try {
-      menu.addSections?.(order);
-      view.onPaneMenu?.(menu, "more-options");
-      view.onMoreOptionsMenu?.(menu);
-      this.app.workspace.trigger("leaf-menu", menu, view.leaf);
-    } catch (e) {
-      console.error("Goguryeo: couldn't build the note menu", e);
-    }
-    const rank = (s) => {
-      const i = order.indexOf(s ?? "");
-      return i < 0 ? order.indexOf("") : i;
-    };
-    const flat = [];
-    const walk = (items, section) => {
-      for (const it of items ?? []) {
-        if (!it?.dom || it.dom.hasClass?.("is-label")) continue;
-        if (it.submenu?.items?.length) {
-          walk(it.submenu.items, it.section ?? section);
-          continue;
-        }
-        flat.push({ it, section: it.section || section });
-      }
-    };
-    walk(menu.items, "");
-    const tr = (key, fallback) => {
-      const text = window.i18next?.t?.(key);
-      return text && text !== key ? text : fallback;
-    };
-    const prefix = {
-      "info.copy": tr("interface.menu.copy-path", "Copy path"),
-      "view.linked": tr("interface.menu.open-linked-view", "Open linked view")
-    };
-    return flat.map((e, i) => ({ ...e, i })).sort((a, b) => rank(a.section) - rank(b.section) || a.i - b.i).map(({ it, section }) => ({
-      title: [prefix[section], it.titleEl?.textContent?.trim() || it.dom.textContent.trim()].filter(Boolean).join(" \xB7 "),
-      iconEl: it.iconEl,
-      warning: it.dom.hasClass("is-warning") || section === "danger",
-      disabled: !!it.disabled || it.dom.hasClass("is-disabled"),
-      checked: !!it.checked,
-      run: (evt) => it.callback ? it.callback(evt) : it.handleEvent?.(evt)
-    })).filter((e) => e.title);
-  }
-  closePhoneMenu(now = false) {
-    const menu = this.phoneMenu;
-    if (!menu) return;
-    this.phoneMenu = null;
-    document.body.removeClass("goguryeo-phone-menu-open");
-    if (now) {
-      menu.bg.remove();
-      menu.panel.remove();
-      return;
-    }
-    this.fadeOut(menu.bg);
-    this.leave(menu.panel, { scale: 0.92 });
   }
   // ---- Folder notes ----
   // A note named like its folder and kept inside it (Novel/Novel.md) is the
@@ -1939,7 +2016,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     const button = ".mod-root .workspace-tab-header-tab-list > .clickable-icon";
     const addIcons = () => {
       document.querySelectorAll(button).forEach((el) => {
-        if (!el.querySelector(`.${OVERVIEW_ICON_CLASS}`)) setIcon(el.createSpan(OVERVIEW_ICON_CLASS), "copy");
+        if (!el.querySelector(`.${OVERVIEW_ICON_CLASS}`)) setIcon2(el.createSpan(OVERVIEW_ICON_CLASS), "copy");
       });
     };
     this.app.workspace.onLayoutReady(addIcons);
@@ -1977,7 +2054,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     const sheet = document.body.createDiv(OVERVIEW_CLASS);
     const bar = sheet.createDiv("goguryeo-tab-overview-bar");
     const add = bar.createDiv({ cls: "clickable-icon", attr: { "aria-label": "New tab" } });
-    setIcon(add, "lucide-plus");
+    setIcon2(add, "lucide-plus");
     add.addEventListener("click", () => {
       const leaf = this.app.workspace.getLeaf("tab");
       this.app.workspace.setActiveLeaf(leaf, { focus: true });
@@ -2182,7 +2259,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
           });
         }
         const label2 = card2.createDiv("goguryeo-tab-card-label");
-        setIcon(label2.createDiv("goguryeo-tab-card-icon"), "lucide-columns-2");
+        setIcon2(label2.createDiv("goguryeo-tab-card-icon"), "lucide-columns-2");
         label2.createDiv({ cls: "goguryeo-tab-card-title", text: entry.map((leaf2) => leaf2.getDisplayText()).join("  \xB7  ") });
         card2.addEventListener("click", () => go(entry.includes(current) ? current : entry[0]));
         continue;
@@ -2196,8 +2273,8 @@ module.exports = class GoguryeoCompanion extends Plugin {
       o.shotOf.set(card, addPage(thumb, leaf));
       const label = card.createDiv("goguryeo-tab-card-label");
       const close = label.createDiv({ cls: "clickable-icon goguryeo-tab-card-close", attr: { "aria-label": "Close tab" } });
-      setIcon(close, "lucide-x");
-      setIcon(label.createDiv("goguryeo-tab-card-icon"), leaf.getIcon?.() ?? "lucide-file");
+      setIcon2(close, "lucide-x");
+      setIcon2(label.createDiv("goguryeo-tab-card-icon"), leaf.getIcon?.() ?? "lucide-file");
       label.createDiv({ cls: "goguryeo-tab-card-title", text: leaf.getDisplayText() });
       close.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2741,38 +2818,6 @@ module.exports = class GoguryeoCompanion extends Plugin {
       if (!peek) this.enter(target.view?.contentEl, { ...slide, x: from * 48, opacity: 0.4 });
     }, ms);
   }
-  // ---- iPhone: the name capsule brings the bars back ----
-  // Scrolling down folds the bottom bar into a small capsule with just the
-  // note's name (the theme, on body.is-hidden-nav). The name is Obsidian's
-  // title, which renames the note when tapped; while folded, a tap brings
-  // the bars back instead, like Safari.
-  setupNameCapsule() {
-    const onTap = (e) => {
-      if (!document.body.hasClass("is-hidden-nav")) return;
-      if (!e.target.closest?.(".mod-root .view-header-title-container")) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.app.mobileNavbar?.restoreNavigation();
-      this.haptic();
-    };
-    const opts = { passive: false, capture: true };
-    this.registerDomEvent(document, "touchstart", onTap, opts);
-    this.registerDomEvent(document, "mousedown", onTap, opts);
-    const ctx = document.createElement("canvas").getContext("2d");
-    const measure = () => {
-      this.app.workspace.iterateRootLeaves((leaf) => {
-        const capsule = leaf.view?.containerEl.querySelector(":scope > .view-header .view-header-title-container");
-        const title = capsule?.querySelector(".view-header-title");
-        if (!title) return;
-        const cs = getComputedStyle(title);
-        ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-        capsule.style.setProperty("--g-capsule-name-w", `${Math.ceil(ctx.measureText(title.textContent).width)}px`);
-      });
-    };
-    this.app.workspace.onLayoutReady(() => window.setTimeout(measure, 0));
-    this.onLayout(["layout-change", "active-leaf-change", "file-open", "css-change", "rename"], measure);
-    this.register(() => document.querySelectorAll(".view-header-title-container").forEach((el) => el.style.removeProperty("--g-capsule-name-w")));
-  }
   // ---- iPhone & iPad: swipe in from an edge to go back / forward ----
   // Like Safari: start within EDGE_SWIPE_ZONE of the left edge and drag
   // right to go back, or from the right edge leftwards to go forward. The
@@ -2969,7 +3014,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
       img.src = this.webShots.get(entry.state.state.url);
     } else {
       const blank = page.createDiv("goguryeo-swipe-blank");
-      if (entry?.icon) setIcon(blank.createDiv("goguryeo-swipe-blank-icon"), entry.icon);
+      if (entry?.icon) setIcon2(blank.createDiv("goguryeo-swipe-blank-icon"), entry.icon);
       blank.createDiv({ cls: "goguryeo-swipe-blank-title", text: entry?.title ?? "" });
     }
     return page;
@@ -3136,7 +3181,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     const arrow = createDiv("goguryeo-swipe-arrow");
     arrow.addClass(s.dir < 0 ? "is-back" : "is-forward");
     arrow.setAttr("inert", "");
-    setIcon(arrow, s.dir < 0 ? "arrow-left" : "arrow-right");
+    setIcon2(arrow, s.dir < 0 ? "arrow-left" : "arrow-right");
     s.leaf.containerEl.appendChild(arrow);
     s.arrow = arrow;
     s.width = ARROW_PULL;
@@ -4904,7 +4949,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
       tab.gIcon = icon;
       const iconEl = tab.querySelector(".goguryeo-stab-icon");
       iconEl.empty();
-      if (icon) setIcon(iconEl, icon);
+      if (icon) setIcon2(iconEl, icon);
     }
     const titleEl = tab.querySelector(".goguryeo-stab-title");
     if (titleEl.textContent !== title) {
@@ -4921,7 +4966,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     const tab = createDiv(part ? "goguryeo-stab-part" : "goguryeo-stab");
     const inner = part ? tab : tab.createDiv("goguryeo-stab-inner");
     const close = inner.createDiv({ cls: "clickable-icon goguryeo-stab-close", attr: { "aria-label": "Close" } });
-    setIcon(close, "lucide-x");
+    setIcon2(close, "lucide-x");
     inner.createDiv("goguryeo-stab-icon");
     inner.createDiv("goguryeo-stab-title");
     close.addEventListener("click", (e) => {
@@ -4978,7 +5023,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
     const extra = menu.createDiv("goguryeo-grip-menu-extra");
     const tile = (icon, label, cls, run) => {
       const b = tiles.createEl("button", { cls: "goguryeo-grip-tile" + (cls ? " " + cls : ""), attr: { "aria-label": label } });
-      setIcon(b.createDiv("goguryeo-grip-tile-icon"), icon);
+      setIcon2(b.createDiv("goguryeo-grip-tile-icon"), icon);
       b.createDiv({ cls: "goguryeo-grip-tile-label", text: label });
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -5050,7 +5095,7 @@ module.exports = class GoguryeoCompanion extends Plugin {
         ]) {
           const here = now(side) && boxes.some(([, q]) => side === "left" || side === "right" ? q.top < r.bottom && q.bottom > r.top : q.left < r.right && q.right > r.left);
           const b2 = row.createEl("button", { cls: "goguryeo-grip-place" + (here ? " is-here" : ""), attr: { "aria-label": label } });
-          setIcon(b2, icon);
+          setIcon2(b2, icon);
           b2.addEventListener("click", (e) => {
             e.stopPropagation();
             this.haptic();
@@ -5282,3 +5327,4 @@ module.exports = class GoguryeoCompanion extends Plugin {
     ribbon.style.removeProperty("opacity");
   }
 };
+Object.assign(module.exports.prototype, phoneBar2, phoneMenu2, noteMenu2);
