@@ -1,7 +1,7 @@
 // The iPhone's bottom bar: the capsule over Obsidian's tabs button and
 // the folded name capsule (theme section 10).
 
-import { Platform } from "../../core/platform.js";
+import { Platform, setIcon } from "../../core/platform.js";
 
 export const phoneBar = {
     // ---- iPhone: one bar at the bottom ----
@@ -15,8 +15,35 @@ export const phoneBar = {
         this.setupNameCapsule();
         this.setupNameGestures();
         this.setupPhoneMenu();
+        this.setupPhoneSideButtons();
         this.setupPhoneTabZoom();
         this.setupStatusEdge();
+    },
+
+    // Design I (canvas "I · (◧) [‹ folder / name ⋯] (◨)"): a round glass
+    // sidebar button at each end of the bar; ‹ and ⋯ sit inside the
+    // capsule (theme section 10). In Obsidian's navbar, so they fade with
+    // it and fold with ‹ ⋯. <button>s, so each tap ticks (setupHaptics).
+    setupPhoneSideButtons() {
+        const ws = this.app.workspace;
+        const add = () => {
+            const nav = this.app.mobileNavbar?.containerEl;
+            if (!nav || nav.querySelector(":scope > .goguryeo-phone-side")) return;
+            for (const side of ["left", "right"]) {
+                const b = nav.createEl("button", {
+                    cls: `goguryeo-phone-side mod-${side}`,
+                    attr: { "aria-label": side === "left" ? "Left sidebar" : "Right sidebar" },
+                });
+                setIcon(b, side === "left" ? "panel-left" : "panel-right");
+                b.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    (side === "left" ? ws.leftSplit : ws.rightSplit).toggle();
+                });
+            }
+        };
+        ws.onLayoutReady(add);
+        this.onLayout(["layout-change"], add);
+        this.register(() => document.querySelectorAll(".goguryeo-phone-side").forEach((b) => b.remove()));
     },
 
     // ---- iPhone: the name capsule brings the bars back ----

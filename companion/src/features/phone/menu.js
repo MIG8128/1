@@ -38,8 +38,8 @@ export const phoneMenu = {
 
     // Design G's ⋯ panel (canvas: "G · ⋯ open" / "scrolled down"): a glass
     // panel the width of the bar, above it (the page dims a little behind).
-    // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, find in note, reading
-    // view / edit, right sidebar). Below, in two columns and scrolling:
+    // On top three tiles, ⧉ ⌕ 📖 (all tabs, find in note, reading view /
+    // edit; ◧ and ◨ are on the bar since design I). Below, in two columns and scrolling:
     // Obsidian's own ≡ menu unfolded (the ribbon's items), then the note's
     // options unfolded (the hidden top row's plugin actions, then the menu
     // Obsidian's own ⋯ would open, built but never shown). Every control is
@@ -76,7 +76,7 @@ export const phoneMenu = {
             setIcon(b, icon);
             b.addEventListener("click", run(fn));
         };
-        tile("panel-left", "Left sidebar", () => ws.leftSplit.toggle());
+        // ◧ and ◨ are on the bar (design I)
         tile("copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
         // Find in this note (the capsule already opens the quick switcher)
         tile("text-search", "Find", () => this.app.commands.executeCommandById("editor:open-search"));
@@ -85,7 +85,6 @@ export const phoneMenu = {
             const reading = view.getMode?.() === "preview";
             tile(reading ? "pencil" : "book-open", reading ? "Edit" : "Reading view", () => mode.click());
         }
-        tile("panel-right", "Right sidebar", () => ws.rightSplit.toggle());
 
         const section = (title) => {
             panel.createDiv({ cls: "goguryeo-phone-menu-section", text: title });

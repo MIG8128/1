@@ -354,8 +354,34 @@ var init_bar = __esm({
         this.setupNameCapsule();
         this.setupNameGestures();
         this.setupPhoneMenu();
+        this.setupPhoneSideButtons();
         this.setupPhoneTabZoom();
         this.setupStatusEdge();
+      },
+      // Design I (canvas "I · (◧) [‹ folder / name ⋯] (◨)"): a round glass
+      // sidebar button at each end of the bar; ‹ and ⋯ sit inside the
+      // capsule (theme section 10). In Obsidian's navbar, so they fade with
+      // it and fold with ‹ ⋯. <button>s, so each tap ticks (setupHaptics).
+      setupPhoneSideButtons() {
+        const ws = this.app.workspace;
+        const add = () => {
+          const nav = this.app.mobileNavbar?.containerEl;
+          if (!nav || nav.querySelector(":scope > .goguryeo-phone-side")) return;
+          for (const side of ["left", "right"]) {
+            const b = nav.createEl("button", {
+              cls: `goguryeo-phone-side mod-${side}`,
+              attr: { "aria-label": side === "left" ? "Left sidebar" : "Right sidebar" }
+            });
+            (0, import_obsidian.setIcon)(b, side === "left" ? "panel-left" : "panel-right");
+            b.addEventListener("click", (e) => {
+              e.preventDefault();
+              (side === "left" ? ws.leftSplit : ws.rightSplit).toggle();
+            });
+          }
+        };
+        ws.onLayoutReady(add);
+        this.onLayout(["layout-change"], add);
+        this.register(() => document.querySelectorAll(".goguryeo-phone-side").forEach((b) => b.remove()));
       },
       // ---- iPhone: the name capsule brings the bars back ----
       // Scrolling down folds the bottom bar into a small capsule with just the
@@ -432,8 +458,8 @@ var init_menu = __esm({
       },
       // Design G's ⋯ panel (canvas: "G · ⋯ open" / "scrolled down"): a glass
       // panel the width of the bar, above it (the page dims a little behind).
-      // On top five tiles, ◧ ⧉ ⌕ 📖 ◨ (left sidebar, all tabs, find in note, reading
-      // view / edit, right sidebar). Below, in two columns and scrolling:
+      // On top three tiles, ⧉ ⌕ 📖 (all tabs, find in note, reading view /
+      // edit; ◧ and ◨ are on the bar since design I). Below, in two columns and scrolling:
       // Obsidian's own ≡ menu unfolded (the ribbon's items), then the note's
       // options unfolded (the hidden top row's plugin actions, then the menu
       // Obsidian's own ⋯ would open, built but never shown). Every control is
@@ -466,7 +492,6 @@ var init_menu = __esm({
           (0, import_obsidian.setIcon)(b, icon);
           b.addEventListener("click", run(fn));
         };
-        tile("panel-left", "Left sidebar", () => ws.leftSplit.toggle());
         tile("copy", "All tabs", () => this.app.mobileTabSwitcher?.show());
         tile("text-search", "Find", () => this.app.commands.executeCommandById("editor:open-search"));
         const mode = view?.modeButtonEl;
@@ -474,7 +499,6 @@ var init_menu = __esm({
           const reading = view.getMode?.() === "preview";
           tile(reading ? "pencil" : "book-open", reading ? "Edit" : "Reading view", () => mode.click());
         }
-        tile("panel-right", "Right sidebar", () => ws.rightSplit.toggle());
         const section = (title) => {
           panel.createDiv({ cls: "goguryeo-phone-menu-section", text: title });
           return panel.createDiv("goguryeo-phone-menu-grid");
